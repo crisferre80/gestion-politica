@@ -114,7 +114,7 @@ const AdminAds: React.FC = () => {
     }
   };
 
-  if (!user || user.type !== 'admin') {
+  if (!user || (user.type as string) !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

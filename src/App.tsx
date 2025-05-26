@@ -1,5 +1,5 @@
-import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -16,6 +16,7 @@ function App() {
   return (
     <UserProvider>
       <div className="flex flex-col min-h-screen bg-gray-50">
+        <Toaster position="top-right" />
         <Navbar />
         <main className="flex-grow">
           <Routes>

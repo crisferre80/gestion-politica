@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, Recycle, LogOut, User, Settings, Key } from 'lucide-react';
 import { useUser } from '../context/UserContext';
-import { supabase } from '../lib/supabase';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,8 +14,7 @@ const Navbar: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    logout();
+    await logout();
   };
 
   useEffect(() => {
@@ -46,7 +44,7 @@ const Navbar: React.FC = () => {
           {/* Desktop menu */}
           <div className="hidden md:flex items-center space-x-4">
             <Link to="/" className="px-3 py-2 rounded-md hover:bg-green-700">Inicio</Link>
-            <Link to="/collection-points" className="px-3 py-2 rounded-md hover:bg-green-700">Puntos de Recolección</Link>
+            
             
             {isAuthenticated ? (
               <>

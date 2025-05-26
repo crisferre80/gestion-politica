@@ -7,22 +7,19 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 // eslint-disable-next-line react-refresh/only-export-components
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-type UserType = 'recycler' | 'resident' | null;
-
-interface User {
-  online: boolean;
-  total_ratings: undefined;
-  rating_average: number;
-  avatar_url: never;
+export interface User {
   id: string;
   name: string;
   email: string;
-  type: UserType;
   phone?: string;
   address?: string;
-  materials?: string[];
-  schedule?: string;
-  bio?: string;
+  type: 'resident' | 'recycler';
+  avatar_url?: string;
+  online?: boolean;
+  // Agrega estos campos:
+  lat?: number;
+  lng?: number;
+  // ...otros campos...
 }
 
 interface UserContextType {

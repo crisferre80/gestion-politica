@@ -1,9 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone, Star } from 'lucide-react';
-import { supabase, deleteCollectionPoint } from '../lib/supabase';
+import { supabase, deleteCollectionPoint, uploadProfilePhoto } from '../lib/supabase';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
+import ChatWithRecycler from '../components/ChatWithRecycler'; // Importa el componente de chat correctamente
+import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
+
+// Tipo para el payload de realtime de perfiles
+export type ProfileRealtimePayload = {
+  id: number;
+  avatar_url?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  rating_average?: number;
+  total_ratings?: number;
+  materials?: string[];
+  bio?: string;
+  lat?: number;
+  lng?: number;
+  online?: boolean;
+  role?: string;
+};
 
 type CollectionPoint = {
   notas: string;
@@ -24,6 +43,14 @@ const DashboardResident: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>('puntos');
+  const [selectedRecycler, setSelectedRecycler] = useState<{ id: number; name: string } | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatRecyclerId, setChatRecyclerId] = useState<number | null>(null);
+  const [chatRecyclerName, setChatRecyclerName] = useState('');
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  // const [] = useState(false);
+  // const [] = useState(false);
   type Recycler = {
     id: number;
     profiles?: {
@@ -65,7 +92,6 @@ const DashboardResident: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'recicladores') {
       setLoadingRecyclers(true);
-      // Cambiar: leer recicladores directamente de profiles
       const fetchRecyclers = async () => {
         const { data, error } = await supabase
           .from('profiles')
@@ -87,12 +113,87 @@ const DashboardResident: React.FC = () => {
               total_ratings: rec.total_ratings || 0,
               materials: rec.materials || [],
               bio: rec.bio || '',
+              lat: rec.lat,
+              lng: rec.lng,
+              online: rec.online,
             }))
           );
         }
         setLoadingRecyclers(false);
       };
       fetchRecyclers();
+
+      // SUSCRIPCIÓN EN TIEMPO REAL PARA ACTUALIZAR CARDS
+      const channel = supabase.channel('recyclers-profiles')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'profiles',
+            filter: 'role=eq.recycler',
+          },
+          (payload) => {
+            const newRec = payload.new as ProfileRealtimePayload;
+            const oldRec = payload.old as ProfileRealtimePayload;
+            if (newRec && newRec.role === 'recycler') {
+              setRecyclers((prev) => {
+                const exists = prev.find((r) => r.id === newRec.id);
+                if (exists) {
+                  // Actualiza el reciclador existente
+                  return prev.map((r) =>
+                    r.id === newRec.id
+                      ? {
+                          ...r,
+                          profiles: {
+                            avatar_url: newRec.avatar_url,
+                            name: newRec.name,
+                            email: newRec.email,
+                            phone: newRec.phone,
+                          },
+                          rating_average: newRec.rating_average || 0,
+                          total_ratings: newRec.total_ratings || 0,
+                          materials: newRec.materials || [],
+                          bio: newRec.bio || '',
+                          lat: newRec.lat,
+                          lng: newRec.lng,
+                          online: newRec.online,
+                        }
+                      : r
+                  );
+                } else {
+                  // Nuevo reciclador
+                  return [
+                    ...prev,
+                    {
+                      id: newRec.id,
+                      profiles: {
+                        avatar_url: newRec.avatar_url,
+                        name: newRec.name,
+                        email: newRec.email,
+                        phone: newRec.phone,
+                      },
+                      rating_average: newRec.rating_average || 0,
+                      total_ratings: newRec.total_ratings || 0,
+                      materials: newRec.materials || [],
+                      bio: newRec.bio || '',
+                      lat: newRec.lat,
+                      lng: newRec.lng,
+                      online: newRec.online,
+                    },
+                  ];
+                }
+              });
+            }
+            if (payload.eventType === 'DELETE' && oldRec) {
+              setRecyclers((prev) => prev.filter((r) => r.id !== oldRec.id));
+            }
+          }
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [activeTab]);
 
@@ -152,10 +253,66 @@ const DashboardResident: React.FC = () => {
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
-  const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  const [editSchedule, setEditSchedule] = useState(user?.schedule || '');
-  const [editNotas, setEditNotas] = useState('');
+  // eslint-disable-next-line no-empty-pattern
+  const [] = useState(user?.materials?.join(', ') || '');
+  // eslint-disable-next-line no-empty-pattern
+  const [] = useState(user?.schedule || '');
+  // eslint-disable-next-line no-empty-pattern
+  const [] = useState('');
   // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('messages-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const msg = payload.new;
+          // Notifica solo si el mensaje es para este usuario y no lo envió él mismo
+          if (msg.receiver_id === user.id && msg.sender_id !== user.id) {
+            toast.success('¡Nuevo mensaje recibido!');
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // Función para eliminar cuenta
+  const handleDeleteAccount = async () => {
+    if (!user?.id) return;
+    setDeletingAccount(true);
+    // Elimina el perfil y el usuario de Supabase
+    await supabase.from('profiles').delete().eq('user_id', user.id);
+    // Si usas Supabase Auth, elimina también el usuario autenticado:
+    await supabase.auth.admin.deleteUser(user.id); // Solo funciona si tienes permisos de admin
+    setDeletingAccount(false);
+    // Redirige o desloguea
+    window.location.href = '/';
+  };
+
+  const handlePhotoUpload = async (file: File) => {
+    try {
+      if (!user?.id) return;
+      await uploadProfilePhoto(user.id, file);
+      // Actualiza el estado local y/o contexto si es necesario
+      toast.success('Foto actualizada correctamente');
+      // Opcional: recarga el usuario o la página para ver el cambio
+      window.location.reload();
+    } catch (err) {
+      toast.error('Error al subir la foto');
+      console.error(err);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -184,30 +341,85 @@ const DashboardResident: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-green-700">{user?.name || 'Residente'}</h2>
           <p className="text-gray-500 capitalize">{user?.type === 'resident' ? 'Residente' : user?.type || 'Usuario'}</p>
+          {/* Menú desplegable de usuario */}
+          <div className="relative mt-2">
+            <details className="group">
+              <summary className="cursor-pointer text-green-700 hover:underline">Opciones</summary>
+              <ul className="absolute left-0 mt-2 w-48 bg-white border rounded shadow-lg z-10">
+                <li>
+                  <button
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                    onClick={() => setActiveTab('perfil')}
+                  >
+                    Mi Perfil
+                  </button>
+                </li>
+                <li>
+                  <button
+                    className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
+                    onClick={() => setShowDeleteAccount(true)}
+                  >
+                    Eliminar cuenta
+                  </button>
+                </li>
+              </ul>
+            </details>
+          </div>
         </div>
       </div>
       <h1 className="text-4xl font-extrabold text-green-700 mb-8">Panel de Residente</h1>
-      <div className="flex space-x-4 mb-8">
+      <Link to="/collection-points" className="block px-6 py-4 rounded-md font-bold text-green-700 hover:bg-green-700 hover:text-white">
+        <img
+          src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747796657/icon_map.mp4_uphkzx.gif"
+          alt="Mapa"
+          className="inline-block w-15 h-12 mr-4 rounded-md align-middle"
+          style={{ verticalAlign: 'middle' }}
+        />
+        Puntos de Recolección ( Global )
+      </Link>
+
+      {/* Separador visual */}
+      <div className="my-6 w-full max-w-4xl">
+        <hr className="border-t-2 border-green-100" />
+      </div>
+
+      <div className="flex space-x-1 mb-10">
         <button
-          className={`px-4 py-2 rounded-md font-semibold ${activeTab === 'puntos' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
+            ${activeTab === 'puntos'
+              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
+              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
+          `}
           onClick={() => setActiveTab('puntos')}
         >
           Mis Puntos de Recolección
         </button>
         <button
-          className={`px-4 py-2 rounded-md font-semibold ${activeTab === 'recicladores' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
+            ${activeTab === 'recicladores'
+              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
+              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
+          `}
           onClick={() => setActiveTab('recicladores')}
         >
           Recicladores
         </button>
         <button
-          className={`px-4 py-2 rounded-md font-semibold ${activeTab === 'perfil' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
+            ${activeTab === 'perfil'
+              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
+              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
+          `}
           onClick={() => setActiveTab('perfil')}
         >
           Mi Perfil
         </button>
         <button
-          className={`px-4 py-2 rounded-md font-semibold ${activeTab === 'historial' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
+            ${activeTab === 'historial'
+              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
+              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
+          `}
           onClick={() => setActiveTab('historial')}
         >
           Historial
@@ -217,9 +429,13 @@ const DashboardResident: React.FC = () => {
         <div className="w-full max-w-4xl">
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
             <h2 className="text-2xl font-bold mb-4">Mis Puntos de Recolección</h2>
-            <Link to="/add-collection-point" className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center hover:bg-green-700 mb-4">
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Punto
+            <Link
+              to="/add-collection-point"
+              className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700 focus:ring-2 focus:ring-green-400 focus:outline-none shadow-md transition-all duration-200 w-fit mb-4 group"
+              style={{ minWidth: 'unset', maxWidth: '220px' }}
+            >
+              <Plus className="h-4 w-4 mr-1 group-hover:rotate-90 transition-transform duration-300" />
+              <span>Agregar Punto</span>
             </Link>
             {collectionPoints.length === 0 ? (
               <p className="text-gray-500">No tienes puntos de recolección registrados.</p>
@@ -290,12 +506,12 @@ const DashboardResident: React.FC = () => {
           </div>
           <div className="bg-white shadow-md rounded-lg p-6">
             <Map
-              points={recyclers.filter(r => r.profiles?.avatar_url && r.profiles?.name && r.lat && r.lng && r.online !== false).map((rec) => ({
+              points={recyclers.filter(r => r.lat && r.lng && r.online !== false).map((rec) => ({
                 id: rec.id.toString(),
-                lat: rec.lat ?? 0, // Asegúrate de tener lat/lng en el modelo de reciclador
+                lat: rec.lat ?? 0,
                 lng: rec.lng ?? 0,
                 title: rec.profiles?.name || 'Reciclador',
-                avatar_url: rec.profiles?.avatar_url,
+                // No avatar_url aquí, para forzar el pin personalizado
                 isRecycler: true
               }))}
               showUserLocation={true}
@@ -335,10 +551,26 @@ const DashboardResident: React.FC = () => {
                     ))}
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
+                  <button
+                    className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                    onClick={() => {
+                      setChatRecyclerId(rec.id);
+                      setChatRecyclerName(rec.profiles?.name || 'Reciclador');
+                      setChatOpen(true);
+                    }}
+                  >
+                    Enviar mensaje
+                  </button>
                 </div>
               ))}
             </div>
           )}
+          <ChatWithRecycler
+            otherUserId={chatRecyclerId !== null ? String(chatRecyclerId) : ''}
+            otherUserName={chatRecyclerName}
+            open={chatOpen}
+            onClose={() => setChatOpen(false)}
+          />
         </div>
       )}
       {activeTab === 'perfil' && (
@@ -348,16 +580,12 @@ const DashboardResident: React.FC = () => {
             className="flex flex-col items-center w-full"
             onSubmit={async (e) => {
               e.preventDefault();
-              // Guardar cambios en la base de datos
               const { error } = await supabase.from('profiles').update({
                 name: editName,
                 email: editEmail,
                 phone: editPhone,
                 address: editAddress,
                 bio: editBio,
-                materials: editMaterials.split(',').map((m) => m.trim()),
-                schedule: editSchedule,
-                // dni: editDni, // Si tienes campo dni
               }).eq('user_id', user?.id);
               if (!error) {
                 setSuccess('Perfil actualizado correctamente');
@@ -370,7 +598,19 @@ const DashboardResident: React.FC = () => {
               <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
                 <img src={user?.avatar_url || avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
               </div>
-              <button type="button" className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Actualizar Foto</button>
+              <label className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer">
+                Actualizar Foto
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      handlePhotoUpload(e.target.files[0]);
+                    }
+                  }}
+                />
+              </label>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
               <div className="text-left">
@@ -389,26 +629,9 @@ const DashboardResident: React.FC = () => {
                 <label className="text-gray-600 text-sm">Domicilio</label>
                 <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
               </div>
-              {/* Si tienes campo dni, descomenta la siguiente línea */}
-              {/* <div className="text-left">
-                <label className="text-gray-600 text-sm">Número de DNI</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editDni} onChange={e => setEditDni(e.target.value)} />
-              </div> */}
               <div className="text-left md:col-span-2">
-                <label className="text-gray-600 text-sm">Nota</label>
+                <label className="text-gray-600 text-sm">Biografía / Nota</label>
                 <textarea className="font-semibold w-full border rounded px-2 py-1" value={editBio} onChange={e => setEditBio(e.target.value)} />
-              </div>
-              <div className="text-left md:col-span-2">
-                <label className="text-gray-600 text-sm">¿Qué le gusta reciclar?</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editMaterials} onChange={e => setEditMaterials(e.target.value)} placeholder="Ej: Papel, Plástico, Vidrio" />
-              </div>
-              <div className="text-left md:col-span-2">
-                <label className="text-gray-600 text-sm">¿Desde cuándo recicla?</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editSchedule} onChange={e => setEditSchedule(e.target.value)} placeholder="Ej: 2020, Hace 3 años, etc." />
-              </div>
-              <div className="text-left md:col-span-2">
-                <label className="text-gray-600 text-sm">Notas adicionales</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editNotas} onChange={e => setEditNotas(e.target.value)} />
               </div>
             </div>
             <button type="submit" className="mt-4 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">Actualizar Perfil</button>
@@ -420,6 +643,39 @@ const DashboardResident: React.FC = () => {
           <h2 className="text-2xl font-bold mb-4">Historial de Actividades</h2>
           <p className="text-gray-500">Aquí puedes ver el historial de tus actividades relacionadas con el reciclaje.</p>
           {/* Aquí puedes agregar el contenido del historial */}
+        </div>
+      )}
+      {selectedRecycler && (
+        <ChatWithRecycler
+          otherUserId={selectedRecycler.id.toString()}
+          otherUserName={selectedRecycler.name}
+          open={!!selectedRecycler}
+          onClose={() => setSelectedRecycler(null)}
+        />
+      )}
+      {/* Modal de confirmación para eliminar cuenta */}
+      {showDeleteAccount && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full">
+            <h2 className="text-lg font-bold mb-2 text-red-600">¿Eliminar cuenta?</h2>
+            <p className="mb-4">Esta acción es irreversible. ¿Seguro que deseas eliminar tu cuenta?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 rounded bg-gray-200"
+                onClick={() => setShowDeleteAccount(false)}
+                disabled={deletingAccount}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-600 text-white"
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -450,5 +706,22 @@ export default DashboardResident;
     transform: scale(2.5);
     opacity: 0;
   }
+}
+.active-tab-effect::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -6px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #22c55e 60%, #bbf7d0 100%);
+  opacity: 0.8;
+  animation: tab-underline 0.3s;
+}
+@keyframes tab-underline {
+  from { width: 0; opacity: 0; }
+  to { width: 80%; opacity: 0.8; }
 }
 `}</style>

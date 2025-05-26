@@ -12,18 +12,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface User {
   id: string;
-  email: string;
   name: string;
-  type: 'recycler' | 'resident' | 'admin';
-  avatar_url?: string;
+  email: string;
   phone?: string;
   address?: string;
+  type: 'resident' | 'recycler';
+  avatar_url?: string;
+  online?: boolean;
   materials?: string[];
-  schedule?: string;
   bio?: string;
+  experience_years?: number;
+  service_areas?: string[];
 }
 
 export type CollectionPoint = {
+  estimated_weight: number;
+  cancellation_reason: string | null;
+  cancelled_at: string | null; // ISO date string or null if not cancelled
+  completed_at: string | null; // ISO date string or null if not completed
   profiles: User;
   creator_email: string;
   creator_name: ReactNode;
@@ -75,18 +81,17 @@ export interface CollectionClaim {
 
 export async function signUpUser(email: string, password: string, userData: Partial<User>) {
   try {
-    // Check if user already exists
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
+    // Elimina esta validación previa:
+    // const { data: existingProfile } = await supabase
+    //   .from('profiles')
+    //   .select('id')
+    //   .eq('email', email)
+    //   .maybeSingle();
+    // if (existingProfile) {
+    //   return { data: null, error: new Error('User already registered') };
+    // }
 
-    if (existingProfile) {
-      return { data: null, error: new Error('User already registered') };
-    }
-
-    // Create auth user
+    // Intenta crear el usuario en Auth
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -101,7 +106,7 @@ export async function signUpUser(email: string, password: string, userData: Part
     if (signUpError) throw signUpError;
     if (!authData.user) throw new Error('Failed to create user');
 
-    // Create profile
+    // Crea el perfil solo si el usuario fue creado en Auth
     const { error: profileError } = await supabase
       .from('profiles')
       .insert([{
@@ -112,7 +117,7 @@ export async function signUpUser(email: string, password: string, userData: Part
       }]);
 
     if (profileError) {
-      // If profile creation fails, delete the auth user
+      // Si falla la creación del perfil, elimina el usuario Auth
       await supabase.auth.admin.deleteUser(authData.user.id);
       throw profileError;
     }
@@ -171,10 +176,20 @@ export async function signInUser(email: string, password: string) {
 
       if (fetchError || !newProfile) throw new Error('Failed to fetch profile');
 
+      // Si es reciclador, poner online
+      if (newProfile.role === 'recycler') {
+        await supabase.rpc('setOnlineStatusTrue');
+      }
+
       return { 
         data: authData, 
         profile: { ...newProfile, type: newProfile.role }
       };
+    }
+
+    // Si es reciclador, poner online
+    if (profile.role === 'recycler') {
+      await supabase.rpc('setOnlineStatusTrue');
     }
 
     // Map role to type for consistency with the User interface
@@ -188,39 +203,34 @@ export async function signInUser(email: string, password: string) {
   }
 }
 
-export async function cancelClaim(
-  claimId: string, 
-  pointId: string, 
-  userId: string,
-  reason: string
-): Promise<void> {
+export async function signOutUser() {
   try {
-    const { error: claimError } = await supabase
-      .from('collection_claims')
-      .update({
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
-        cancelled_by: userId,
-        cancellation_reason: reason
-      })
-      .eq('id', claimId);
-
-    if (claimError) throw claimError;
-
-    const { error: pointError } = await supabase
-      .from('collection_points')
-      .update({ 
-        status: 'available',
-        claim_id: null,
-        pickup_time: null
-      })
-      .eq('id', pointId);
-
-    if (pointError) throw pointError;
+    await supabase.auth.signOut();
+    await supabase.rpc('setOnlineStatusFalse');
   } catch (error) {
-    console.error('Error cancelling claim:', error);
+    console.error('SignOut error:', error);
     throw error;
   }
+}
+
+export async function cancelClaim(
+  claimId: string,
+  userId: string,
+  reason: string
+) {
+  // Actualiza el status y el motivo en collection_claims
+  const { error } = await supabase
+    .from('collection_claims')
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: reason,
+      cancelled_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', claimId);
+
+  if (error) throw error;
 }
 
 export async function deleteCollectionPoint(pointId: string): Promise<void> {
@@ -240,10 +250,10 @@ export async function deleteCollectionPoint(pointId: string): Promise<void> {
 export async function fetchRecyclerProfiles(): Promise<RecyclerProfile[]> {
   try {
     const { data, error } = await supabase
-      .from('recycler_profiles')
+      .from('profiles')
       .select(`
         *,
-        profiles!recycler_profiles_user_id_fkey (
+        profiles!profiles_user_id_fkey (
           name,
           email,
           phone,
@@ -292,10 +302,10 @@ export async function uploadProfilePhoto(userId: string, file: File) {
 
 export async function fetchRecyclers() {
   const { data, error } = await supabase
-    .from('recycler_profiles')
+    .from('profiles')
     .select(`
       *,
-      profiles!recycler_profiles_user_id_fkey(
+      profiles!profiles_user_id_fkey(
         name,
         email,
         phone
@@ -398,3 +408,7 @@ export async function createCollectionPoint(point: Omit<CollectionPoint, 'id' | 
     throw error;
   }
 }
+
+// SQL policies for messages table should be managed in your Supabase dashboard or SQL migration scripts.
+
+// Obtener perfil completo de reciclador

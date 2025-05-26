@@ -1,8 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Recycle, Users, MapPin, Calendar, ArrowRight } from 'lucide-react';
+import { Users, MapPin, Calendar, ArrowRight, Lock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+
+type Advertisement = {
+  id: string;
+  title: string;
+  image_url: string;
+  link?: string;
+  active: boolean;
+  created_at: string;
+};
 
 const Home: React.FC = () => {
+  const [, setShowAdminLogin] = useState(false);
+  // Removed invalid empty array destructuring
+  // Removed invalid empty array destructuring
+  const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+
+  useEffect(() => {
+    fetchAdvertisements();
+  }, []);
+
+  const fetchAdvertisements = async () => {
+    try {
+      const { data: ads, error } = await supabase
+        .from('advertisements')
+        .select('*')
+        .eq('active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAdvertisements(ads);
+    } catch (err) {
+      console.error('Error fetching advertisements:', err);
+    }
+  };
+
+
   return (
     <div>
       {/* Hero Section */}
@@ -12,7 +47,7 @@ const Home: React.FC = () => {
           className="relative h-[600px] bg-cover bg-center flex items-center"
           style={{ backgroundImage: "url('https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80')" }}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+          <div className="max-w-7xl mx-auto px-10 sm:px-6 lg:px-8 py-24">
             <div className="max-w-3xl">
               <h1 className="text-4xl md:text-5xl font-bold mb-6">Conectando recicladores con comunidades sostenibles</h1>
               <p className="text-xl mb-8">
@@ -135,6 +170,39 @@ const Home: React.FC = () => {
         </div>
       </section>
 
+      {/* Sponsors Section */}
+      {advertisements.length > 0 && (
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Nuestros Auspiciantes</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {advertisements.map((ad) => (
+                <div key={ad.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                  <img
+                    src={ad.image_url}
+                    alt={ad.title}
+                    className="w-full h-38 object-cover"
+                  />
+                  <div className="p-4">
+                    <h3 className="font-medium text-lg text-gray-900">{ad.title}</h3>
+                    {ad.link && (
+                      <a
+                        href={ad.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-block text-green-600 hover:text-green-700"
+                      >
+                        Más información
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* CTA */}
       <section className="py-16 bg-green-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -149,9 +217,19 @@ const Home: React.FC = () => {
             <Link to="/collection-points" className="bg-green-700 text-white px-6 py-3 rounded-md font-medium hover:bg-green-800 border border-white transition">
               Explorar puntos de recolección
             </Link>
+            <button
+              onClick={() => setShowAdminLogin(true)}
+              className="bg-gray-800 text-white px-6 py-3 rounded-md font-medium hover:bg-gray-900 transition flex items-center"
+            >
+              <Lock className="h-5 w-5 mr-2" />
+              Acceso Administrador
+            </button>
           </div>
         </div>
       </section>
+
+      
+   
     </div>
   );
 };

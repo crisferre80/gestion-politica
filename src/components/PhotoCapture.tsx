@@ -4,10 +4,10 @@ import { Camera, Upload, X } from 'lucide-react';
 
 export interface PhotoCaptureProps {
   onCapture: (file: File) => void | Promise<void>;
-  onClose: () => void;
+  onCancel: () => void;
 }
 
-const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, onClose }) => {
+const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, onCancel }) => {
   const webcamRef = useRef<Webcam>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,7 +69,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, onClose }) => {
           <h3 className="text-lg font-medium">Tomar foto de perfil</h3>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onCancel}
             className="text-gray-400 hover:text-gray-500"
           >
             <X className="h-6 w-6" />
@@ -91,7 +91,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, onClose }) => {
         <div className="mt-4 flex justify-end space-x-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={onCancel}
             className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
           >
             Cancelar
@@ -110,3 +110,16 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, onClose }) => {
 };
 
 export default PhotoCapture;
+
+// Usage example
+/*
+{showPhotoCapture && (
+  <PhotoCapture
+    onCapture={async (file: File) => {
+      await handlePhotoUpload(file);
+      setShowPhotoCapture(false);
+    }}
+    onCancel={() => setShowPhotoCapture(false)}
+  />
+)}
+*/

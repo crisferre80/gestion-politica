@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Plus, Star, Phone, Mail, MapIcon, X, User, Camera, AlertTriangle, Trash2 } from 'lucide-react';
-import { supabase, type CollectionPoint, type RecyclerProfile, uploadProfilePhoto, cancelClaim, deleteCollectionPoint, fetchRecyclerProfiles, claimCollectionPoint } from '../lib/supabase';
+import { MapPin, Calendar, Plus, Star, Phone, MapIcon, X, User, Camera, AlertTriangle, Trash2 } from 'lucide-react';
+import { supabase, type CollectionPoint, type RecyclerProfile, cancelClaim, deleteCollectionPoint, fetchRecyclerProfiles, claimCollectionPoint, uploadProfilePhoto } from '../lib/supabase';
 import Map from '../components/Map';
 import PhotoCapture from '../components/PhotoCapture';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
+import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
 
 const Dashboard: React.FC = () => {
-  const { user } = useUser();
-  const [activeTab, setActiveTab] = useState<'points' | 'recyclers' | 'history' | 'profile'>('points');
+  const { user, login } = useUser();
+  const [activeTab, setActiveTab] = useState<'points' | 'recyclers' | 'history' | 'profile' | 'messages'>('points');
   const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [recyclers, setRecyclers] = useState<RecyclerProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,8 +31,32 @@ const Dashboard: React.FC = () => {
     address: '',
     materials: '',
     bio: '',
+    service_areas: '', // Añadido para evitar error
+    experience_years: '', // Añadido para evitar error
   });
+  const [locationError, setLocationError] = useState<string | null>(null);
 
+  // Tipos
+  interface ConversationProfile {
+    name?: string;
+    email?: string;
+    avatar_url?: string;
+  }
+  interface Conversation {
+    user_id: string;
+    profiles?: ConversationProfile;
+  }
+  interface ChatMessage {
+    id: string;
+    sender_id: string;
+    receiver_id: string;
+    text: string;
+    created_at: string;
+  }
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -95,11 +120,20 @@ const Dashboard: React.FC = () => {
           ...claim.collection_point,
           claim_id: claim.id,
           status: claim.status,
+          claimed_at: claim.claimed_at,
+          completed_at: claim.completed_at,
+          cancelled_at: claim.cancelled_at,
+          cancellation_reason: claim.cancellation_reason,
+          created_at: claim.created_at,
+          updated_at: claim.updated_at,
+          cancelled_by: claim.cancelled_by,
+          pickup_time: claim.pickup_time,
+          estimated_weight: claim.estimated_weight,
+          // Datos del creador del punto
           creator_name: claim.collection_point?.profiles?.name || 'Usuario Anónimo',
           creator_email: claim.collection_point?.profiles?.email,
           creator_phone: claim.collection_point?.profiles?.phone,
           creator_avatar: claim.collection_point?.profiles?.avatar_url,
-          pickup_time: claim.pickup_time
         }));
 
         setCollectionPoints(points);
@@ -122,32 +156,65 @@ const Dashboard: React.FC = () => {
   }, [user, fetchData]);
 
   useEffect(() => {
-    setProfileData({
-      name: user?.name || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
-      address: user?.address || '',
-      materials: user?.materials?.join(', ') || '',
-      bio: user?.bio || '',
-    });
-  }, [user]);
+      setProfileData({
+        name: user?.name || '',
+        email: user?.email || '',
+        phone: user?.phone || '',
+        address: user?.address || '',
+        materials:
+          user?.type === 'recycler' && Array.isArray((user as unknown as RecyclerProfile).materials)
+            ? (user as unknown as RecyclerProfile).materials.join(', ')
+            : '',
+        bio:
+          user?.type === 'recycler' && typeof (user as unknown as RecyclerProfile).bio === 'string'
+            ? (user as unknown as RecyclerProfile).bio ?? ''
+            : '',
+        service_areas:
+          user?.type === 'recycler' && Array.isArray((user as unknown as RecyclerProfile).service_areas)
+            ? (user as unknown as RecyclerProfile).service_areas.join(', ')
+            : '',
+        experience_years:
+          user?.type === 'recycler' && typeof ((user as unknown as RecyclerProfile).experience_years) !== 'undefined'
+            ? String((user as unknown as RecyclerProfile).experience_years)
+            : '',
+      });
+      // Forzar recarga del campo online desde la base de datos si es reciclador
+      if (user && user.type === 'recycler') {
+        (async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('online')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          if (!error && data && typeof data.online === 'boolean') {
+            user.online = data.online;
+          }
+        })();
+      }
+    }, [user]);
 
   useEffect(() => {
     const setOnlineStatus = async (online: boolean) => {
       if (user && user.type === 'recycler') {
-        await supabase
-          .from('profiles')
-          .update({ online })
-          .eq('id', user.id);
+        try {
+          const { error, data } = await supabase
+            .from('profiles')
+            .update({ online })
+            .eq('id', user.id);
+          if (error) {
+            console.error('Error actualizando online:', error);
+            setError('No se pudo actualizar el estado en línea.');
+          } else {
+            console.log('Estado online actualizado:', online, 'para usuario', user.id, data);
+          }
+        } catch (err) {
+          console.error('Excepción actualizando online:', err);
+          setError('Error inesperado al actualizar el estado en línea.');
+        }
       }
     };
 
-    // Al iniciar sesión, poner en línea
-    if (user && user.type === 'recycler') {
-      setOnlineStatus(true);
-    }
-
-    // Al cerrar o recargar la página, poner fuera de línea
+    // Solo poner offline al salir
     const handleBeforeUnload = () => {
       setOnlineStatus(false);
     };
@@ -160,6 +227,41 @@ const Dashboard: React.FC = () => {
     };
   }, [user]);
 
+  // Actualiza la ubicación del reciclador en tiempo real
+  useEffect(() => {
+    let watchId: number | null = null;
+    if (user && user.type === 'recycler') {
+      if ('geolocation' in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            await supabase
+              .from('profiles')
+              .update({ lat: latitude, lng: longitude, online: true })
+              .eq('id', user.id);
+            setLocationError(null);
+          },
+          (error) => {
+            setLocationError('No se pudo obtener tu ubicación en tiempo real. Activa la ubicación para aparecer en el mapa de residentes.');
+            console.error('No se pudo obtener la ubicación en tiempo real:', error);
+          },
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+        );
+      } else {
+        setLocationError('Tu navegador no soporta geolocalización.');
+      }
+    }
+    return () => {
+      if (watchId !== null && 'geolocation' in navigator) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      // Al salir, poner offline
+      if (user && user.type === 'recycler') {
+        supabase.from('profiles').update({ online: false }).eq('id', user.id);
+      }
+    };
+  }, [user]);
+
   const handleCancelClaim = async () => {
     if (!selectedClaim || !user) return;
 
@@ -167,7 +269,6 @@ const Dashboard: React.FC = () => {
       setError(null);
       await cancelClaim(
         selectedClaim.id,
-        selectedClaim.pointId,
         user.id,
         cancellationReason
       );
@@ -198,17 +299,6 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const handlePhotoCapture = async (file: File) => {
-    try {
-      if (!user) return;
-      const publicUrl = await uploadProfilePhoto(user.id, file);
-      setProfilePhoto(publicUrl);
-      setShowPhotoCapture(false);
-    } catch (err) {
-      console.error('Error uploading photo:', err);
-      setError('Error al subir la foto');
-    }
-  };
 
   // Nueva función para reclamar un punto
   const handleClaimPoint = async (pointId: string) => {
@@ -240,33 +330,218 @@ const Dashboard: React.FC = () => {
     if (!user) return;
     try {
       setError(null);
-      // Si es reciclador, separa los materiales
-      const updatedData = {
-        ...profileData,
-        materials: user && user.type === 'recycler'
-          ? profileData.materials.split(',').map(m => m.trim()).filter(Boolean)
-          : undefined,
-      };
-      // Llama a tu función de actualización (debes implementarla en supabase/lib)
-      await supabase
+      // Actualiza datos generales en profiles
+      const { data: profileDataResult, error: profileError } = await supabase
         .from('profiles')
         .update({
-          name: updatedData.name,
-          email: updatedData.email,
-          phone: updatedData.phone,
-          address: updatedData.address,
-          ...((user && user.type === 'recycler') && {
-            materials: updatedData.materials,
-            bio: updatedData.bio,
-          }),
+          name: profileData.name,
+          email: profileData.email,
+          phone: profileData.phone,
+          address: profileData.address,
         })
-        .eq('id', user.id);
+        .eq('id', user.id) // <-- Cambia aquí si tu columna es 'id'
+        .select()
+        .maybeSingle();
 
-      // Opcional: recarga datos del usuario
-      window.location.reload();
+      if (profileError) throw profileError;
+
+      let recyclerDataResult = null;
+      if (user.type === 'recycler') {
+        // Actualiza datos de reciclador en recycler_profiles
+        const { data: recyclerData, error: recyclerError } = await supabase
+          .from('recycler_profiles')
+          .update({
+            materials: profileData.materials.split(',').map(m => m.trim()),
+            service_areas: profileData.service_areas.split(',').map(z => z.trim()),
+            bio: profileData.bio,
+            experience_years: Number(profileData.experience_years),
+          })
+          .eq('user_id', user.id)
+          .select()
+          .maybeSingle();
+        if (recyclerError) throw recyclerError;
+        recyclerDataResult = recyclerData;
+      }
+
+      // Actualiza el estado local del perfil
+      setProfileData(prev => ({
+        ...prev,
+        ...profileDataResult,
+        ...(user.type === 'recycler' && recyclerDataResult
+          ? {
+              materials: Array.isArray(recyclerDataResult.materials)
+                ? recyclerDataResult.materials.join(', ')
+                : '',
+              bio: recyclerDataResult.bio || '',
+            }
+          : {}),
+      }));
+      // Actualiza el usuario en el contexto
+      login({
+        ...user,
+        name: profileDataResult.name,
+        email: profileDataResult.email,
+        phone: profileDataResult.phone,
+        address: profileDataResult.address,
+        ...(user.type === 'recycler' && recyclerDataResult
+          ? {
+              materials: recyclerDataResult.materials,
+              bio: recyclerDataResult.bio,
+            }
+          : {}),
+      });
     } catch {
       setError('Error al actualizar el perfil');
     }
+  };
+
+  // 1. Cargar conversaciones (usuarios únicos que han enviado mensajes)
+  useEffect(() => {
+    if (user?.type !== 'recycler') return;
+    const fetchConversations = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('sender_id, profiles:sender_id(name, email, avatar_url)')
+        .eq('receiver_id', user.id)
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        // Agrupa por sender_id
+        const unique = Object.values(
+          data.reduce((acc: Record<string, Conversation>, msg) => {
+            acc[msg.sender_id] = {
+              user_id: msg.sender_id,
+              profiles: Array.isArray(msg.profiles) ? msg.profiles[0] : msg.profiles
+            };
+            return acc;
+          }, {} as Record<string, Conversation>)
+        );
+        setConversations(unique);
+      }
+    };
+    fetchConversations();
+  }, [user, activeTab]);
+
+  // 2. Cargar mensajes de la conversación seleccionada
+  useEffect(() => {
+    if (!selectedConversation || !user?.id) return;
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedConversation.user_id}),and(sender_id.eq.${selectedConversation.user_id},receiver_id.eq.${user.id})`)
+        .order('created_at', { ascending: true });
+      if (!error && data) setChatMessages(data);
+    };
+    fetchMessages();
+  }, [selectedConversation, user]);
+
+  // 3. Enviar mensaje
+  const handleSendMessage = async () => {
+    if (!chatInput.trim() || !user?.id || !selectedConversation) return;
+    await supabase.from('messages').insert([
+      {
+        sender_id: user.id,
+        receiver_id: selectedConversation.user_id,
+        text: chatInput,
+      },
+    ]);
+    setChatInput('');
+  };
+
+  // 4. Suscripción en tiempo real para mensajes nuevos
+  useEffect(() => {
+    if (!selectedConversation || !user?.id) return;
+    const channel = supabase
+      .channel('recycler-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `or(sender_id=eq.${user.id},receiver_id=eq.${user.id})`,
+        },
+        (payload) => {
+          const msg = payload.new as ChatMessage;
+          if (
+            (msg.sender_id === user.id && msg.receiver_id === selectedConversation.user_id) ||
+            (msg.sender_id === selectedConversation.user_id && msg.receiver_id === user.id)
+          ) {
+            setChatMessages((prev) => [...prev, msg]);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversation, user]);
+
+  // Suscripción para notificaciones de nuevos mensajes
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('messages-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const msg = payload.new;
+          // Notifica solo si el mensaje es para este usuario y no lo envió él mismo
+          if (msg.receiver_id === user.id && msg.sender_id !== user.id) {
+            toast.success('¡Nuevo mensaje recibido!');
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const handlePhotoUpload = async (file: File) => {
+    try {
+      if (!user) return;
+      // Asume que tienes la función uploadProfilePhoto en tu lib/supabase
+      const publicUrl = await uploadProfilePhoto(user.id, file);
+      setProfilePhoto(publicUrl);
+      toast.success('Foto actualizada correctamente');
+      // Actualiza el usuario en el contexto para reflejar el nuevo avatar
+      login({
+        ...user,
+        avatar_url: publicUrl,
+      });
+    } catch (err) {
+      toast.error('Error al subir la foto');
+      console.error(err);
+    }
+  };
+
+  // Añade esta función dentro del componente Dashboard
+  const handleVerRutaGoogleMaps = (point: CollectionPoint) => {
+    // Ubicación del reciclador (usuario actual)
+    const originLat = user?.lat;
+    const originLng = user?.lng;
+    // Ubicación del punto de recolección
+    const destLat = Number(point.latitude);
+    const destLng = Number(point.longitude);
+
+    if (!originLat || !originLng) {
+      toast.error('No se pudo obtener tu ubicación actual.');
+      return;
+    }
+    if (!destLat || !destLng) {
+      toast.error('No se pudo obtener la ubicación del punto.');
+      return;
+    }
+
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
+    window.open(url, '_blank');
   };
 
   if (!user) {
@@ -290,13 +565,33 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  // Mostrar mensaje de error de geolocalización si existe
+  const geoErrorBanner = locationError ? (
+    <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 mt-4">
+      <div className="flex">
+        <div className="flex-shrink-0">
+          <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        </div>
+        <div className="ml-3">
+          <p className="text-sm text-red-700">{locationError}</p>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {showPhotoCapture && (
-          <PhotoCapture 
-            onCapture={handlePhotoCapture}
-            onClose={() => setShowPhotoCapture(false)}
+          <PhotoCapture
+            onCapture={async (file: File) => {
+              await handlePhotoUpload(file);
+              setShowPhotoCapture(false);
+            }}
+            onCancel={() => setShowPhotoCapture(false)}
           />
         )}
 
@@ -432,8 +727,16 @@ const Dashboard: React.FC = () => {
                   <Camera className="h-4 w-4 text-gray-600" />
                 </button>
               </div>
-              <div className="ml-4">
-                <h1 className="text-2xl font-bold">Bienvenido, {user.name}</h1>
+              <div className="ml-4 flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold">Bienvenido, {user.name}</h1>
+                  {/* ONLINE badge for recyclers */}
+                  {user.type === 'recycler' && user.online === true && (
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-400">
+                      ONLINE
+                    </span>
+                  )}
+                </div>
                 <p className="text-green-100">
                   {user.type === 'recycler' ? 'Panel de Reciclador' : 'Panel de Residente'}
                 </p>
@@ -443,7 +746,7 @@ const Dashboard: React.FC = () => {
 
           {/* Dashboard Tabs */}
           <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
+            <nav className="flex -mb-px items-center">
               <button
                 onClick={() => setActiveTab('points')}
                 className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
@@ -454,7 +757,6 @@ const Dashboard: React.FC = () => {
               >
                 {user.type === 'recycler' ? 'Puntos Reclamados' : 'Mis Puntos de Recolección'}
               </button>
-              
               {user.type === 'resident' && (
                 <button
                   onClick={() => setActiveTab('recyclers')}
@@ -467,7 +769,6 @@ const Dashboard: React.FC = () => {
                   Recicladores
                 </button>
               )}
-              
               <button
                 onClick={() => setActiveTab('history')}
                 className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
@@ -478,7 +779,6 @@ const Dashboard: React.FC = () => {
               >
                 Historial
               </button>
-              
               <button
                 onClick={() => setActiveTab('profile')}
                 className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
@@ -489,6 +789,28 @@ const Dashboard: React.FC = () => {
               >
                 Mi Perfil
               </button>
+              {/* Nueva pestaña de Mensajes para recicladores */}
+              {user.type === 'recycler' && (
+                <>
+                  <button
+                    onClick={() => setActiveTab('messages')}
+                    className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                      activeTab === 'messages'
+                        ? 'border-green-500 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Mensajes
+                  </button>
+                  {/* Botón al lado de Mensajes */}
+                  <Link
+                    to="/collection-points"
+                    className="ml-2 inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md shadow hover:bg-green-700 font-semibold transition text-sm"
+                  >
+                    Ver todos los Puntos de Recolección
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
 
@@ -499,6 +821,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
+            {geoErrorBanner}
 
             {/* Collection Points Tab */}
             {activeTab === 'points' && (
@@ -583,32 +906,48 @@ const Dashboard: React.FC = () => {
                           )}
 
                           {/* Contact Information for Recyclers */}
-                          {user.type === 'recycler' && point.status === 'claimed' && (
+                          {user.type === 'recycler' && (point.status === 'claimed' || point.status === 'pending') && (
                             <div className="mt-6 pt-6 border-t border-gray-200">
                               <h4 className="text-sm font-medium text-gray-700 mb-3">
-                                Información del Residente:
+                                Información del Reclamo:
                               </h4>
-                              <div className="space-y-2">
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <User className="h-4 w-4 mr-2" />
-                                  <span>{point.creator_name}</span>
+                              <div className="space-y-2 text-sm text-gray-600">
+                                <div>
+                                  <span className="font-medium">Estado:</span> {point.status}
                                 </div>
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <Mail className="h-4 w-4 mr-2" />
-                                  <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">
-                                    {point.creator_email}
-                                  </a>
+                                <div>
+                                  <span className="font-medium">Fecha de Reclamo:</span>{' '}
+                                  {point.claimed_by ? new Date(point.claimed_by).toLocaleString() : 'N/A'}
                                 </div>
-                                {point.creator_name && (
-                                  <div className="flex items-center text-sm text-gray-500">
-                                    <Phone className="h-4 w-4 mr-2" />
-                                    <a href={`tel:${point.creator_name}`} className="text-green-600 hover:text-green-700">
-                                      {point.creator_name}
-                                    </a>
+                                {point.completed_at && (
+                                  <div>
+                                    <span className="font-medium">Completado el:</span>{' '}
+                                    {new Date(point.completed_at).toLocaleString()}
+                                  </div>
+                                )}
+                                {point.cancelled_at && (
+                                  <div>
+                                    <span className="font-medium">Cancelado el:</span>{' '}
+                                    {new Date(point.cancelled_at).toLocaleString()}
+                                  </div>
+                                )}
+                                {point.cancellation_reason && (
+                                  <div>
+                                    <span className="font-medium">Motivo de Cancelación:</span> {point.cancellation_reason}
+                                  </div>
+                                )}
+                                {point.pickup_time && (
+                                  <div>
+                                    <span className="font-medium">Hora de Recolección:</span>{' '}
+                                    {new Date(point.pickup_time).toLocaleString()}
+                                  </div>
+                                )}
+                                {typeof point.estimated_weight === 'number' && (
+                                  <div>
+                                    <span className="font-medium">Peso Estimado:</span> {point.estimated_weight} kg
                                   </div>
                                 )}
                               </div>
-
                               {/* Action Buttons */}
                               <div className="mt-4 grid grid-cols-2 gap-3">
                                 <button
@@ -622,14 +961,21 @@ const Dashboard: React.FC = () => {
                                   Ver en Mapa
                                 </button>
                                 <button
+                                  onClick={() => handleVerRutaGoogleMaps(point)}
+                                  className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                                >
+                                  <MapIcon className="h-4 w-4 mr-2" />
+                                  Ver Ruta en Google Maps
+                                </button>
+                                <button
                                   onClick={() => {
                                     setSelectedClaim({ id: point.claim_id!, pointId: point.id });
                                     setShowCancelClaimModal(true);
                                   }}
-                                  className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                                  className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 col-span-2"
                                 >
                                   <X className="h-4 w-4 mr-2" />
-                                  Cancelar
+                                  Cancelar Reclamación
                                 </button>
                               </div>
                             </div>
@@ -803,8 +1149,8 @@ const Dashboard: React.FC = () => {
         {/* Etiqueta de estado en línea para reciclador */}
         {user.type === 'recycler' && (
           <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold
-            ${user.online ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
-            {user.online ? 'En Línea' : 'Fuera de Línea'}
+            ${user.online === true ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+            {user.online === true ? 'En Línea' : 'Fuera de Línea'}
           </span>
         )}
         {/* ...ranking si aplica... */}
@@ -923,6 +1269,82 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Mensajes Tab */}
+            {activeTab === 'messages' && user.type === 'recycler' && (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800 mb-6">Mensajes de Residentes</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Lista de conversaciones */}
+                  <div className="col-span-1">
+                    <h3 className="text-lg font-medium mb-2">Conversaciones</h3>
+                    <ul>
+                      {conversations.length === 0 && (
+                        <li className="text-gray-500">No tienes mensajes aún.</li>
+                      )}
+                      {conversations.map((conv) => (
+                        <li
+                          key={conv.user_id}
+                          className={`p-2 rounded cursor-pointer mb-2 ${selectedConversation?.user_id === conv.user_id ? 'bg-green-100' : 'hover:bg-gray-100'}`}
+                          onClick={() => setSelectedConversation(conv)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {conv.profiles?.avatar_url ? (
+                              <img src={conv.profiles.avatar_url} alt={conv.profiles.name} className="h-8 w-8 rounded-full" />
+                            ) : (
+                              <div className="h-8 w-8 rounded-full bg-green-200 flex items-center justify-center">
+                                <span className="text-green-700 font-bold">{conv.profiles?.name?.[0] || '?'}</span>
+                              </div>
+                            )}
+                            <span>{conv.profiles?.name || conv.user_id}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {/* Chat */}
+                  <div className="col-span-2">
+                    {selectedConversation ? (
+                      <div className="flex flex-col h-96 border rounded p-4 bg-gray-50">
+                        <div className="flex-1 overflow-y-auto mb-2">
+                          {chatMessages.length === 0 ? (
+                            <p className="text-gray-400 text-center mt-10">No hay mensajes aún.</p>
+                          ) : (
+                            chatMessages.map((msg) => (
+                              <div
+                                key={msg.id}
+                                className={`mb-2 ${msg.sender_id === user.id ? 'text-right' : 'text-left'}`}
+                              >
+                                <span className="block text-xs text-gray-400">
+                                  {msg.sender_id === user.id ? 'Tú' : selectedConversation.profiles?.name || 'Residente'} - {new Date(msg.created_at).toLocaleTimeString()}
+                                </span>
+                                <span className={`inline-block ${msg.sender_id === user.id ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-800'} rounded px-2 py-1 text-sm mt-1`}>
+                                  {msg.text}
+                                </span>
+                              </div>
+                            ))
+                         ) }
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            className="flex-1 border rounded px-2 py-1"
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            placeholder="Escribe un mensaje..."
+                            onKeyDown={e => { if (e.key === 'Enter') handleSendMessage(); }}
+                          />
+                          <button onClick={handleSendMessage} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700">Enviar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-96 text-gray-400">
+                        Selecciona una conversación para ver los mensajes.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -930,3 +1352,10 @@ const Dashboard: React.FC = () => {
   );
 };
 export default Dashboard;
+
+export interface PhotoCaptureProps {
+  onCapture: (file: File) => void;
+  onClose: () => void;
+}
+
+

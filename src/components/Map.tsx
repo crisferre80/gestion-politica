@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Recycle, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -162,12 +162,13 @@ const MapComponent: React.FC<MapComponentProps> = ({
       >
         <NavigationControl position="top-right" />
         
-        {userLocation && (
+        {/* Solo mostrar la ubicación del usuario si no es un reciclador */}
+        {userLocation && !points.some(p => p.isRecycler && p.lat === userLocation.latitude && p.lng === userLocation.longitude) && (
           <Marker
             longitude={userLocation.longitude}
             latitude={userLocation.latitude}
           >
-            <div className="w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center animate-pulse">
+            <div className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center animate-pulse">
               <div className="w-3 h-3 bg-white rounded-full"></div>
             </div>
           </Marker>
@@ -180,11 +181,24 @@ const MapComponent: React.FC<MapComponentProps> = ({
             latitude={point.lat}
             onClick={() => onMarkerClick && onMarkerClick(point.id)}
           >
-            <div className="cursor-pointer transform -translate-x-1/2 -translate-y-1/2 relative">
+            <div className="cursor-pointer transform -translate-x-1/2 -translate-y-1/2 relative flex flex-col items-center">
               {point.isRecycler ? (
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                  <Recycle className="h-5 w-5 text-white" />
-                </div>
+                <>
+                  <img
+                    src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png"
+                    alt="Reciclador"
+                    className="w-10 h-10 object-contain drop-shadow-lg z-0"
+                  />
+                  {point.avatar_url && (
+                    <div className="w-10 h-10 rounded-full border-2 border-green-600 shadow-lg overflow-hidden z-10 absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                      <img
+                        src={point.avatar_url}
+                        alt={point.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                </>
               ) : point.avatar_url ? (
                 <div className="w-10 h-10 rounded-full border-2 border-white shadow-lg overflow-hidden">
                   <img 
@@ -221,19 +235,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
             longitude={selectedLocation.lng}
             latitude={selectedLocation.lat}
           >
-            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center border-2 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2 animate-pulse">
-              <svg
-                className="w-4 h-4 text-white"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </div>
+            {/* Usa el mismo marcador visual que los puntos de recolección */}
+            <img
+              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+              alt="Punto de Recolección"
+              className="w-10 h-10 object-contain drop-shadow-lg"
+            />
           </Marker>
         )}
       </Map>

@@ -4,7 +4,6 @@ import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone, S
 import { supabase, deleteCollectionPoint, uploadProfilePhoto } from '../lib/supabase';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
-import ChatWithRecycler from '../components/ChatWithRecycler'; // Importa el componente de chat correctamente
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
 
 // Tipo para el payload de realtime de perfiles
@@ -58,10 +57,9 @@ const DashboardResident: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>('puntos');
-  const [selectedRecycler, setSelectedRecycler] = useState<{ id: number; name: string } | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatRecyclerId] = useState<number | null>(null);
-  const [chatRecyclerName] = useState('');
+  const [] = useState<{ id: number; name: string } | null>(null);
+  // const [chatOpen, setChatOpen] = useState(false);
+  // const [chatRecyclerId] = useState<number | null>(null);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   // const [] = useState(false);
@@ -577,12 +575,7 @@ const DashboardResident: React.FC = () => {
               ))}
             </div>
           )}
-          <ChatWithRecycler
-            otherUserId={chatRecyclerId !== null ? String(chatRecyclerId) : ''}
-            otherUserName={chatRecyclerName}
-            open={chatOpen}
-            onClose={() => setChatOpen(false)}
-          />
+         
         </div>
       )}
       {activeTab === 'perfil' && (
@@ -667,14 +660,14 @@ const DashboardResident: React.FC = () => {
           {/* Aquí puedes agregar el contenido del historial */}
         </div>
       )}
-      {selectedRecycler && (
+      {/* {selectedRecycler && (
         <ChatWithRecycler
           otherUserId={selectedRecycler.id.toString()}
           otherUserName={selectedRecycler.name}
           open={!!selectedRecycler}
           onClose={() => setSelectedRecycler(null)}
         />
-      )}
+      )} */}
       {/* Modal de confirmación para eliminar cuenta */}
       {showDeleteAccount && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">

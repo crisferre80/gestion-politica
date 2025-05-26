@@ -187,10 +187,7 @@ export async function signInUser(email: string, password: string) {
       };
     }
 
-    // Si es reciclador, poner online
-    if (profile.role === 'recycler') {
-      await supabase.rpc('setOnlineStatusTrue');
-    }
+    
 
     // Map role to type for consistency with the User interface
     return { 

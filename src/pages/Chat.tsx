@@ -59,9 +59,11 @@ const Chat = () => {
   const [input, setInput] = useState('');
 
   useEffect(() => {
-    if (otherUserId) fetchMessages(otherUserId);
+    if (user?.id && otherUserId) {
+      fetchMessages(otherUserId);
+    }
     // eslint-disable-next-line
-  }, [otherUserId]);
+  }, [user, otherUserId]);
 
   const handleSend = async () => {
     if (otherUserId && input.trim()) {

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
 export type Message = {
     id: string;
@@ -10,8 +11,8 @@ export type Message = {
 
 type MessagesContextType = {
     messages: Message[];
-    sendMessage: (message: Omit<Message, 'id' | 'timestamp'>) => void;
-    getConversation: (userId1: string, userId2: string) => Message[];
+    fetchConversation: (userId1: string, userId2: string) => Promise<void>;
+    sendMessage: (senderId: string, receiverId: string, content: string) => Promise<void>;
 };
 
 const MessagesContext = createContext<MessagesContextType | undefined>(undefined);
@@ -19,25 +20,53 @@ const MessagesContext = createContext<MessagesContextType | undefined>(undefined
 export const MessagesProvider = ({ children }: { children: ReactNode }) => {
     const [messages, setMessages] = useState<Message[]>([]);
 
-    const sendMessage = (message: Omit<Message, 'id' | 'timestamp'>) => {
-        const newMessage: Message = {
-            ...message,
-            id: crypto.randomUUID(),
-            timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, newMessage]);
-    };
+    // Cargar mensajes entre dos usuarios
+    const fetchConversation = async (userId1: string, userId2: string) => {
+        const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .or(
+                `and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`
+            )
+            .order('created_at', { ascending: true });
 
-    const getConversation = (userId1: string, userId2: string) => {
-        return messages.filter(
-            (msg) =>
-                (msg.senderId === userId1 && msg.receiverId === userId2) ||
-                (msg.senderId === userId2 && msg.receiverId === userId1)
+        if (error) {
+            console.error('Error fetching messages:', error);
+            setMessages([]);
+            return;
+        }
+
+        // Adaptar los datos a tu tipo Message
+        setMessages(
+            (data ?? []).map((msg: any) => ({
+                id: msg.id.toString(),
+                senderId: msg.sender_id,
+                receiverId: msg.receiver_id,
+                content: msg.content,
+                timestamp: new Date(msg.created_at),
+            }))
         );
     };
 
+    // Enviar mensaje y recargar la conversación
+    const sendMessage = async (senderId: string, receiverId: string, content: string) => {
+        const { error } = await supabase.from('messages').insert([
+            {
+                sender_id: senderId,
+                receiver_id: receiverId,
+                content,
+            },
+        ]);
+        if (error) {
+            console.error('Error sending message:', error);
+            return;
+        }
+        // Opcional: recargar mensajes después de enviar
+        await fetchConversation(senderId, receiverId);
+    };
+
     return (
-        <MessagesContext.Provider value={{ messages, sendMessage, getConversation }}>
+        <MessagesContext.Provider value={{ messages, fetchConversation, sendMessage }}>
             {children}
         </MessagesContext.Provider>
     );

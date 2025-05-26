@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+// import React-related hooks if needed in the future
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
@@ -13,33 +13,7 @@ import Dashboard from './pages/Dashboard';
 import AdminAds from './pages/AdminAds';
 import { UserProvider } from './context/UserContext';
 import Chat from './pages/Chat';
-
-interface MessagesContextType {
-  messages: string[];
-  addMessage: (msg: string) => void;
-}
-
-const MessagesContext = createContext<MessagesContextType | undefined>(undefined);
-
-export const MessagesProvider = ({ children }: { children: ReactNode }) => {
-  const [messages, setMessages] = useState<string[]>([]);
-
-  const addMessage = (msg: string) => setMessages((prev) => [...prev, msg]);
-
-  return (
-    <MessagesContext.Provider value={{ messages, addMessage }}>
-      {children}
-    </MessagesContext.Provider>
-  );
-};
-
-export const useMessages = () => {
-  const context = useContext(MessagesContext);
-  if (!context) {
-    throw new Error('useMessages must be used within a MessagesProvider');
-  }
-  return context;
-};
+import { MessagesProvider } from './context/MessagesContext';
 
 function App() {
   return (

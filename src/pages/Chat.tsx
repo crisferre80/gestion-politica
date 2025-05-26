@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 
 type Message = {
@@ -71,6 +71,7 @@ const Chat = () => {
   };
 
   if (!user) return <div>Debes iniciar sesión para ver el chat.</div>;
+  if (!otherUserId) return <div>No se encontró el usuario para chatear.</div>;
 
   return (
     <div className="max-w-xl mx-auto p-4 bg-white rounded shadow">
@@ -105,6 +106,12 @@ const Chat = () => {
           Enviar
         </button>
       </div>
+      <Link
+        to={`/chat/${otherUserId}`}
+        className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+      >
+        Enviar mensaje
+      </Link>
     </div>
   );
 };

@@ -566,7 +566,7 @@ const DashboardResident: React.FC = () => {
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
                   <Link
-                    to={`/chat/${rec.id}`}
+                    to={`/chat/${rec.id.toString()}`}
                     className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                   >
                     Enviar mensaje

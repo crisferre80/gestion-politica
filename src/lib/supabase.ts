@@ -196,16 +196,6 @@ export async function signInUser(email: string, password: string) {
   }
 }
 
-export async function signOutUser() {
-  try {
-    await supabase.auth.signOut();
-    await supabase.rpc('setOnlineStatusFalse');
-  } catch (error) {
-    console.error('SignOut error:', error);
-    throw error;
-  }
-}
-
 export async function cancelClaim(
   claimId: string,
   userId: string,

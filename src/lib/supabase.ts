@@ -26,6 +26,8 @@ export interface User {
 }
 
 export type CollectionPoint = {
+  lng: number;
+  lat: unknown;
   estimated_weight: number;
   cancellation_reason: string | null;
   cancelled_at: string | null; // ISO date string or null if not cancelled

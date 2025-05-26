@@ -473,20 +473,28 @@ const Dashboard: React.FC = () => {
   };
 
   const handleVerRutaGoogleMaps = (point: CollectionPoint) => {
-    if (!point.latitude || !point.longitude) {
+    // Usa los mismos campos que Mapbox: lat y lng
+    const destLat = Number(point.lat ?? point.latitude);
+    const destLng = Number(point.lng ?? point.longitude);
+
+    if (!destLat || !destLng) {
       toast.error('No se pudo obtener la ubicación del punto.');
       return;
     }
 
-    // Usa la ubicación actual del navegador
+    // Usa la ubicación del usuario si está disponible (como en Mapbox)
+    if (user && typeof user.lat === 'number' && typeof user.lng === 'number') {
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${destLat},${destLng}&travelmode=driving`;
+      window.open(url, '_blank');
+      return;
+    }
+
+    // Si no hay lat/lng en el usuario, pide la ubicación al navegador
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const originLat = position.coords.latitude;
           const originLng = position.coords.longitude;
-          const destLat = Number(point.latitude);
-          const destLng = Number(point.longitude);
-
           const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
           window.open(url, '_blank');
         },

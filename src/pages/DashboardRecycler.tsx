@@ -59,6 +59,7 @@ const Dashboard: React.FC = () => {
 
   // Cargar datos principales
   const fetchData = useCallback(async () => {
+    console.log('[fetchData] called', { user });
     try {
       setLoading(true);
       setError(null);
@@ -132,14 +133,17 @@ const Dashboard: React.FC = () => {
 
         setCollectionPoints(points);
       }
-    } catch {
+    } catch (e) {
+      console.error('[fetchData] error', e);
       setError('Error al cargar los datos');
     } finally {
       setLoading(false);
+      console.log('[fetchData] finished');
     }
   }, [user]);
 
   useEffect(() => {
+    console.log('[useEffect] user or fetchData changed', { user });
     if (user) {
       fetchData();
       if (user.avatar_url) setProfilePhoto(user.avatar_url);
@@ -147,6 +151,7 @@ const Dashboard: React.FC = () => {
   }, [user, fetchData]);
 
   useEffect(() => {
+    console.log('[useEffect] user changed for profileData', { user });
     setProfileData({
       name: user?.name || '',
       email: user?.email || '',
@@ -173,12 +178,14 @@ const Dashboard: React.FC = () => {
 
   // Estado online y geolocalización automática
   useEffect(() => {
+    console.log('[useEffect] geolocation effect', { user });
     let watchId: number | null = null;
     if (user && user.type === 'recycler') {
       if ('geolocation' in navigator) {
         watchId = navigator.geolocation.watchPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
+            console.log('[geolocation] position updated', { latitude, longitude });
             await supabase
               .from('profiles')
               .update({ lat: latitude, lng: longitude, online: true })
@@ -188,7 +195,7 @@ const Dashboard: React.FC = () => {
           },
           (error) => {
             setLocationError('No se pudo obtener tu ubicación en tiempo real. Activa la ubicación para aparecer en el mapa de residentes.');
-            console.error('No se pudo obtener la ubicación en tiempo real:', error);
+            console.error('[geolocation] error:', error);
           },
           { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
         );
@@ -197,6 +204,7 @@ const Dashboard: React.FC = () => {
       }
     }
     return () => {
+      console.log('[useEffect cleanup] geolocation effect', { user });
       if (watchId !== null && 'geolocation' in navigator) {
         navigator.geolocation.clearWatch(watchId);
       }
@@ -208,6 +216,7 @@ const Dashboard: React.FC = () => {
 
   // Conversaciones y mensajes
   useEffect(() => {
+    console.log('[useEffect] fetchConversations', { user, activeTab });
     if (user?.type !== 'recycler') return;
     const fetchConversations = async () => {
       const { data, error } = await supabase
@@ -232,6 +241,7 @@ const Dashboard: React.FC = () => {
   }, [user, activeTab]);
 
   useEffect(() => {
+    console.log('[useEffect] fetchMessages', { selectedConversation, user });
     if (!selectedConversation || !user?.id) return;
     const fetchMessages = async () => {
       const { data, error } = await supabase
@@ -258,6 +268,7 @@ const Dashboard: React.FC = () => {
 
   // Suscripción en tiempo real para mensajes nuevos
   useEffect(() => {
+    console.log('[useEffect] subscribe recycler-messages', { selectedConversation, user });
     if (!selectedConversation || !user?.id) return;
     const channel = supabase
       .channel('recycler-messages')
@@ -281,12 +292,13 @@ const Dashboard: React.FC = () => {
       )
       .subscribe();
     return () => {
+      console.log('[useEffect cleanup] unsubscribe recycler-messages');
       supabase.removeChannel(channel);
     };
   }, [selectedConversation, user]);
 
-  // Notificaciones de nuevos mensajes
   useEffect(() => {
+    console.log('[useEffect] subscribe messages-realtime', { user });
     if (!user?.id) return;
     const channel = supabase
       .channel('messages-realtime')
@@ -307,6 +319,7 @@ const Dashboard: React.FC = () => {
       )
       .subscribe();
     return () => {
+      console.log('[useEffect cleanup] unsubscribe messages-realtime');
       supabase.removeChannel(channel);
     };
   }, [user]);

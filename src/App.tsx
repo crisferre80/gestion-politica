@@ -58,7 +58,6 @@ function App() {
               <Route path="/add-collection-point" element={<AddCollectionPoint />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/admin/ads" element={<AdminAds />} />
-              {/* Nueva ruta para el chat */}
               <Route path="/chat/:otherUserId" element={<Chat />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

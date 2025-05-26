@@ -53,8 +53,8 @@ export const useMessages = () => {
 };
 
 const Chat = () => {
-  const { otherUserId } = useParams<{ otherUserId: string }>();
-  const { user } = useUser();
+  const { otherUserId } = useParams<{ otherUserId: string }>(); // ID del reciclador
+  const { user } = useUser(); // El residente autenticado
   const { messages, fetchMessages, sendMessage } = useMessages();
   const [input, setInput] = useState('');
 
@@ -74,7 +74,7 @@ const Chat = () => {
 
   return (
     <div className="max-w-xl mx-auto p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-4">Chat</h2>
+      <h2 className="text-xl font-bold mb-4">Chat con reciclador</h2>
       <div className="h-64 overflow-y-auto border p-2 mb-4 bg-gray-50">
         {messages.map(msg => (
           <div

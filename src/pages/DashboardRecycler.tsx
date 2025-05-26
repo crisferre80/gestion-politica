@@ -473,22 +473,30 @@ const Dashboard: React.FC = () => {
   };
 
   const handleVerRutaGoogleMaps = (point: CollectionPoint) => {
-    const originLat = user?.lat;
-    const originLng = user?.lng;
-    const destLat = Number(point.latitude);
-    const destLng = Number(point.longitude);
-
-    if (!originLat || !originLng) {
-      toast.error('No se pudo obtener tu ubicación actual.');
-      return;
-    }
-    if (!destLat || !destLng) {
+    if (!point.latitude || !point.longitude) {
       toast.error('No se pudo obtener la ubicación del punto.');
       return;
     }
 
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
-    window.open(url, '_blank');
+    // Usa la ubicación actual del navegador
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const originLat = position.coords.latitude;
+          const originLng = position.coords.longitude;
+          const destLat = Number(point.latitude);
+          const destLng = Number(point.longitude);
+
+          const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
+          window.open(url, '_blank');
+        },
+        () => {
+          toast.error('No se pudo obtener tu ubicación actual.');
+        }
+      );
+    } else {
+      toast.error('Tu navegador no soporta geolocalización.');
+    }
   };
 
   if (!user) {

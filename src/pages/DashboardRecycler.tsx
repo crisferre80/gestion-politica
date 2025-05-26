@@ -190,8 +190,8 @@ const Dashboard: React.FC = () => {
           .update({ lat: latitude, lng: longitude, online: true })
           .eq('id', user.id);
         if (isMounted) {
-          login({ ...user, lat: latitude, lng: longitude });
           setLocationError(null);
+          // NO LLAMAR login({ ...user, lat, lng }) aquí para evitar loops infinitos
         }
       } catch (err) {
         if (isMounted) {
@@ -232,7 +232,7 @@ const Dashboard: React.FC = () => {
         supabase.from('profiles').update({ online: false }).eq('id', user.id);
       }
     };
-  }, [user, login]);
+  }, [user]);
 
   // Conversaciones y mensajes
   useEffect(() => {

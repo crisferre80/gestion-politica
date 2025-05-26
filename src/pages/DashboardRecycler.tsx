@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Plus, Star, Phone, MapIcon, X, User, Camera, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase, type CollectionPoint, type RecyclerProfile, cancelClaim, deleteCollectionPoint, fetchRecyclerProfiles, claimCollectionPoint, uploadProfilePhoto } from '../lib/supabase';
 import Map from '../components/Map';
 import PhotoCapture from '../components/PhotoCapture';
 import CountdownTimer from '../components/CountdownTimer';
-import { useUser } from '../context/UserContext'; // Asegúrate de importar correctamente
-import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
+import { useUser } from '../context/UserContext';
+import { toast } from 'react-hot-toast';
 
 const Dashboard: React.FC = () => {
   const { user, login } = useUser();
@@ -31,12 +31,11 @@ const Dashboard: React.FC = () => {
     address: '',
     materials: '',
     bio: '',
-    service_areas: '', // Añadido para evitar error
-    experience_years: '', // Añadido para evitar error
+    service_areas: '',
+    experience_years: '',
   });
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  // Tipos
   interface ConversationProfile {
     name?: string;
     email?: string;
@@ -58,13 +57,13 @@ const Dashboard: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
 
-  const fetchData = React.useCallback(async () => {
+  // Cargar datos principales
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       if (user?.type === 'resident') {
-        // Fetch collection points
         const { data: pointsData, error: pointsError } = await supabase
           .from('collection_points')
           .select(`
@@ -77,12 +76,10 @@ const Dashboard: React.FC = () => {
             )
           `)
           .eq('user_id', user.id)
-          .eq('status', 'available') // Solo mostrar puntos no reclamados
+          .eq('status', 'available')
           .order('created_at', { ascending: false });
 
         if (pointsError) throw pointsError;
-
-        // Fetch recycler profiles
         const recyclerProfiles = await fetchRecyclerProfiles();
 
         setCollectionPoints(pointsData.map(point => ({
@@ -95,7 +92,6 @@ const Dashboard: React.FC = () => {
         setRecyclers(recyclerProfiles);
 
       } else if (user?.type === 'recycler') {
-        // For recyclers, fetch their claims
         const { data: claimsData, error: claimsError } = await supabase
           .from('collection_claims')
           .select(`
@@ -115,7 +111,6 @@ const Dashboard: React.FC = () => {
 
         if (claimsError) throw claimsError;
 
-        // Transform claims data into collection points format
         const points = claimsData.map(claim => ({
           ...claim.collection_point,
           claim_id: claim.id,
@@ -129,7 +124,6 @@ const Dashboard: React.FC = () => {
           cancelled_by: claim.cancelled_by,
           pickup_time: claim.pickup_time,
           estimated_weight: claim.estimated_weight,
-          // Datos del creador del punto
           creator_name: claim.collection_point?.profiles?.name || 'Usuario Anónimo',
           creator_email: claim.collection_point?.profiles?.email,
           creator_phone: claim.collection_point?.profiles?.phone,
@@ -138,8 +132,7 @@ const Dashboard: React.FC = () => {
 
         setCollectionPoints(points);
       }
-    } catch (err) {
-      console.error('Error fetching data:', err);
+    } catch {
       setError('Error al cargar los datos');
     } finally {
       setLoading(false);
@@ -149,85 +142,36 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchData();
-      if (user.avatar_url) {
-        setProfilePhoto(user.avatar_url);
-      }
+      if (user.avatar_url) setProfilePhoto(user.avatar_url);
     }
   }, [user, fetchData]);
 
   useEffect(() => {
-      setProfileData({
-        name: user?.name || '',
-        email: user?.email || '',
-        phone: user?.phone || '',
-        address: user?.address || '',
-        materials:
-          user?.type === 'recycler' && Array.isArray((user as unknown as RecyclerProfile).materials)
-            ? (user as unknown as RecyclerProfile).materials.join(', ')
-            : '',
-        bio:
-          user?.type === 'recycler' && typeof (user as unknown as RecyclerProfile).bio === 'string'
-            ? (user as unknown as RecyclerProfile).bio ?? ''
-            : '',
-        service_areas:
-          user?.type === 'recycler' && Array.isArray((user as unknown as RecyclerProfile).service_areas)
-            ? (user as unknown as RecyclerProfile).service_areas.join(', ')
-            : '',
-        experience_years:
-          user?.type === 'recycler' && typeof ((user as unknown as RecyclerProfile).experience_years) !== 'undefined'
-            ? String((user as unknown as RecyclerProfile).experience_years)
-            : '',
-      });
-      // Forzar recarga del campo online desde la base de datos si es reciclador
-      if (user && user.type === 'recycler') {
-        (async () => {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('online')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          if (!error && data && typeof data.online === 'boolean') {
-            user.online = data.online;
-          }
-        })();
-      }
-    }, [user]);
-
-  useEffect(() => {
-    const setOnlineStatus = async (online: boolean) => {
-      if (user && user.type === 'recycler') {
-        try {
-          const { error, data } = await supabase
-            .from('profiles')
-            .update({ online })
-            .eq('id', user.id);
-          if (error) {
-            console.error('Error actualizando online:', error);
-            setError('No se pudo actualizar el estado en línea.');
-          } else {
-            console.log('Estado online actualizado:', online, 'para usuario', user.id, data);
-          }
-        } catch (err) {
-          console.error('Excepción actualizando online:', err);
-          setError('Error inesperado al actualizar el estado en línea.');
-        }
-      }
-    };
-
-    // Solo poner offline al salir
-    const handleBeforeUnload = () => {
-      setOnlineStatus(false);
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      setOnlineStatus(false);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
+    setProfileData({
+      name: user?.name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      address: user?.address || '',
+      materials:
+        user?.type === 'recycler' && Array.isArray((user as unknown as RecyclerProfile).materials)
+          ? (user as unknown as RecyclerProfile).materials.join(', ')
+          : '',
+      bio:
+        user?.type === 'recycler' && typeof (user as unknown as RecyclerProfile).bio === 'string'
+          ? (user as unknown as RecyclerProfile).bio ?? ''
+          : '',
+      service_areas:
+        user?.type === 'recycler' && Array.isArray((user as unknown as RecyclerProfile).service_areas)
+          ? (user as unknown as RecyclerProfile).service_areas.join(', ')
+          : '',
+      experience_years:
+        user?.type === 'recycler' && typeof ((user as unknown as RecyclerProfile).experience_years) !== 'undefined'
+          ? String((user as unknown as RecyclerProfile).experience_years)
+          : '',
+    });
   }, [user]);
 
-  // Actualiza la ubicación del reciclador en tiempo real
+  // Estado online y geolocalización automática
   useEffect(() => {
     let watchId: number | null = null;
     if (user && user.type === 'recycler') {
@@ -239,7 +183,6 @@ const Dashboard: React.FC = () => {
               .from('profiles')
               .update({ lat: latitude, lng: longitude, online: true })
               .eq('id', user.id);
-            // Actualiza el contexto del usuario con la nueva ubicación
             login({ ...user, lat: latitude, lng: longitude });
             setLocationError(null);
           },
@@ -257,147 +200,13 @@ const Dashboard: React.FC = () => {
       if (watchId !== null && 'geolocation' in navigator) {
         navigator.geolocation.clearWatch(watchId);
       }
-      // Al salir, poner offline
       if (user && user.type === 'recycler') {
         supabase.from('profiles').update({ online: false }).eq('id', user.id);
       }
     };
   }, [user, login]);
 
-  const handleCancelClaim = async () => {
-    if (!selectedClaim || !user) return;
-
-    try {
-      setError(null);
-      await cancelClaim(
-        selectedClaim.id,
-        user.id,
-        cancellationReason
-      );
-
-      // Remove the cancelled point from the list
-      setCollectionPoints(points => points.filter(p => p.id !== selectedClaim.pointId));
-      
-      // Reset state
-      setShowCancelClaimModal(false);
-      setSelectedClaim(null);
-      setCancellationReason('');
-    } catch (err) {
-      console.error('Error cancelling claim:', err);
-      setError('Error al cancelar la reclamación');
-    }
-  };
-
-  const handleDeletePoint = async (pointId: string) => {
-    try {
-      setError(null);
-      await deleteCollectionPoint(pointId);
-      setCollectionPoints(points => points.filter(p => p.id !== pointId));
-      setShowDeleteConfirm(false);
-      setPointToDelete(null);
-    } catch (err) {
-      console.error('Error deleting point:', err);
-      setError('Error al eliminar el punto de recolección');
-    }
-  };
-
-
-  // Nueva función para reclamar un punto
-  const handleClaimPoint = async (pointId: string) => {
-    if (!user) return;
-    try {
-      setError(null);
-      // Llama a tu función para reclamar el punto (debes implementarla en tu backend/supabase)
-      // Aquí puedes pedir al usuario que seleccione una fecha/hora o usar la actual como ejemplo
-      const pickupTime = new Date().toISOString();
-      await claimCollectionPoint(pointId, user.id, pickupTime);
-      // Actualiza el estado local para reflejar el cambio inmediatamente
-      setCollectionPoints(points =>
-        points.map(p =>
-          p.id === pointId ? { ...p, status: 'claimed' } : p
-        )
-      );
-    } catch (err) {
-      console.error('Error al reclamar el punto:', err);
-      setError('Error al reclamar el punto');
-    }
-  };
-
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setProfileData(prev => ({ ...prev, [id]: value }));
-  };
-
-  const handleSaveProfile = async () => {
-    if (!user) return;
-    try {
-      setError(null);
-      // Actualiza datos generales en profiles
-      const { data: profileDataResult, error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          name: profileData.name,
-          email: profileData.email,
-          phone: profileData.phone,
-          address: profileData.address,
-        })
-        .eq('id', user.id) // <-- Cambia aquí si tu columna es 'id'
-        .select()
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-
-      let recyclerDataResult = null;
-      if (user.type === 'recycler') {
-        // Actualiza datos de reciclador en recycler_profiles
-        const { data: recyclerData, error: recyclerError } = await supabase
-          .from('recycler_profiles')
-          .update({
-            materials: profileData.materials.split(',').map(m => m.trim()),
-            service_areas: profileData.service_areas.split(',').map(z => z.trim()),
-            bio: profileData.bio,
-            experience_years: Number(profileData.experience_years),
-          })
-          .eq('user_id', user.id)
-          .select()
-          .maybeSingle();
-        if (recyclerError) throw recyclerError;
-        recyclerDataResult = recyclerData;
-      }
-
-      // Actualiza el estado local del perfil
-      setProfileData(prev => ({
-        ...prev,
-        ...profileDataResult,
-        ...(user.type === 'recycler' && recyclerDataResult
-          ? {
-              materials: Array.isArray(recyclerDataResult.materials)
-                ? recyclerDataResult.materials.join(', ')
-                : '',
-              bio: recyclerDataResult.bio || '',
-            }
-          : {}),
-      }));
-      // Actualiza el usuario en el contexto
-      login({
-        ...user,
-        name: profileDataResult.name,
-        email: profileDataResult.email,
-        phone: profileDataResult.phone,
-        address: profileDataResult.address,
-        ...(user.type === 'recycler' && recyclerDataResult
-          ? {
-              materials: recyclerDataResult.materials,
-              bio: recyclerDataResult.bio,
-            }
-          : {}),
-      });
-    } catch {
-      setError('Error al actualizar el perfil');
-    }
-  };
-
-  // 1. Cargar conversaciones (usuarios únicos que han enviado mensajes)
+  // Conversaciones y mensajes
   useEffect(() => {
     if (user?.type !== 'recycler') return;
     const fetchConversations = async () => {
@@ -407,7 +216,6 @@ const Dashboard: React.FC = () => {
         .eq('receiver_id', user.id)
         .order('created_at', { ascending: false });
       if (!error && data) {
-        // Agrupa por sender_id
         const unique = Object.values(
           data.reduce((acc: Record<string, Conversation>, msg) => {
             acc[msg.sender_id] = {
@@ -423,7 +231,6 @@ const Dashboard: React.FC = () => {
     fetchConversations();
   }, [user, activeTab]);
 
-  // 2. Cargar mensajes de la conversación seleccionada
   useEffect(() => {
     if (!selectedConversation || !user?.id) return;
     const fetchMessages = async () => {
@@ -437,7 +244,6 @@ const Dashboard: React.FC = () => {
     fetchMessages();
   }, [selectedConversation, user]);
 
-  // 3. Enviar mensaje
   const handleSendMessage = async () => {
     if (!chatInput.trim() || !user?.id || !selectedConversation) return;
     await supabase.from('messages').insert([
@@ -450,7 +256,7 @@ const Dashboard: React.FC = () => {
     setChatInput('');
   };
 
-  // 4. Suscripción en tiempo real para mensajes nuevos
+  // Suscripción en tiempo real para mensajes nuevos
   useEffect(() => {
     if (!selectedConversation || !user?.id) return;
     const channel = supabase
@@ -479,7 +285,7 @@ const Dashboard: React.FC = () => {
     };
   }, [selectedConversation, user]);
 
-  // Suscripción para notificaciones de nuevos mensajes
+  // Notificaciones de nuevos mensajes
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -494,7 +300,6 @@ const Dashboard: React.FC = () => {
         },
         (payload) => {
           const msg = payload.new;
-          // Notifica solo si el mensaje es para este usuario y no lo envió él mismo
           if (msg.receiver_id === user.id && msg.sender_id !== user.id) {
             toast.success('¡Nuevo mensaje recibido!');
           }
@@ -506,30 +311,137 @@ const Dashboard: React.FC = () => {
     };
   }, [user]);
 
+  // Funciones de acciones
+  const handleCancelClaim = async () => {
+    if (!selectedClaim || !user) return;
+    try {
+      setError(null);
+      await cancelClaim(selectedClaim.id, user.id, cancellationReason);
+      setCollectionPoints(points => points.filter(p => p.id !== selectedClaim.pointId));
+      setShowCancelClaimModal(false);
+      setSelectedClaim(null);
+      setCancellationReason('');
+    } catch {
+      setError('Error al cancelar la reclamación');
+    }
+  };
+
+  const handleDeletePoint = async (pointId: string) => {
+    try {
+      setError(null);
+      await deleteCollectionPoint(pointId);
+      setCollectionPoints(points => points.filter(p => p.id !== pointId));
+      setShowDeleteConfirm(false);
+      setPointToDelete(null);
+    } catch {
+      setError('Error al eliminar el punto de recolección');
+    }
+  };
+
+  const handleClaimPoint = async (pointId: string) => {
+    if (!user) return;
+    try {
+      setError(null);
+      const pickupTime = new Date().toISOString();
+      await claimCollectionPoint(pointId, user.id, pickupTime);
+      setCollectionPoints(points =>
+        points.map(p =>
+          p.id === pointId ? { ...p, status: 'claimed' } : p
+        )
+      );
+    } catch {
+      setError('Error al reclamar el punto');
+    }
+  };
+
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setProfileData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    try {
+      setError(null);
+      const { data: profileDataResult, error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          name: profileData.name,
+          email: profileData.email,
+          phone: profileData.phone,
+          address: profileData.address,
+        })
+        .eq('id', user.id)
+        .select()
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      let recyclerDataResult = null;
+      if (user.type === 'recycler') {
+        const { data: recyclerData, error: recyclerError } = await supabase
+          .from('recycler_profiles')
+          .update({
+            materials: profileData.materials.split(',').map(m => m.trim()),
+            service_areas: profileData.service_areas.split(',').map(z => z.trim()),
+            bio: profileData.bio,
+            experience_years: Number(profileData.experience_years),
+          })
+          .eq('user_id', user.id)
+          .select()
+          .maybeSingle();
+        if (recyclerError) throw recyclerError;
+        recyclerDataResult = recyclerData;
+      }
+
+      setProfileData(prev => ({
+        ...prev,
+        ...profileDataResult,
+        ...(user.type === 'recycler' && recyclerDataResult
+          ? {
+              materials: Array.isArray(recyclerDataResult.materials)
+                ? recyclerDataResult.materials.join(', ')
+                : '',
+              bio: recyclerDataResult.bio || '',
+            }
+          : {}),
+      }));
+      login({
+        ...user,
+        name: profileDataResult.name,
+        email: profileDataResult.email,
+        phone: profileDataResult.phone,
+        address: profileDataResult.address,
+        ...(user.type === 'recycler' && recyclerDataResult
+          ? {
+              materials: recyclerDataResult.materials,
+              bio: recyclerDataResult.bio,
+            }
+          : {}),
+      });
+    } catch {
+      setError('Error al actualizar el perfil');
+    }
+  };
+
   const handlePhotoUpload = async (file: File) => {
     try {
       if (!user) return;
-      // Asume que tienes la función uploadProfilePhoto en tu lib/supabase
       const publicUrl = await uploadProfilePhoto(user.id, file);
       setProfilePhoto(publicUrl);
       toast.success('Foto actualizada correctamente');
-      // Actualiza el usuario en el contexto para reflejar el nuevo avatar
       login({
         ...user,
         avatar_url: publicUrl,
       });
-    } catch (err) {
+    } catch {
       toast.error('Error al subir la foto');
-      console.error(err);
     }
   };
 
-  // Añade esta función dentro del componente Dashboard
   const handleVerRutaGoogleMaps = (point: CollectionPoint) => {
-    // Ubicación del reciclador (usuario actual)
     const originLat = user?.lat;
     const originLng = user?.lng;
-    // Ubicación del punto de recolección
     const destLat = Number(point.latitude);
     const destLng = Number(point.longitude);
 
@@ -545,26 +457,6 @@ const Dashboard: React.FC = () => {
     const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
     window.open(url, '_blank');
   };
-
-  useEffect(() => {
-    if (user?.type === 'recycler' && (!user.lat || !user.lng)) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-
-          // Actualiza en Supabase
-          await supabase
-            .from('profiles')
-            .update({ lat, lng })
-            .eq('id', user.id);
-
-          // Actualiza en el contexto
-          login({ ...user, lat, lng });
-        });
-      }
-    }
-  }, [login, user]);
 
   if (!user) {
     return (
@@ -587,7 +479,6 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Mostrar mensaje de error de geolocalización si existe
   const geoErrorBanner = locationError ? (
     <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6 mt-4">
       <div className="flex">
@@ -602,7 +493,6 @@ const Dashboard: React.FC = () => {
       </div>
     </div>
   ) : null;
-
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">

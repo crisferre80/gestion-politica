@@ -1,11 +1,9 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+ 
+
 
 export interface User {
   id: string;

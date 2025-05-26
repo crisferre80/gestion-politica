@@ -46,6 +46,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  // Removed local routeDestination state to avoid duplicate identifier error
 
   useEffect(() => {
     if (showUserLocation) {
@@ -74,6 +75,15 @@ const MapComponent: React.FC<MapComponentProps> = ({
       }
     }
   }, [showUserLocation, showRoute, routeDestination]);
+
+  useEffect(() => {
+    if (userLocation && routeDestination) {
+      drawRoute(
+        [userLocation.longitude, userLocation.latitude],
+        [routeDestination.lng, routeDestination.lat]
+      );
+    }
+  }, [userLocation, routeDestination]);
 
   const drawRoute = async (start: [number, number], end: [number, number]) => {
     try {
@@ -179,7 +189,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
             key={point.id}
             longitude={point.lng}
             latitude={point.lat}
-            onClick={() => onMarkerClick && onMarkerClick(point.id)}
+            onClick={() => {
+              if (onMarkerClick) onMarkerClick(point.id);
+              // setRouteDestination({ lat: point.lat, lng: point.lng }); // Use prop to control routeDestination
+            }}
           >
             <div className="cursor-pointer transform -translate-x-1/2 -translate-y-1/2 relative flex flex-col items-center">
               {point.isRecycler ? (

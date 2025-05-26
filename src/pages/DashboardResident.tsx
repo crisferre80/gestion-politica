@@ -60,8 +60,8 @@ const DashboardResident: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>('puntos');
   const [selectedRecycler, setSelectedRecycler] = useState<{ id: number; name: string } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatRecyclerId, setChatRecyclerId] = useState<number | null>(null);
-  const [chatRecyclerName, setChatRecyclerName] = useState('');
+  const [chatRecyclerId] = useState<number | null>(null);
+  const [chatRecyclerName] = useState('');
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   // const [] = useState(false);
@@ -567,16 +567,12 @@ const DashboardResident: React.FC = () => {
                     ))}
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
-                  <button
+                  <Link
+                    to={`/chat/${rec.id}`}
                     className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                    onClick={() => {
-                      setChatRecyclerId(rec.id);
-                      setChatRecyclerName(rec.profiles?.name || 'Reciclador');
-                      setChatOpen(true);
-                    }}
                   >
                     Enviar mensaje
-                  </button>
+                  </Link>
                 </div>
               ))}
             </div>

@@ -1247,6 +1247,13 @@ const Dashboard: React.FC = () => {
                             {recycler.profiles.phone}
                           </div>
                         )}
+                        {/* Botón de chat */}
+                        <Link
+                          to={`/chat/${recycler.id}`}
+                          className="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 font-semibold transition text-sm"
+                        >
+                          Chatear
+                        </Link>
                       </div>
                     ))}
                   </div>
@@ -1514,7 +1521,7 @@ const Dashboard: React.FC = () => {
 export default Dashboard;
 
 
- 
+
 
 
 

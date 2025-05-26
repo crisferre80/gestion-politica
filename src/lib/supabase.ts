@@ -176,11 +176,7 @@ export async function signInUser(email: string, password: string) {
 
       if (fetchError || !newProfile) throw new Error('Failed to fetch profile');
 
-      // Si es reciclador, poner online
-      if (newProfile.role === 'recycler') {
-        await supabase.rpc('setOnlineStatusTrue');
-      }
-
+   
       return { 
         data: authData, 
         profile: { ...newProfile, type: newProfile.role }

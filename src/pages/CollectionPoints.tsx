@@ -19,6 +19,7 @@ function PuntosRecoleccion() {
   const [selectedPickupTime, setSelectedPickupTime] = useState<Date | null>(null);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const [pickupExtra, setPickupExtra] = useState('');
 
   const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos'];
 
@@ -81,19 +82,19 @@ function PuntosRecoleccion() {
         .update({ 
           status: 'claimed',
           recycler_id: user.id,
-          claimed_at: new Date().toISOString()
+          claimed_at: new Date().toISOString(),
+          additional_info: pickupExtra // Actualiza si corresponde
         })
         .eq('id', pointId)
         .eq('status', 'available');
 
       if (error) throw error;
 
-      // No modifiques el estado local aquí, solo cierra el modal y resetea selección
       setShowPickupModal(false);
       setSelectedPointId(null);
       setSelectedPickupTime(null);
+      setPickupExtra(''); // limpia el campo
       alert('Punto de recolección reclamado exitosamente');
-      // Refresca la lista desde el backend para evitar inconsistencias de DOM
       await fetchPoints();
     } catch (err) {
       console.error('Error claiming point:', err);
@@ -326,6 +327,11 @@ function PuntosRecoleccion() {
                             <Calendar className="h-4 w-4 mr-1" />
                             <span>{point.schedule}</span>
                           </div>
+                          {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
+                            <div className="mt-2 text-sm text-gray-600">
+                              <strong>Información adicional:</strong> {point.additional_info}
+                            </div>
+                          )}
                           <div className="mt-4 pt-4 border-t border-gray-200">
                             <button
                               onClick={() => handleCancelClaim(point.id)}
@@ -437,6 +443,18 @@ function PuntosRecoleccion() {
                   placeholderText="Selecciona fecha y hora"
                 />
               </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Información adicional (opcional)
+                </label>
+                <textarea
+                  value={pickupExtra}
+                  onChange={e => setPickupExtra(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  placeholder="Ejemplo: Instrucciones para el recolector, referencias, etc."
+                  rows={2}
+                />
+              </div>
               {error && (
                 <div className="bg-red-50 border-l-4 border-red-400 p-2 mb-3">
                   <p className="text-sm text-red-700">{error}</p>
@@ -448,6 +466,7 @@ function PuntosRecoleccion() {
                     setShowPickupModal(false);
                     setSelectedPointId(null);
                     setSelectedPickupTime(null);
+                    setPickupExtra('');
                   }}
                   className="px-4 py-2 text-gray-700 hover:text-gray-900"
                 >

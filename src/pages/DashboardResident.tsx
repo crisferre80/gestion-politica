@@ -25,6 +25,7 @@ export type ProfileRealtimePayload = {
 };
 
 type CollectionPoint = {
+  additional_info: boolean;
   notas: string;
   id: number;
   address: string;
@@ -474,8 +475,13 @@ const DashboardResident: React.FC = () => {
                         <Calendar className="inline-block w-4 h-4 mr-1" />
                         {point.schedule}
                       </p>
+                      {/* Mostrar notas adicionales si existen */}
                       {point.notas && (
                         <p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>
+                      )}
+                      {/* Mostrar información adicional si existe */}
+                      {point.additional_info && (
+                        <p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>
                       )}
                     </div>
                     {/* GIF animado a la derecha */}

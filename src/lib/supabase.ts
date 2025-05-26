@@ -26,6 +26,7 @@ export interface User {
 }
 
 export type CollectionPoint = {
+  additional_info: unknown;
   user_id: string;
   recycler_id: string;
   lng: number;
@@ -49,6 +50,7 @@ export type CollectionPoint = {
   status: string;
   claim_id?: string | null; // <-- usa claim_id
   pickup_time?: string | null;
+  pickup_extra?: string | null; // Nuevo campo agregado
   // otros campos...
 };
 
@@ -305,32 +307,25 @@ export async function fetchRecyclers() {
 }
 
 export async function claimCollectionPoint(pointId: string, recyclerId: string, pickupTime: string) {
-  const { data: claim, error: claimError } = await supabase
+  // Insertar reclamo
+  const { error: claimError } = await supabase
     .from('collection_claims')
-    .insert([{
-      collection_point_id: pointId,
-      recycler_id: recyclerId,
-      status: 'pending',
-      pickup_time: pickupTime
-    }])
-    .select()
-    .single();
-
+    .insert([
+      {
+        collection_point_id: pointId,
+        recycler_id: recyclerId,
+        pickup_time: pickupTime,
+        status: 'claimed',
+      }
+    ]);
   if (claimError) throw claimError;
 
-  // Update collection point status
+  // Actualizar estado del punto
   const { error: updateError } = await supabase
     .from('collection_points')
-    .update({ 
-      status: 'claimed',
-      claim_id: recyclerId,
-      pickup_time: pickupTime
-    })
+    .update({ status: 'claimed' })
     .eq('id', pointId);
-
   if (updateError) throw updateError;
-
-  return claim;
 }
 
 export async function fetchCollectionPoints() {

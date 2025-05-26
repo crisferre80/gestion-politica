@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export type User = {
+  lng: number;
+  lat: number;
   id: string;
   name?: string;
   email?: string;
@@ -11,6 +13,7 @@ export type User = {
   schedule?: string;
   type?: string;
   bio?: string;
+  online?: boolean;
   // otros campos...
 };
 

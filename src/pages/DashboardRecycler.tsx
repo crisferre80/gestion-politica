@@ -5,7 +5,7 @@ import { supabase, type CollectionPoint, type RecyclerProfile, cancelClaim, dele
 import Map from '../components/Map';
 import PhotoCapture from '../components/PhotoCapture';
 import CountdownTimer from '../components/CountdownTimer';
-import { useUser } from '../context/UserContext';
+import { useUser } from '../context/UserContext'; // Asegúrate de importar correctamente
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
 
 const Dashboard: React.FC = () => {
@@ -239,6 +239,8 @@ const Dashboard: React.FC = () => {
               .from('profiles')
               .update({ lat: latitude, lng: longitude, online: true })
               .eq('id', user.id);
+            // Actualiza el contexto del usuario con la nueva ubicación
+            login({ ...user, lat: latitude, lng: longitude });
             setLocationError(null);
           },
           (error) => {
@@ -260,7 +262,7 @@ const Dashboard: React.FC = () => {
         supabase.from('profiles').update({ online: false }).eq('id', user.id);
       }
     };
-  }, [user]);
+  }, [user, login]);
 
   const handleCancelClaim = async () => {
     if (!selectedClaim || !user) return;
@@ -543,6 +545,26 @@ const Dashboard: React.FC = () => {
     const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
     window.open(url, '_blank');
   };
+
+  useEffect(() => {
+    if (user?.type === 'recycler' && (!user.lat || !user.lng)) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+
+          // Actualiza en Supabase
+          await supabase
+            .from('profiles')
+            .update({ lat, lng })
+            .eq('id', user.id);
+
+          // Actualiza en el contexto
+          login({ ...user, lat, lng });
+        });
+      }
+    }
+  }, [login, user]);
 
   if (!user) {
     return (
@@ -1188,7 +1210,6 @@ const Dashboard: React.FC = () => {
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                           />
                         </div>
-                        
                         <div>
                           <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
                             Teléfono

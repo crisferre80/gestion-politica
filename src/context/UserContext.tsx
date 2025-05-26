@@ -1,17 +1,18 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
-export interface User {
+export type User = {
   id: string;
-  name: string;
-  email: string;
+  name?: string;
+  email?: string;
   phone?: string;
-  address?: string;
-  type: 'resident' | 'recycler';
   avatar_url?: string;
-  online?: boolean;
-  lat?: number;
-  lng?: number;
-}
+  address?: string;
+  materials?: string[];
+  schedule?: string;
+  type?: string;
+  bio?: string;
+  // otros campos...
+};
 
 interface UserContextType {
   user: User | null;

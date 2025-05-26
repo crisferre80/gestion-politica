@@ -15,7 +15,7 @@ function PuntosRecoleccion() {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState('');
+  const [error, setError] = useState('');
   const [selectedPickupTime, setSelectedPickupTime] = useState<Date | null>(null);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
@@ -76,7 +76,7 @@ function PuntosRecoleccion() {
     }
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('collection_points')
         .update({ 
           status: 'claimed',
@@ -86,13 +86,15 @@ function PuntosRecoleccion() {
         .eq('id', pointId)
         .eq('status', 'available');
 
-      // Update local state
-      setCollectionPoints(points => points.filter(p => p.id !== pointId));
+      if (error) throw error;
+
+      // No modifiques el estado local aquí, solo cierra el modal y resetea selección
       setShowPickupModal(false);
       setSelectedPointId(null);
       setSelectedPickupTime(null);
-      
       alert('Punto de recolección reclamado exitosamente');
+      // Refresca la lista desde el backend para evitar inconsistencias de DOM
+      await fetchPoints();
     } catch (err) {
       console.error('Error claiming point:', err);
       setError('Error al reclamar el punto de recolección');
@@ -104,24 +106,46 @@ function PuntosRecoleccion() {
     try {
       const { error } = await supabase
         .from('collection_points')
-        .update({ status: 'available', claimed_by: null, pickup_time: null })
+        .update({ status: 'available', claimed_by: null, pickup_time: null, recycler_id: null, claimed_at: null })
         .eq('id', pointId);
 
       if (error) throw error;
 
-      setCollectionPoints(points =>
-        points.map(p =>
-          p.id === pointId
-            ? { ...p, status: 'available', claimed_by: '', pickup_time: undefined }
-            : p
-        )
-      );
+      // Refresca la lista desde el backend para evitar inconsistencias de DOM
+      await fetchPoints();
       alert('Reclamación cancelada');
     } catch (err) {
       console.error('Error cancelando reclamación:', err);
       setError('Error al cancelar la reclamación');
     }
   };
+
+  // Función para eliminar un punto de recolección
+  const handleDeletePoint = async (pointId: string) => {
+    if (!user) {
+      setError('Debes iniciar sesión para eliminar puntos de recolección');
+      return;
+    }
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este punto de recolección?')) {
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('collection_points')
+        .delete()
+        .eq('id', pointId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      await fetchPoints();
+      alert('Punto de recolección eliminado exitosamente');
+    } catch (err) {
+      console.error('Error eliminando punto:', err);
+      setError('Error al eliminar el punto de recolección');
+    }
+  };
+
 
   const toggleMaterial = (material: string) => {
     if (selectedMaterials.includes(material)) {
@@ -132,16 +156,25 @@ function PuntosRecoleccion() {
   };
 
   const filteredPoints = collectionPoints.filter(point => {
-    const matchesSearch = 
+    const matchesSearch =
       point.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
       point.district.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesMaterials = 
-      selectedMaterials.length === 0 || 
+
+    const matchesMaterials =
+      selectedMaterials.length === 0 ||
       selectedMaterials.some(material => point.materials.includes(material));
-    
+
     return matchesSearch && matchesMaterials;
   });
+
+  // NUEVO: Separa los puntos reclamados por el recolector logueado
+  const claimedByMe = user && user.type === 'recycler'
+    ? filteredPoints.filter(p => p.status === 'claimed' && p.recycler_id === user.id)
+    : [];
+
+  const availablePoints = filteredPoints.filter(
+    p => !(user && user.type === 'recycler' && p.status === 'claimed' && p.recycler_id === user.id)
+  );
 
   const mapPoints = viewMode === 'map' ? filteredPoints.map(point => ({
     id: point.id,
@@ -155,6 +188,14 @@ function PuntosRecoleccion() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-xl text-gray-600">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-xl text-red-600">{error}</p>
       </div>
     );
   }
@@ -261,9 +302,55 @@ function PuntosRecoleccion() {
           </div>
         ) : (
           <>
-            {filteredPoints.length > 0 ? (
+            {/* Sección de puntos reclamados por el recolector */}
+            {user && user.type === 'recycler' && (
+              <div className="mb-10">
+                <h2 className="text-lg font-bold text-green-700 mb-4">Puntos de Recolección Reclamados</h2>
+                {claimedByMe.length > 0 ? (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {claimedByMe.map(point => (
+                      <div key={point.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start">
+                              <MapPin className="h-5 w-5 text-green-500 mr-2 mt-1" />
+                              <div>
+                                <h3 className="font-medium text-gray-900">{point.address}</h3>
+                                <p className="text-sm text-gray-500">
+                                  Materiales: {point.materials.join(', ')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex items-center text-sm text-gray-500">
+                            <Calendar className="h-4 w-4 mr-1" />
+                            <span>{point.schedule}</span>
+                          </div>
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <button
+                              onClick={() => handleCancelClaim(point.id)}
+                              className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center justify-center"
+                            >
+                              Cancelar reclamación
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+                    <p className="text-gray-500">No tienes puntos reclamados.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sección de puntos disponibles */}
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Puntos de Recolección Disponibles</h2>
+            {availablePoints.length > 0 ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {filteredPoints.map((point) => (
+                {availablePoints.map(point => (
                   <div key={point.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
                     <div className="p-4">
                       <div className="flex items-start justify-between">
@@ -276,34 +363,35 @@ function PuntosRecoleccion() {
                             </p>
                           </div>
                         </div>
+                        {/* Botón eliminar solo para el creador */}
+                        {user && user.id === point.user_id && (
+                          <button
+                            onClick={() => handleDeletePoint(point.id)}
+                            className="ml-2 text-red-600 hover:text-red-800"
+                            title="Eliminar punto"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
-                      
                       <div className="mt-4 flex items-center text-sm text-gray-500">
                         <Calendar className="h-4 w-4 mr-1" />
                         <span>{point.schedule}</span>
                       </div>
-
                       {user && user.type === 'recycler' && (
                         <div className="mt-4 pt-4 border-t border-gray-200">
-                          {point.status === 'claimed' && point.claimed_by === user.id ? (
-                            <button
-                              onClick={() => handleCancelClaim(point.id)}
-                              className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 flex items-center justify-center"
-                            >
-                              Cancelar reclamación
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={() => {
-                                setSelectedPointId(point.id);
-                                setShowPickupModal(true);
-                              }}
-                              className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center justify-center"
-                            >
-                              <Clock className="h-4 w-4 mr-2" />
-                              Programar Recolección
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedPointId(point.id);
+                              setShowPickupModal(true);
+                            }}
+                            className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center justify-center"
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Programar Recolección
+                          </button>
                         </div>
                       )}
                     </div>
@@ -326,52 +414,62 @@ function PuntosRecoleccion() {
             )}
           </>
         )}
-      </div>
 
-      {showPickupModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Seleccionar fecha y hora de recolección
-            </h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                ¿Cuándo pasarás a recoger?
-              </label>
-              <DatePicker
-                selected={selectedPickupTime}
-                onChange={(date) => setSelectedPickupTime(date)}
-                showTimeSelect
-                timeFormat="HH:mm"
-                timeIntervals={30}
-                dateFormat="MMMM d, yyyy h:mm aa"
-                minDate={new Date()}
-                className="w-full border border-gray-300 rounded-md shadow-sm p-2"
-                placeholderText="Selecciona fecha y hora"
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowPickupModal(false);
-                  setSelectedPointId(null);
-                  setSelectedPickupTime(null);
-                }}
-                className="px-4 py-2 text-gray-700 hover:text-gray-900"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => selectedPointId && handleClaimPoint(selectedPointId)}
-                disabled={!selectedPickupTime}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-              >
-                Confirmar
-              </button>
+        {showPickupModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Programar recolección
+              </h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Selecciona fecha y hora para la recolección
+                </label>
+                <DatePicker
+                  selected={selectedPickupTime}
+                  onChange={(date) => setSelectedPickupTime(date)}
+                  showTimeSelect
+                  timeFormat="HH:mm"
+                  timeIntervals={30}
+                  dateFormat="MMMM d, yyyy h:mm aa"
+                  minDate={new Date()}
+                  className="w-full border border-gray-300 rounded-md shadow-sm p-2"
+                  placeholderText="Selecciona fecha y hora"
+                />
+              </div>
+              {error && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-2 mb-3">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowPickupModal(false);
+                    setSelectedPointId(null);
+                    setSelectedPickupTime(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    if (selectedPointId) {
+                      await handleClaimPoint(selectedPointId);
+                      // El modal se cierra y el estado se limpia en handleClaimPoint
+                    }
+                  }}
+                  disabled={!selectedPickupTime}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                >
+                  Confirmar reclamación
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

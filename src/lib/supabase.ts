@@ -26,6 +26,8 @@ export interface User {
 }
 
 export type CollectionPoint = {
+  user_id: string;
+  recycler_id: string;
   lng: number;
   lat: unknown;
   estimated_weight: number;

@@ -36,6 +36,20 @@ type CollectionPoint = {
   // Agrega aquí otros campos si existen en tu tabla
 };
 
+export type User = {
+  id: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  avatar_url?: string;
+  address?: string;
+  materials?: string[]; // <-- agrega esto si falta
+  schedule?: string;
+  type?: string;
+  bio?: string;         // <-- agrega esto si falta
+  // otros campos...
+};
+
 const DashboardResident: React.FC = () => {
   const { user } = useUser();
   const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
@@ -253,12 +267,8 @@ const DashboardResident: React.FC = () => {
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
-  // eslint-disable-next-line no-empty-pattern
-  const [] = useState(user?.materials?.join(', ') || '');
-  // eslint-disable-next-line no-empty-pattern
-  const [] = useState(user?.schedule || '');
-  // eslint-disable-next-line no-empty-pattern
-  const [] = useState('');
+  const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
+  
   // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
 
   useEffect(() => {
@@ -586,6 +596,8 @@ const DashboardResident: React.FC = () => {
                 phone: editPhone,
                 address: editAddress,
                 bio: editBio,
+                materials: editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean),
+                
               }).eq('user_id', user?.id);
               if (!error) {
                 setSuccess('Perfil actualizado correctamente');
@@ -632,6 +644,14 @@ const DashboardResident: React.FC = () => {
               <div className="text-left md:col-span-2">
                 <label className="text-gray-600 text-sm">Biografía / Nota</label>
                 <textarea className="font-semibold w-full border rounded px-2 py-1" value={editBio} onChange={e => setEditBio(e.target.value)} />
+              </div>
+              <div className="text-left md:col-span-2">
+                <label className="text-gray-600 text-sm">Materiales (separados por coma)</label>
+                <input
+                  className="font-semibold w-full border rounded px-2 py-1"
+                  value={editMaterials}
+                  onChange={e => setEditMaterials(e.target.value)}
+                />
               </div>
             </div>
             <button type="submit" className="mt-4 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">Actualizar Perfil</button>

@@ -397,3 +397,5 @@ export async function createCollectionPoint(point: Omit<CollectionPoint, 'id' | 
 // SQL policies for messages table should be managed in your Supabase dashboard or SQL migration scripts.
 
 // Obtener perfil completo de reciclador
+
+// (Express backend code removed. Move it to a separate file, e.g., server.ts)

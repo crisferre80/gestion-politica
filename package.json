@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@mapbox/mapbox-gl-directions": "^4.3.1",
-    "@supabase/supabase-js": "^2.39.3",
+    "@supabase/supabase-js": "^2.49.8",
     "@types/react-datepicker": "^6.0.1",
+    "cors": "^2.8.5",
     "date-fns": "^3.3.1",
+    "express": "^5.1.0",
     "lucide-react": "^0.344.0",
     "mapbox-gl": "^3.1.2",
     "react": "^18.3.1",
@@ -27,6 +29,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.2",
     "@types/mapbox-gl": "^2.7.21",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",

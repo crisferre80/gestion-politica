@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Filter, Search, Plus, List, Map as MapIcon, Clock } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import Map from '../components/Map';
-import { supabase, type CollectionPoint, claimCollectionPoint } from '../lib/supabase';
+import { supabase, type CollectionPoint } from '../lib/supabase';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
-const CollectionPoints: React.FC = () => {
+function PuntosRecoleccion() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
@@ -34,13 +34,12 @@ const CollectionPoints: React.FC = () => {
             phone
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .eq('status', 'available');
 
       if (user && user.type === 'recycler') {
         query = query.or(`status.eq.available,status.eq.claimed.and(claimed_by.eq.${user.id})`);
-      } else {
-        query = query.eq('status', 'available');
-      }
+      } 
 
       const { data, error: supabaseError } = await query;
 
@@ -77,8 +76,16 @@ const CollectionPoints: React.FC = () => {
     }
 
     try {
-      await claimCollectionPoint(pointId, user.id, selectedPickupTime.toISOString());
-      
+      await supabase
+        .from('collection_points')
+        .update({ 
+          status: 'claimed',
+          recycler_id: user.id,
+          claimed_at: new Date().toISOString()
+        })
+        .eq('id', pointId)
+        .eq('status', 'available');
+
       // Update local state
       setCollectionPoints(points => points.filter(p => p.id !== pointId));
       setShowPickupModal(false);
@@ -367,6 +374,6 @@ const CollectionPoints: React.FC = () => {
       )}
     </div>
   );
-};
+}
 
-export default CollectionPoints;
+export default PuntosRecoleccion;

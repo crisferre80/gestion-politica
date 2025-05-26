@@ -180,21 +180,38 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     console.log('[useEffect] geolocation effect', { user });
     let watchId: number | null = null;
+    let isMounted = true;
+
+    const updateLocation = async (latitude: number, longitude: number) => {
+      try {
+        if (!user) return;
+        await supabase
+          .from('profiles')
+          .update({ lat: latitude, lng: longitude, online: true })
+          .eq('id', user.id);
+        if (isMounted) {
+          login({ ...user, lat: latitude, lng: longitude });
+          setLocationError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setLocationError('Error actualizando tu ubicación.');
+        }
+        console.error('[geolocation] update error:', err);
+      }
+    };
+
     if (user && user.type === 'recycler') {
       if ('geolocation' in navigator) {
         watchId = navigator.geolocation.watchPosition(
-          async (position) => {
+          (position) => {
             const { latitude, longitude } = position.coords;
-            console.log('[geolocation] position updated', { latitude, longitude });
-            await supabase
-              .from('profiles')
-              .update({ lat: latitude, lng: longitude, online: true })
-              .eq('id', user.id);
-            login({ ...user, lat: latitude, lng: longitude });
-            setLocationError(null);
+            updateLocation(latitude, longitude);
           },
           (error) => {
-            setLocationError('No se pudo obtener tu ubicación en tiempo real. Activa la ubicación para aparecer en el mapa de residentes.');
+            if (isMounted) {
+              setLocationError('No se pudo obtener tu ubicación en tiempo real. Activa la ubicación para aparecer en el mapa de residentes.');
+            }
             console.error('[geolocation] error:', error);
           },
           { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
@@ -203,11 +220,14 @@ const Dashboard: React.FC = () => {
         setLocationError('Tu navegador no soporta geolocalización.');
       }
     }
+
     return () => {
+      isMounted = false;
       console.log('[useEffect cleanup] geolocation effect', { user });
       if (watchId !== null && 'geolocation' in navigator) {
         navigator.geolocation.clearWatch(watchId);
       }
+      // Solo marcar offline si el usuario sigue siendo reciclador
       if (user && user.type === 'recycler') {
         supabase.from('profiles').update({ online: false }).eq('id', user.id);
       }

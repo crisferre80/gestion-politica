@@ -202,24 +202,138 @@ export async function signInUser(email: string, password: string) {
   }
 }
 
+export async function claimCollectionPoint(
+  pointId: string,
+  recyclerId: string,
+  pickupTime: string
+): Promise<void> {
+  try {
+    // Create claim with status 'pending'
+    const { data: claim, error: claimError } = await supabase
+      .from('collection_claims')
+      .insert([
+        {
+          collection_point_id: pointId,
+          recycler_id: recyclerId,
+          status: 'pending',
+          pickup_time: pickupTime
+        }
+      ])
+      .select()
+      .single();
+
+    if (claimError) throw claimError;
+
+    // Update collection point status
+    const { error: updateError } = await supabase
+      .from('collection_points')
+      .update({
+        status: 'claimed',
+        claim_id: claim.id,
+        pickup_time: pickupTime,
+        recycler_id: recyclerId
+      })
+      .eq('id', pointId);
+
+    if (updateError) throw updateError;
+
+  } catch (error) {
+    console.error('Error claiming collection point:', error);
+    throw error;
+  }
+}
+
 export async function cancelClaim(
   claimId: string,
+  pointId: string,
   userId: string,
   reason: string
-) {
-  // Actualiza el status y el motivo en collection_claims
-  const { error } = await supabase
-    .from('collection_claims')
-    .update({
-      status: 'cancelled',
-      cancelled_at: new Date().toISOString(),
-      cancellation_reason: reason,
-      cancelled_by: userId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', claimId);
+): Promise<void> {
+  try {
+    // Update claim status
+    const { error: claimError } = await supabase
+      .from('collection_claims')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: userId,
+        cancellation_reason: reason
+      })
+      .eq('id', claimId);
 
-  if (error) throw error;
+    if (claimError) throw claimError;
+
+    // Update collection point status
+    const { error: pointError } = await supabase
+      .from('collection_points')
+      .update({
+        status: 'available',
+        claim_id: null,
+        pickup_time: null,
+        recycler_id: null
+      })
+      .eq('id', pointId);
+
+    if (pointError) throw pointError;
+
+  } catch (error) {
+    console.error('Error cancelling claim:', error);
+    throw error;
+  }
+}
+
+export async function completeCollection(
+  claimId: string,
+  pointId: string
+): Promise<void> {
+  try {
+    // Update claim status
+    const { error: claimError } = await supabase
+      .from('collection_claims')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', claimId);
+
+    if (claimError) throw claimError;
+
+    // Update collection point status
+    const { error: pointError } = await supabase
+      .from('collection_points')
+      .update({
+        status: 'completed'
+      })
+      .eq('id', pointId);
+
+    if (pointError) throw pointError;
+
+    // Get resident ID
+    const { data: point, error: pointFetchError } = await supabase
+      .from('collection_points')
+      .select('user_id')
+      .eq('id', pointId)
+      .single();
+
+    if (pointFetchError) throw pointFetchError;
+
+    // Create notification for resident
+    const { error: notificationError } = await supabase
+      .from('notifications')
+      .insert([{
+        user_id: point.user_id,
+        title: 'Recolección Completada',
+        content: 'Tu punto de recolección ha sido completado exitosamente.',
+        type: 'collection_completed',
+        related_id: pointId
+      }]);
+
+    if (notificationError) throw notificationError;
+
+  } catch (error) {
+    console.error('Error completing collection:', error);
+    throw error;
+  }
 }
 
 export async function deleteCollectionPoint(pointId: string): Promise<void> {
@@ -236,163 +350,16 @@ export async function deleteCollectionPoint(pointId: string): Promise<void> {
   }
 }
 
-export async function fetchRecyclerProfiles(): Promise<RecyclerProfile[]> {
+export async function updateOnlineStatus(userId: string, online: boolean): Promise<void> {
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
-      .select(`
-        *,
-        profiles!profiles_user_id_fkey (
-          name,
-          email,
-          phone,
-          avatar_url
-        )
-      `)
-      .order('rating_average', { ascending: false });
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error fetching recycler profiles:', error);
-    throw error;
-  }
-}
-
-export async function uploadProfilePhoto(userId: string, file: File) {
-  try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}-${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ avatar_url: publicUrl })
+      .update({ online })
       .eq('user_id', userId);
 
-    if (updateError) throw updateError;
-
-    return publicUrl;
-  } catch (error) {
-    console.error('Error uploading profile photo:', error);
-    throw error;
-  }
-}
-
-export async function fetchRecyclers() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(`
-      *,
-      profiles!profiles_user_id_fkey(
-        name,
-        email,
-        phone
-      )
-    `)
-    .order('rating_average', { ascending: false });
-
-  if (error) throw error;
-  return data;
-}
-
-export async function claimCollectionPoint(pointId: string, recyclerId: string, pickupTime: string) {
-  // Insertar reclamo
-  const { error: claimError } = await supabase
-    .from('collection_claims')
-    .insert([
-      {
-        collection_point_id: pointId,
-        recycler_id: recyclerId,
-        pickup_time: pickupTime,
-        status: 'claimed',
-      }
-    ]);
-  if (claimError) throw claimError;
-
-  // Actualizar estado del punto
-  const { error: updateError } = await supabase
-    .from('collection_points')
-    .update({ status: 'claimed' })
-    .eq('id', pointId);
-  if (updateError) throw updateError;
-}
-
-export async function fetchCollectionPoints() {
-  const { data, error } = await supabase
-    .from('collection_points')
-    .select(`
-      *,
-      profiles!collection_points_user_id_fkey(
-        name,
-        email,
-        phone
-      ),
-      claims:collection_claims(*)
-    `)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  return data.map(point => ({
-    ...point,
-    creator_name: point.profiles.name,
-    creator_email: point.profiles.email,
-    creator_phone: point.profiles.phone,
-    status: point.claims?.[0]?.status === 'pending' ? 'claimed' : 'available',
-    claim_id: point.claims?.[0]?.id,
-    pickup_time: point.claims?.[0]?.pickup_time
-  })) as CollectionPoint[];
-}
-
-export async function createCollectionPoint(point: Omit<CollectionPoint, 'id' | 'created_at' | 'updated_at' | 'creator_name'>) {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) throw new Error('User not authenticated');
-
-    const { data, error } = await supabase
-      .from('collection_points')
-      .insert([{
-        ...point,
-        status: 'available'
-      }])
-      .select(`
-        *,
-        profiles!collection_points_user_id_fkey(
-          name,
-          email,
-          phone
-        )
-      `)
-      .single();
-
     if (error) throw error;
-    
-    return {
-      ...data,
-      creator_name: data.profiles.name,
-      creator_email: data.profiles.email,
-      creator_phone: data.profiles.phone
-    } as CollectionPoint;
   } catch (error) {
-    console.error('Error creating collection point:', error);
+    console.error('Error updating online status:', error);
     throw error;
   }
 }
-
-// SQL policies for messages table should be managed in your Supabase dashboard or SQL migration scripts.
-
-// Obtener perfil completo de reciclador
-
-// (Express backend code removed. Move it to a separate file, e.g., server.ts)

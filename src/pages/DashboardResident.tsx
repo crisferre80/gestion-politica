@@ -329,6 +329,39 @@ const DashboardResident: React.FC = () => {
     }
   };
 
+  const [activePointsTab, setActivePointsTab] = useState<'todos' | 'reclamados' | 'demorados' | 'retirados'>('todos');
+  const [detailedPoints, setDetailedPoints] = useState<any[]>([]);
+
+  // Cargar puntos con detalles de reclamo y reciclador
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchDetailedPoints = async () => {
+      const { data, error } = await supabase
+        .from('collection_points')
+        .select(`*,
+          claim:collection_claims!claim_id (*, recycler:profiles!collection_claims_recycler_id_fkey (name, avatar_url, email, phone))
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (!error && data) setDetailedPoints(data);
+      else setDetailedPoints([]);
+    };
+    fetchDetailedPoints();
+  }, [user]);
+
+  // Filtrado por sub-tab
+  const now = new Date();
+  const puntosTodos = detailedPoints;
+  const puntosReclamados = detailedPoints.filter(p => p.status === 'claimed' && p.claim && p.claim.status === 'pending');
+  const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || (p.claim && p.claim.status === 'completed'));
+  const puntosDemorados = detailedPoints.filter(p => {
+    if (p.status === 'claimed' && p.claim && p.claim.status === 'pending' && p.claim.pickup_time) {
+      const pickup = new Date(p.claim.pickup_time);
+      return pickup < now;
+    }
+    return false;
+  });
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -445,6 +478,12 @@ const DashboardResident: React.FC = () => {
       </div>
       {activeTab === 'puntos' && (
         <div className="w-full max-w-4xl">
+          <div className="mb-4 flex gap-2">
+            <button onClick={() => setActivePointsTab('todos')} className={`px-3 py-1 rounded ${activePointsTab==='todos'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Todos</button>
+            <button onClick={() => setActivePointsTab('reclamados')} className={`px-3 py-1 rounded ${activePointsTab==='reclamados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos reclamados</button>
+            <button onClick={() => setActivePointsTab('demorados')} className={`px-3 py-1 rounded ${activePointsTab==='demorados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos demorados</button>
+            <button onClick={() => setActivePointsTab('retirados')} className={`px-3 py-1 rounded ${activePointsTab==='retirados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos retirados</button>
+          </div>
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
             <h2 className="text-2xl font-bold mb-4">Mis Puntos de Recolección</h2>
             <Link
@@ -455,77 +494,86 @@ const DashboardResident: React.FC = () => {
               <Plus className="h-4 w-4 mr-1 group-hover:rotate-90 transition-transform duration-300" />
               <span>Agregar Punto</span>
             </Link>
-            {collectionPoints.length === 0 ? (
-              <p className="text-gray-500">No tienes puntos de recolección registrados.</p>
-            ) : (
-              <ul className="space-y-4">
-                {collectionPoints.map((point) => (
-                  <li
-                    key={point.id}
-                    className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in"
-                    style={{ animation: 'fadeInUp 0.7s' }}
-                  >
-                    <div className="flex-1 mb-2 md:mb-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <img
-                          src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
-                          alt="Marcador"
-                          className="w-12 h-12"
-                        />
-                        <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
+            {(() => {
+              let pointsToShow = puntosTodos;
+              if (activePointsTab === 'reclamados') pointsToShow = puntosReclamados;
+              if (activePointsTab === 'demorados') pointsToShow = puntosDemorados;
+              if (activePointsTab === 'retirados') pointsToShow = puntosRetirados;
+              if (pointsToShow.length === 0) return <p className="text-gray-500">No hay puntos en esta categoría.</p>;
+              return (
+                <ul className="space-y-4">
+                  {pointsToShow.map((point) => (
+                    <li key={point.id} className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in" style={{ animation: 'fadeInUp 0.7s' }}>
+                      <div className="flex-1 mb-2 md:mb-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Marcador" className="w-12 h-12" />
+                          <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
+                          {/* Etiqueta de estado */}
+                          {point.status === 'claimed' && point.claim && point.claim.status === 'pending' && <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">Reclamado</span>}
+                          {point.status === 'completed' && <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Retirado</span>}
+                          {activePointsTab==='demorados' && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Demorado</span>}
+                        </div>
+                        <p className="text-gray-500">
+                          <MapPin className="inline-block w-4 h-4 mr-1" />
+                          {point.district}
+                        </p>
+                        <p className="text-gray-500">
+                          <Calendar className="inline-block w-4 h-4 mr-1" />
+                          {point.schedule}
+                        </p>
+                        {/* Mostrar notas adicionales si existen */}
+                        {point.notas && (
+                          <p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>
+                        )}
+                        {/* Mostrar información adicional si existe */}
+                        {point.additional_info && (
+                          <p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>
+                        )}
+                        {/* Info del reciclador reclamante */}
+                        {point.claim && point.claim.recycler && (
+                          <div className="mt-2 text-sm text-blue-700 flex items-center gap-2">
+                            <UserIcon className="w-4 h-4" />
+                            <span>Reclamado por: <b>{point.claim.recycler.name}</b></span>
+                            {point.claim.recycler.phone && <span className="ml-2">Tel: {point.claim.recycler.phone}</span>}
+                          </div>
+                        )}
                       </div>
-                      <p className="text-gray-500">
-                        <MapPin className="inline-block w-4 h-4 mr-1" />
-                        {point.district}
-                      </p>
-                      <p className="text-gray-500">
-                        <Calendar className="inline-block w-4 h-4 mr-1" />
-                        {point.schedule}
-                      </p>
-                      {/* Mostrar notas adicionales si existen */}
-                      {point.notas && (
-                        <p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>
-                      )}
-                      {/* Mostrar información adicional si existe */}
-                      {point.additional_info && (
-                        <p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>
-                      )}
-                    </div>
-                    {/* GIF animado a la derecha */}
-                    <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
-                      <div className="transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
-                        <img
-                          src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747453055/Reduce_Climate_Change_GIF_by_Bhumi_Pednekar_uazzk6.gif"
-                          alt="Reduce Climate Change GIF"
-                          className="w-40 h-28 object-contain rounded-lg shadow-md border border-green-200"
-                          style={{ background: '#f0fdf4' }}
-                        />
+                      {/* GIF animado a la derecha */}
+                      <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
+                        <div className="transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                          <img
+                            src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747453055/Reduce_Climate_Change_GIF_by_Bhumi_Pednekar_uazzk6.gif"
+                            alt="Reduce Climate Change GIF"
+                            className="w-40 h-28 object-contain rounded-lg shadow-md border border-green-200"
+                            style={{ background: '#f0fdf4' }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-shrink-0 md:ml-4 mt-4 md:mt-0 flex items-center">
-                      <button
-                        onClick={(e) => {
-                          const btn = e.currentTarget;
-                          const ripple = document.createElement('span');
-                          ripple.className = 'ripple-effect';
-                          const rect = btn.getBoundingClientRect();
-                          ripple.style.left = `${e.clientX - rect.left}px`;
-                          ripple.style.top = `${e.clientY - rect.top}px`;
-                          btn.appendChild(ripple);
-                          setTimeout(() => ripple.remove(), 600);
-                          handleDelete(point.id);
-                        }}
-                        className="bg-red-500 text-white rounded-lg px-4 py-2 flex items-center overflow-hidden relative ripple-btn"
-                        disabled={isDeleting}
-                      >
-                        {isDeleting ? <Clock className="animate-spin h-5 w-5 mr-2" /> : <Trash2 className="h-5 w-5 mr-2" />}
-                        Eliminar
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                      <div className="flex-shrink-0 md:ml-4 mt-4 md:mt-0 flex items-center">
+                        <button
+                          onClick={(e) => {
+                            const btn = e.currentTarget;
+                            const ripple = document.createElement('span');
+                            ripple.className = 'ripple-effect';
+                            const rect = btn.getBoundingClientRect();
+                            ripple.style.left = `${e.clientX - rect.left}px`;
+                            ripple.style.top = `${e.clientY - rect.top}px`;
+                            btn.appendChild(ripple);
+                            setTimeout(() => ripple.remove(), 600);
+                            handleDelete(point.id);
+                          }}
+                          className="bg-red-500 text-white rounded-lg px-4 py-2 flex items-center overflow-hidden relative ripple-btn"
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? <Clock className="animate-spin h-5 w-5 mr-2" /> : <Trash2 className="h-5 w-5 mr-2" />}
+                          Eliminar
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
           </div>
           <div className="bg-white shadow-md rounded-lg p-6">
             <Map

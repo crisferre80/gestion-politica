@@ -230,8 +230,8 @@ export async function claimCollectionPoint(
       .update({
         status: 'claimed',
         claim_id: claim.id,
-        pickup_time: pickupTime,
-        recycler_id: recyclerId
+        pickup_time: pickupTime
+        // NO actualizar recycler_id aquí para evitar error de clave foránea
       })
       .eq('id', pointId);
 

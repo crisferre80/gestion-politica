@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MapPin, Calendar, Phone, Mail, MapIcon, X, User } from 'lucide-react';
-import { supabase, type CollectionPoint, cancelClaim } from '../lib/supabase';
+import { MapPin, Calendar, Phone, Mail, MapIcon, X, User, Clock } from 'lucide-react';
+import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint } from '../lib/supabase';
 import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
@@ -17,6 +17,10 @@ const DashboardRecycler: React.FC = () => {
   const [selectedClaim, setSelectedClaim] = useState<{ id: string; pointId: string } | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
   const [activeTab, setActiveTab] = useState('mis-puntos-reclamados');
+  // Estado para el modal de programar recolección
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const [pointToClaim, setPointToClaim] = useState<CollectionPoint | null>(null);
+  const [pickupDateTimeInput, setPickupDateTimeInput] = useState('');
   // Estado para edición de perfil
   const [editName, setEditName] = useState(user?.name || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
@@ -99,39 +103,45 @@ const DashboardRecycler: React.FC = () => {
     if (user) fetchData();
   }, [user, fetchData]);
 
-  // Reclamar punto
-  const reclamarPunto = async (pointId: string) => {
+  // Abrir modal para programar recolección
+  const handleOpenPickupModal = (point: CollectionPoint) => {
+    setPointToClaim(point);
+    setPickupDateTimeInput(''); // Resetear input
+    setShowPickupModal(true);
+    setError(null); // Limpiar errores previos
+  };
+
+  // Confirmar reclamo con hora de recolección
+  const handleConfirmClaim = async () => {
     if (!user) {
       setError('Usuario no autenticado');
       return;
     }
+    if (!pointToClaim) {
+      setError('No se ha seleccionado un punto para reclamar.');
+      return;
+    }
+    if (!pickupDateTimeInput) {
+      setError('Por favor, selecciona una fecha y hora para la recolección.');
+      return;
+    }
+
     try {
       setError(null);
-      // Insertar reclamo en la tabla collection_claims
-      const { error: claimError } = await supabase
-        .from('collection_claims')
-        .insert([
-          {
-            collection_point_id: pointId,
-            recycler_id: user.id,
-            status: 'claimed',
-            claimed_at: new Date().toISOString(),
-          },
-        ]);
-      if (claimError) throw claimError;
-      // Actualizar el estado del punto a 'claimed'
-      const { error: updateError } = await supabase
-        .from('collection_points')
-        .update({ status: 'claimed' })
-        .eq('id', pointId);
-      if (updateError) throw updateError;
+      setLoading(true);
+      await claimCollectionPoint(pointToClaim.id, user.id, new Date(pickupDateTimeInput).toISOString());
       await fetchData();
+      setShowPickupModal(false);
+      setPointToClaim(null);
+      // Podrías añadir un mensaje de éxito aquí si lo deseas
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message || 'Error al reclamar el punto');
       } else {
-        setError('Error al reclamar el punto');
+        setError('Error desconocido al reclamar el punto');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -307,7 +317,7 @@ const DashboardRecycler: React.FC = () => {
                         {/* Botón reclamar */}
                         <div className="mt-4 flex gap-2">
                           <button
-                            onClick={() => reclamarPunto(point.id)}
+                            onClick={() => handleOpenPickupModal(point)}
                             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
                           >
                             Reclamar
@@ -317,7 +327,7 @@ const DashboardRecycler: React.FC = () => {
                               setSelectedPoint(point);
                               setShowMap(true);
                             }}
-                            className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-green-200 font-semibold border border-green-400"
+                            className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400"
                           >
                             Ver en Mapa
                           </button>
@@ -779,6 +789,75 @@ const DashboardRecycler: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Modal para programar recolección */}
+      {showPickupModal && pointToClaim && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Programar Recolección</h3>
+              <button
+                onClick={() => {
+                  setShowPickupModal(false);
+                  setPointToClaim(null);
+                  setError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">Punto: <span className="font-semibold">{pointToClaim.address}</span></p>
+            <p className="text-sm text-gray-600 mb-4">Distrito: <span className="font-semibold">{pointToClaim.district}</span></p>
+
+            <div className="mb-4">
+              <label htmlFor="pickupDateTime" className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha y Hora de Recolección <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Calendar className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="datetime-local"
+                  id="pickupDateTime"
+                  value={pickupDateTimeInput}
+                  onChange={(e) => setPickupDateTimeInput(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md shadow-sm p-2 pl-10 focus:ring-green-500 focus:border-green-500"
+                  min={new Date().toISOString().slice(0, 16)} // Evitar fechas pasadas
+                  required
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-400 p-3 mb-4">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowPickupModal(false);
+                  setPointToClaim(null);
+                  setError(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmClaim}
+                disabled={loading || !pickupDateTimeInput}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center"
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                {loading ? 'Procesando...' : 'Confirmar Reclamo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

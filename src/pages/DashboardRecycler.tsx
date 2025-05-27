@@ -135,11 +135,13 @@ const DashboardRecycler: React.FC = () => {
       setPointToClaim(null);
       // Podrías añadir un mensaje de éxito aquí si lo deseas
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || 'Error al reclamar el punto');
-      } else {
-        setError('Error desconocido al reclamar el punto');
+      let message = 'Error desconocido al reclamar el punto';
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+        message = (err as { message: string }).message;
+      } else if (err instanceof Error) {
+        message = err.message;
       }
+      setError(message || 'Error al reclamar el punto');
     } finally {
       setLoading(false);
     }

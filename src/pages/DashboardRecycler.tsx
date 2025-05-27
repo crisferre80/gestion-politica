@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MapPin, Calendar, Phone, Mail, MapIcon, X, User, Clock } from 'lucide-react';
-import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint } from '../lib/supabase';
+import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection } from '../lib/supabase';
 import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
@@ -34,6 +34,9 @@ const DashboardRecycler: React.FC = () => {
 
   const [claimedPoints, setClaimedPoints] = useState<CollectionPoint[]>([]);
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
+  const [residentNotified, setResidentNotified] = useState(false);
 
   // Cargar puntos reclamados y disponibles
   const fetchData = useCallback(async () => {
@@ -162,6 +165,25 @@ const DashboardRecycler: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err?.message || 'Error al cancelar la reclamación');
+    }
+  };
+
+  // Marcar punto como retirado
+  const handleCompleteCollection = async () => {
+    if (!pointToComplete || !pointToComplete.claim_id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await completeCollection(pointToComplete.claim_id, pointToComplete.id);
+      setShowCompleteModal(false);
+      setResidentNotified(true);
+      setPointToComplete(null);
+      await fetchData();
+      setTimeout(() => setResidentNotified(false), 4000);
+    } catch (err: any) {
+      setError(err?.message || 'Error al marcar como retirado');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -401,7 +423,7 @@ const DashboardRecycler: React.FC = () => {
                               </div>
                             )}
                           </div>
-                          <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="mt-4 grid grid-cols-3 gap-3">
                             <button
                               onClick={() => {
                                 setSelectedPoint(point);
@@ -421,6 +443,16 @@ const DashboardRecycler: React.FC = () => {
                             >
                               <X className="h-4 w-4 mr-2" />
                               Cancelar Reclamo
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPointToComplete(point);
+                                setShowCompleteModal(true);
+                              }}
+                              className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                            >
+                              <Clock className="h-4 w-4 mr-2" />
+                              Retirado
                             </button>
                           </div>
                         </div>
@@ -787,6 +819,44 @@ const DashboardRecycler: React.FC = () => {
                       Confirmar Cancelación
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+            {/* Modal de retiro exitoso */}
+            {showCompleteModal && pointToComplete && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg p-6 max-w-md w-full mx-auto">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Retiro Exitoso</h3>
+                    <button
+                      onClick={() => {
+                        setShowCompleteModal(false);
+                        setPointToComplete(null);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">Has marcado el punto como retirado. El residente será notificado automáticamente.</p>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleCompleteCollection}
+                      disabled={loading}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                    >
+                      {loading ? 'Procesando...' : 'Confirmar Retiro'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Modal de notificación al residente */}
+            {residentNotified && (
+              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-auto text-center">
+                  <h3 className="text-lg font-semibold text-green-700 mb-2">¡El residente ha sido notificado!</h3>
+                  <p className="text-gray-700">El residente recibirá una notificación de que su punto fue retirado exitosamente.</p>
                 </div>
               </div>
             )}

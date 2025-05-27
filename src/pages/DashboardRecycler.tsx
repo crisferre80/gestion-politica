@@ -131,7 +131,7 @@ const DashboardRecycler: React.FC = () => {
       setLoading(true);
       console.log('User object:', user);
       console.log('User ID being sent as recyclerId:', user.id); // Verifica este valor
-      await claimCollectionPoint(pointToClaim.id, user.id, new Date(pickupDateTimeInput).toISOString());
+      await claimCollectionPoint(pointToClaim!.id, user.id, new Date(pickupDateTimeInput).toISOString());
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);
@@ -810,8 +810,8 @@ const DashboardRecycler: React.FC = () => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 mb-1">Punto: <span className="font-semibold">{pointToClaim.address}</span></p>
-            <p className="text-sm text-gray-600 mb-4">Distrito: <span className="font-semibold">{pointToClaim.district}</span></p>
+            <p className="text-sm text-gray-600 mb-1">Punto: <span className="font-semibold">{pointToClaim?.address || ''}</span></p>
+            <p className="text-sm text-gray-600 mb-4">Distrito: <span className="font-semibold">{pointToClaim?.district || ''}</span></p>
 
             <div className="mb-4">
               <label htmlFor="pickupDateTime" className="block text-sm font-medium text-gray-700 mb-1">

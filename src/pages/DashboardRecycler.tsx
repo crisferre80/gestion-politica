@@ -129,6 +129,8 @@ const DashboardRecycler: React.FC = () => {
     try {
       setError(null);
       setLoading(true);
+      console.log('User object:', user);
+      console.log('User ID being sent as recyclerId:', user.id); // Verifica este valor
       await claimCollectionPoint(pointToClaim.id, user.id, new Date(pickupDateTimeInput).toISOString());
       await fetchData();
       setShowPickupModal(false);
@@ -345,10 +347,10 @@ const DashboardRecycler: React.FC = () => {
               <>
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Reclamados</h2>
                 <div className="grid gap-6 md:grid-cols-2">
-                  {claimedPoints.filter(p => p.status === 'claimed').length === 0 && (
+                  {claimedPoints.filter(p => p.status === 'pending').length === 0 && (
                     <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
                   )}
-                  {claimedPoints.filter(p => p.status === 'claimed').map(point => (
+                  {claimedPoints.filter(p => p.status === 'pending').map(point => (
                     <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="p-6">
                         {/* Info principal */}
@@ -377,7 +379,7 @@ const DashboardRecycler: React.FC = () => {
                         {point.pickup_time && (
                           <div className="mt-2 text-xs text-gray-500">Retiro programado: {new Date(point.pickup_time).toLocaleString()}</div>
                         )}
-                        {point.status === 'claimed' && point.pickup_time && (
+                        {point.status === 'pending' && point.pickup_time && (
                           <CountdownTimer targetDate={new Date(point.pickup_time)} onComplete={() => fetchData()} />
                         )}
                         {/* Info residente */}

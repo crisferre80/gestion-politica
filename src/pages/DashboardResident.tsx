@@ -116,7 +116,7 @@ const DashboardResident: React.FC = () => {
     } else {
       setRecyclers(
         (data || [])
-          .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
+          .filter(rec => (rec.role && typeof rec.role === 'string' && rec.role.toLowerCase() === 'recycler'))
           .map((rec) => ({
             id: rec.id,
             profiles: {
@@ -127,11 +127,11 @@ const DashboardResident: React.FC = () => {
             },
             rating_average: rec.rating_average || 0,
             total_ratings: rec.total_ratings || 0,
-            materials: rec.materials || [],
-            bio: rec.bio || '',
+            materials: Array.isArray(rec.materials) ? rec.materials : [],
+            bio: typeof rec.bio === 'string' ? rec.bio : '',
             lat: rec.lat,
             lng: rec.lng,
-            online: rec.online,
+            online: !!rec.online,
           }))
       );
     }

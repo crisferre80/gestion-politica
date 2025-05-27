@@ -21,25 +21,36 @@ const Login: React.FC = () => {
       const { data, profile } = await signInUser(email, password);
       
       if (data.user && profile) {
+        // Marcar online en el backend
+        await import('../lib/supabase').then(({ supabase }) =>
+          supabase.from('profiles').update({ online: true }).eq('user_id', data.user.id)
+        );
         login({
-          id: data.user.id,
-          email: data.user.email!,
-          name: profile.name || '',
-          type: profile.type,
-          avatar_url: profile.avatar_url,
-          phone: profile.phone,
-          address: profile.address,
+            id: data.user.id,
+            email: data.user.email!,
+            name: profile.name || '',
+            type: profile.type,
+            avatar_url: profile.avatar_url,
+            phone: profile.phone,
+            address: profile.address,
+            online: true,
+            lng: 0,
+            lat: 0
         });
         navigate('/dashboard');
       } else {
         setError('No se pudo iniciar sesión. Por favor, verifica tus credenciales.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Login error:', err);
-      if (err.message === 'Invalid login credentials') {
-        setError('Correo electrónico o contraseña incorrectos.');
-      } else if (err.message === 'Profile not found. Please contact support.') {
-        setError('No se encontró el perfil. Por favor, contacta con soporte.');
+      if (err instanceof Error) {
+        if (err.message === 'Invalid login credentials') {
+          setError('Correo electrónico o contraseña incorrectos.');
+        } else if (err.message === 'Profile not found. Please contact support.') {
+          setError('No se encontró el perfil. Por favor, contacta con soporte.');
+        } else {
+          setError('Error al iniciar sesión. Por favor, intenta nuevamente.');
+        }
       } else {
         setError('Error al iniciar sesión. Por favor, intenta nuevamente.');
       }

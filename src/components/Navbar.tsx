@@ -14,6 +14,11 @@ const Navbar: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    if (user?.id) {
+      await import('../lib/supabase').then(({ supabase }) =>
+        supabase.from('profiles').update({ online: false }).eq('user_id', user.id)
+      );
+    }
     await logout();
   };
 

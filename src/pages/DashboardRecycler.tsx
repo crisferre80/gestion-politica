@@ -7,8 +7,8 @@ import { useUser } from '../context/UserContext';
 import HeaderRecycler from '../components/HeaderRecycler';
 
 const DashboardRecycler: React.FC = () => {
-  const { user } = useUser();
-  const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
+  const { user, login } = useUser();
+  // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
@@ -24,21 +24,24 @@ const DashboardRecycler: React.FC = () => {
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  const [editExperience, setEditExperience] = useState((user as any)?.experience_years || 0);
-  const [editServiceAreas, setEditServiceAreas] = useState(((user as any)?.service_areas || []).join(', '));
   const [success, setSuccess] = useState<string | null>(null);
+  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
+  const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
+
+  const [claimedPoints, setClaimedPoints] = useState<CollectionPoint[]>([]);
+  const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
 
   // Cargar puntos reclamados y disponibles
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      // Reclamos del reciclador
       if (!user) {
         setError('Usuario no autenticado');
         setLoading(false);
         return;
       }
+      // Reclamos del reciclador
       const { data: claimsData, error: claimsError } = await supabase
         .from('collection_claims')
         .select(`
@@ -56,7 +59,7 @@ const DashboardRecycler: React.FC = () => {
         .eq('recycler_id', user.id)
         .order('claimed_at', { ascending: false });
       if (claimsError) throw claimsError;
-      const claimedPoints = claimsData.map(claim => ({
+      const claimed = claimsData.map(claim => ({
         ...claim.collection_point,
         claim_id: claim.id,
         status: claim.status,
@@ -66,21 +69,24 @@ const DashboardRecycler: React.FC = () => {
         creator_avatar: claim.collection_point?.profiles?.avatar_url,
         pickup_time: claim.pickup_time
       }));
+
       // Puntos disponibles
-      const { data: availablePoints, error: availableError } = await supabase
+      const { data: availableData, error: availableError } = await supabase
         .from('collection_points')
         .select(`*, profiles!collection_points_user_id_fkey (name, email, phone, avatar_url)`)
         .eq('status', 'available')
         .order('created_at', { ascending: false });
       if (availableError) throw availableError;
-      const availablePointsFormatted = availablePoints.map(point => ({
+      const available = availableData.map(point => ({
         ...point,
         creator_name: point.profiles?.name,
         creator_email: point.profiles?.email,
         creator_phone: point.profiles?.phone,
         creator_avatar: point.profiles?.avatar_url,
       }));
-      setCollectionPoints([...claimedPoints, ...availablePointsFormatted]);
+
+      setClaimedPoints(claimed);
+      setAvailablePoints(available);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       setError('Error al cargar los datos');
@@ -145,6 +151,46 @@ const DashboardRecycler: React.FC = () => {
     }
   };
 
+  // --- PRESENCIA EN TIEMPO REAL ---
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('recycler-presence')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new && typeof payload.new.online === 'boolean') {
+            login({ ...user, online: payload.new.online });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, login]);
+
+  useEffect(() => {
+    const handleUnload = async () => {
+      if (user?.id) {
+        await supabase
+          .from('profiles')
+          .update({ online: false })
+          .eq('user_id', user.id);
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -167,6 +213,56 @@ const DashboardRecycler: React.FC = () => {
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white shadow rounded-lg overflow-hidden">
+          {/* Header profesional del reciclador */}
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 px-8 py-8 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100">
+            <div className="flex-shrink-0">
+              <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-green-400 bg-white shadow">
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-16 h-16 text-gray-300 mx-auto my-6" />
+                )}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl md:text-3xl font-bold text-green-800 mb-1">{user?.name || 'Reciclador'}</h1>
+                  {user?.online ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold ml-2 animate-pulse">
+                      <span className="w-2 h-2 bg-white rounded-full mr-1"></span>En Línea
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-300 text-gray-600 text-xs font-semibold ml-2">
+                      <span className="w-2 h-2 bg-gray-100 rounded-full mr-1"></span>Desconectado
+                    </span>
+                  )}
+                </div>
+                <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-8 gap-y-2 text-gray-700 text-sm">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-green-500" />
+                  <span>{user?.email}</span>
+                </div>
+                {user?.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-green-500" />
+                    <span>{user.phone}</span>
+                  </div>
+                )}
+                {user?.address && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-green-500" />
+                    <span>{user.address}</span>
+                  </div>
+                )}
+              </div>
+              {user?.bio && (
+                <div className="mt-3 text-gray-600 text-sm italic max-w-2xl">{user.bio}</div>
+              )}
+            </div>
+          </div>
           {/* Header con tabs y submenus */}
           <HeaderRecycler activeTab={activeTab} setActiveTab={setActiveTab} />
           <div className="p-6">
@@ -176,14 +272,71 @@ const DashboardRecycler: React.FC = () => {
               </div>
             )}
             {/* Secciones de Mis Puntos */}
+            {activeTab === 'mis-puntos-disponibles' && (
+              <>
+                <h2 className="text-xl font-semibold text-green-700 mb-4">Puntos Disponibles para Reclamar</h2>
+                <div className="grid gap-6 md:grid-cols-2">
+                  {availablePoints.length === 0 && (
+                    <div className="col-span-2 text-center text-gray-500">No hay puntos disponibles para reclamar en este momento.</div>
+                  )}
+                  {availablePoints.map(point => (
+                    <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">
+                      <div className="p-6">
+                        {/* Info principal */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-3">
+                            <MapPin className="h-6 w-6 text-green-500" />
+                            <div>
+                              <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
+                              <p className="mt-1 text-sm text-gray-500">{point.district}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {point.materials.map((material: string, idx: number) => (
+                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="mt-4 flex items-center text-sm text-gray-500">
+                          <Calendar className="h-4 w-4 mr-2" />
+                          <span>{point.schedule}</span>
+                        </div>
+                        {/* Botón reclamar */}
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            onClick={() => reclamarPunto(point.id)}
+                            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
+                          >
+                            Reclamar
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedPoint(point);
+                              setShowMap(true);
+                            }}
+                            className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-green-200 font-semibold border border-green-400"
+                          >
+                            Ver en Mapa
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <hr className="my-10 border-green-300" />
+              </>
+            )}
             {activeTab === 'mis-puntos-reclamados' && (
               <>
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Reclamados</h2>
                 <div className="grid gap-6 md:grid-cols-2">
-                  {collectionPoints.filter(p => p.status === 'claimed').length === 0 && (
+                  {claimedPoints.filter(p => p.status === 'claimed').length === 0 && (
                     <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
                   )}
-                  {collectionPoints.filter(p => p.status === 'claimed').map(point => (
+                  {claimedPoints.filter(p => p.status === 'claimed').map(point => (
                     <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="p-6">
                         {/* Info principal */}
@@ -267,10 +420,10 @@ const DashboardRecycler: React.FC = () => {
               <>
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Cancelados</h2>
                 <div className="grid gap-6 md:grid-cols-2">
-                  {collectionPoints.filter(p => p.status === 'cancelled').length === 0 && (
+                  {claimedPoints.filter(p => p.status === 'cancelled').length === 0 && (
                     <div className="col-span-2 text-center text-gray-500">No tienes puntos cancelados.</div>
                   )}
-                  {collectionPoints.filter(p => p.status === 'cancelled').map(point => (
+                  {claimedPoints.filter(p => p.status === 'cancelled').map(point => (
                     <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="p-6">
                         <div className="flex items-start justify-between">
@@ -331,10 +484,10 @@ const DashboardRecycler: React.FC = () => {
               <>
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Retirados</h2>
                 <div className="grid gap-6 md:grid-cols-2">
-                  {collectionPoints.filter(p => p.status === 'completed').length === 0 && (
+                  {claimedPoints.filter(p => p.status === 'completed').length === 0 && (
                     <div className="col-span-2 text-center text-gray-500">No tienes puntos retirados.</div>
                   )}
-                  {collectionPoints.filter(p => p.status === 'completed').map(point => (
+                  {claimedPoints.filter(p => p.status === 'completed').map(point => (
                     <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="p-6">
                         <div className="flex items-start justify-between">
@@ -408,6 +561,19 @@ const DashboardRecycler: React.FC = () => {
                   onSubmit={async (e) => {
                     e.preventDefault();
                     setError(null);
+                    let avatarUrl = user?.avatar_url || null;
+                    if (editAvatarFile) {
+                      const fileExt = editAvatarFile.name.split('.').pop();
+                      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+                      const { error: uploadError } = await supabase.storage
+                        .from('avatars')
+                        .upload(fileName, editAvatarFile, { upsert: true });
+                      if (uploadError) {
+                        setError('Error al subir la imagen de perfil');
+                        return;
+                      }
+                      avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl;
+                    }
                     const formMaterials = editMaterials.split(',').map((m) => m.trim()).filter(Boolean);
                     const { error: updateError } = await supabase.from('profiles').update({
                       name: editName,
@@ -416,24 +582,70 @@ const DashboardRecycler: React.FC = () => {
                       address: editAddress,
                       bio: editBio,
                       materials: formMaterials,
-                      experience_years: editExperience,
-                      service_areas: editServiceAreas.split(',').map((a) => a.trim()).filter(Boolean),
+                      avatar_url: avatarUrl,
                     }).eq('user_id', user.id);
                     if (!updateError) {
+                      // Obtener el perfil actualizado
+                      const { data: updatedProfile, error: fetchError } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('user_id', user.id)
+                        .single();
+                      if (!fetchError && updatedProfile) {
+                        // Normalización defensiva para evitar errores de renderizado
+                        const safeMaterials = Array.isArray(updatedProfile.materials)
+                          ? updatedProfile.materials
+                          : (typeof updatedProfile.materials === 'string' && updatedProfile.materials.length > 0
+                              ? [updatedProfile.materials]
+                              : []);
+                        const safeBio = typeof updatedProfile.bio === 'string' ? updatedProfile.bio : '';
+                        login({
+                          ...user,
+                          ...updatedProfile,
+                          type: updatedProfile.role || user.type,
+                          materials: safeMaterials,
+                          bio: safeBio,
+                        });
+                        setEditName(updatedProfile.name || '');
+                        setEditEmail(updatedProfile.email || '');
+                        setEditPhone(updatedProfile.phone || '');
+                        setEditAddress(updatedProfile.address || '');
+                        setEditBio(safeBio);
+                        setEditMaterials(safeMaterials.join(', '));
+                        setEditAvatarPreview(null);
+                        setEditAvatarFile(null);
+                      }
                       setSuccess('Perfil actualizado correctamente');
-                      // Opcional: recargar datos de usuario
                     } else {
                       setError('Error al actualizar el perfil');
                     }
                   }}
                 >
                   <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 border-2 border-green-600 flex items-center justify-center mb-2">
-                    {user?.avatar_url ? (
+                    {editAvatarPreview ? (
+                      <img src={editAvatarPreview || undefined} alt="Preview" className="w-full h-full object-cover" />
+                    ) : user?.avatar_url ? (
                       <img src={user.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-12 h-12 text-gray-400" />
                     )}
                   </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="mb-2"
+                    onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      setEditAvatarFile(file);
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setEditAvatarPreview(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      } else {
+                        setEditAvatarPreview(null);
+                      }
+                    }}
+                  />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                     <div>
                       <label className="text-gray-600 text-sm">Nombre completo</label>
@@ -459,14 +671,6 @@ const DashboardRecycler: React.FC = () => {
                       <label className="text-gray-600 text-sm">Materiales (separados por coma)</label>
                       <input className="font-semibold w-full border rounded px-2 py-1" value={editMaterials} onChange={e => setEditMaterials(e.target.value)} />
                     </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Años de experiencia</label>
-                      <input type="number" min="0" className="font-semibold w-full border rounded px-2 py-1" value={editExperience} onChange={e => setEditExperience(Number(e.target.value))} />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Zonas de servicio (separadas por coma)</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1" value={editServiceAreas} onChange={e => setEditServiceAreas(e.target.value)} />
-                    </div>
                   </div>
                   <button type="submit" className="mt-4 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">Actualizar Perfil</button>
                   {success && <div className="text-green-600 mt-2">{success}</div>}
@@ -479,15 +683,15 @@ const DashboardRecycler: React.FC = () => {
                 <h2 className="text-2xl font-bold mb-4 text-green-700">Historial</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="bg-green-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-green-700">{collectionPoints.filter(p => p.status === 'claimed').length}</div>
+                    <div className="text-3xl font-bold text-green-700">{claimedPoints.filter(p => p.status === 'claimed').length}</div>
                     <div className="text-gray-600 mt-1">Reclamados</div>
                   </div>
                   <div className="bg-red-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-red-700">{collectionPoints.filter(p => p.status === 'cancelled').length}</div>
+                    <div className="text-3xl font-bold text-red-700">{claimedPoints.filter(p => p.status === 'cancelled').length}</div>
                     <div className="text-gray-600 mt-1">Cancelados</div>
                   </div>
                   <div className="bg-blue-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-blue-700">{collectionPoints.filter(p => p.status === 'completed').length}</div>
+                    <div className="text-3xl font-bold text-blue-700">{claimedPoints.filter(p => p.status === 'completed').length}</div>
                     <div className="text-gray-600 mt-1">Retirados</div>
                   </div>
                 </div>
@@ -571,64 +775,6 @@ const DashboardRecycler: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )}
-            {/* Secciones de Mis Puntos */}
-            {activeTab === 'mis-puntos-disponibles' && (
-              <>
-                <h2 className="text-xl font-semibold text-green-700 mb-4">Puntos Disponibles para Reclamar</h2>
-                <div className="grid gap-6 md:grid-cols-2">
-                  {collectionPoints.filter(p => p.status === 'available').length === 0 && (
-                    <div className="col-span-2 text-center text-gray-500">No hay puntos disponibles para reclamar en este momento.</div>
-                  )}
-                  {collectionPoints.filter(p => p.status === 'available').map(point => (
-                    <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">
-                      <div className="p-6">
-                        {/* Info principal */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            <MapPin className="h-6 w-6 text-green-500" />
-                            <div>
-                              <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
-                              <p className="mt-1 text-sm text-gray-500">{point.district}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          <span>{point.schedule}</span>
-                        </div>
-                        {/* Botón reclamar */}
-                        <div className="mt-4 flex gap-2">
-                          <button
-                            onClick={() => reclamarPunto(point.id)}
-                            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
-                          >
-                            Reclamar
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedPoint(point);
-                              setShowMap(true);
-                            }}
-                            className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-green-200 font-semibold border border-green-400"
-                          >
-                            Ver en Mapa
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <hr className="my-10 border-green-300" />
-              </>
             )}
           </div>
         </div>

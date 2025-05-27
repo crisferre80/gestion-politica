@@ -105,40 +105,42 @@ const DashboardResident: React.FC = () => {
     }
   }, [user]);
 
+  // --- EXTRACTED FETCH RECYCLERS FUNCTION ---
+  const fetchRecyclers = async () => {
+    setLoadingRecyclers(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*');
+    if (error) {
+      setRecyclers([]);
+    } else {
+      setRecyclers(
+        (data || [])
+          .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
+          .map((rec) => ({
+            id: rec.id,
+            profiles: {
+              avatar_url: rec.avatar_url,
+              name: rec.name,
+              email: rec.email,
+              phone: rec.phone,
+            },
+            rating_average: rec.rating_average || 0,
+            total_ratings: rec.total_ratings || 0,
+            materials: rec.materials || [],
+            bio: rec.bio || '',
+            lat: rec.lat,
+            lng: rec.lng,
+            online: rec.online,
+          }))
+      );
+    }
+    setLoadingRecyclers(false);
+  };
+
   useEffect(() => {
     if (activeTab === 'recicladores') {
-      setLoadingRecyclers(true);
-      const fetchRecyclers = async () => {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('role', 'recycler');
-        if (error) {
-          setRecyclers([]);
-        } else {
-          setRecyclers(
-            (data || []).map((rec) => ({
-              id: rec.id,
-              profiles: {
-                avatar_url: rec.avatar_url,
-                name: rec.name,
-                email: rec.email,
-                phone: rec.phone,
-              },
-              rating_average: rec.rating_average || 0,
-              total_ratings: rec.total_ratings || 0,
-              materials: rec.materials || [],
-              bio: rec.bio || '',
-              lat: rec.lat,
-              lng: rec.lng,
-              online: rec.online,
-            }))
-          );
-        }
-        setLoadingRecyclers(false);
-      };
       fetchRecyclers();
-
       // SUSCRIPCIÓN EN TIEMPO REAL PARA ACTUALIZAR CARDS
       const channel = supabase.channel('recyclers-profiles')
         .on(
@@ -152,7 +154,7 @@ const DashboardResident: React.FC = () => {
           (payload) => {
             const newRec = payload.new as ProfileRealtimePayload;
             const oldRec = payload.old as ProfileRealtimePayload;
-            if (newRec && newRec.role === 'recycler') {
+            if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
               setRecyclers((prev) => {
                 const exists = prev.find((r) => r.id === newRec.id);
                 if (exists) {
@@ -201,7 +203,7 @@ const DashboardResident: React.FC = () => {
                 }
               });
             }
-            if (payload.eventType === 'DELETE' && oldRec) {
+            if (payload.eventType === 'DELETE' && oldRec && oldRec.role && oldRec.role.toLowerCase() === 'recycler') {
               setRecyclers((prev) => prev.filter((r) => r.id !== oldRec.id));
             }
           }
@@ -220,26 +222,27 @@ const DashboardResident: React.FC = () => {
     const fetchRecyclersRealtime = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
-        .eq('role', 'recycler');
+        .select('*');
       if (!error && data) {
         setRecyclers(
-          (data || []).map((rec) => ({
-            id: rec.id,
-            profiles: {
-              avatar_url: rec.avatar_url,
-              name: rec.name,
-              email: rec.email,
-              phone: rec.phone,
-            },
-            rating_average: rec.rating_average || 0,
-            total_ratings: rec.total_ratings || 0,
-            materials: rec.materials || [],
-            bio: rec.bio || '',
-            lat: rec.lat,
-            lng: rec.lng,
-            online: rec.online,
-          }))
+          (data || [])
+            .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
+            .map((rec) => ({
+              id: rec.id,
+              profiles: {
+                avatar_url: rec.avatar_url,
+                name: rec.name,
+                email: rec.email,
+                phone: rec.phone,
+              },
+              rating_average: rec.rating_average || 0,
+              total_ratings: rec.total_ratings || 0,
+              materials: rec.materials || [],
+              bio: rec.bio || '',
+              lat: rec.lat,
+              lng: rec.lng,
+              online: rec.online,
+            }))
         );
       }
     };
@@ -412,7 +415,10 @@ const DashboardResident: React.FC = () => {
               ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
               : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
           `}
-          onClick={() => setActiveTab('recicladores')}
+          onClick={() => {
+            setActiveTab('recicladores');
+            fetchRecyclers(); // Refresca la lista al hacer click
+          }}
         >
           Recicladores
         </button>

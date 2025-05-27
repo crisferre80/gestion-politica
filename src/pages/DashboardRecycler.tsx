@@ -227,6 +227,20 @@ const DashboardRecycler: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [user]);
 
+  // Sincronizar campos de edición de perfil con el usuario actual
+  useEffect(() => {
+    if (user) {
+      setEditName(user.name || '');
+      setEditEmail(user.email || '');
+      setEditPhone(user.phone || '');
+      setEditAddress(user.address || '');
+      setEditBio(user.bio || '');
+      setEditMaterials(Array.isArray(user.materials) ? user.materials.join(', ') : (user.materials || ''));
+      setEditAvatarPreview(null);
+      setEditAvatarFile(null);
+    }
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">

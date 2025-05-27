@@ -502,78 +502,74 @@ const DashboardResident: React.FC = () => {
               if (pointsToShow.length === 0) return <p className="text-gray-500">No hay puntos en esta categoría.</p>;
               return (
                 <ul className="space-y-4">
-                  {pointsToShow.map((point) => (
-                    <li key={point.id} className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in" style={{ animation: 'fadeInUp 0.7s' }}>
-                      <div className="flex-1 mb-2 md:mb-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Marcador" className="w-12 h-12" />
-                          <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
-                          {/* Etiqueta de estado */}
-                          {point.status === 'claimed' && point.claim && point.claim.status === 'pending' && <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">Reclamado</span>}
-                          {point.status === 'completed' && <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Retirado</span>}
-                          {activePointsTab==='demorados' && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Demorado</span>}
-                        </div>
-                        <p className="text-gray-500">
-                          <MapPin className="inline-block w-4 h-4 mr-1" />
-                          {point.district}
-                        </p>
-                        <p className="text-gray-500">
-                          <Calendar className="inline-block w-4 h-4 mr-1" />
-                          {point.schedule}
-                        </p>
-                        {/* Mostrar notas adicionales si existen */}
-                        {point.notas && (
-                          <p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>
-                        )}
-                        {/* Mostrar información adicional si existe */}
-                        {point.additional_info && (
-                          <p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>
-                        )}
-                        {/* Info del reciclador reclamante */}
-                        {point.claim && point.claim.recycler && (
-                          <div className="mt-2 text-sm text-blue-700 flex items-center gap-2">
-                            <UserIcon className="w-4 h-4" />
-                            <span>Reclamado por: <b>{point.claim.recycler.name}</b></span>
-                            {point.claim.recycler.phone && <span className="ml-2">Tel: {point.claim.recycler.phone}</span>}
+                  {pointsToShow.map((point) => {
+                    // Determinar si el punto debe verse apagado
+                    const isInactive = activePointsTab !== 'todos';
+                    return (
+                      <li
+                        key={point.id}
+                        className={`border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in ${isInactive ? 'opacity-60 grayscale-[0.7] pointer-events-none' : ''}`}
+                        style={{ animation: 'fadeInUp 0.7s' }}
+                      >
+                        <div className="flex-1 mb-2 md:mb-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Marcador" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
+                            <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
+                            {/* Etiqueta de estado */}
+                            {point.status === 'claimed' && point.claim && point.claim.status === 'pending' && <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">Reclamado</span>}
+                            {point.status === 'completed' && <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Retirado</span>}
+                            {activePointsTab==='demorados' && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Demorado</span>}
                           </div>
-                        )}
-                      </div>
-                      {/* GIF animado a la derecha */}
-                      <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
-                        <div className="transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
-                          <img
-                            src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747453055/Reduce_Climate_Change_GIF_by_Bhumi_Pednekar_uazzk6.gif"
-                            alt="Reduce Climate Change GIF"
-                            className="w-40 h-28 object-contain rounded-lg shadow-md border border-green-200"
-                            style={{ background: '#f0fdf4' }}
-                          />
+                          <p className="text-gray-500"><MapPin className="inline-block w-4 h-4 mr-1" />{point.district}</p>
+                          <p className="text-gray-500"><Calendar className="inline-block w-4 h-4 mr-1" />{point.schedule}</p>
+                          {/* Mostrar notas adicionales si existen */}
+                          {point.notas && (<p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>)}
+                          {point.additional_info && (<p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>)}
+                          {/* Info del reciclador reclamante */}
+                          {point.claim && point.claim.recycler && (
+                            <div className="mt-2 text-sm text-blue-700 flex items-center gap-2">
+                              <UserIcon className="w-4 h-4" />
+                              <span>Reclamado por: <b>{point.claim.recycler.name}</b></span>
+                              {point.claim.recycler.phone && <span className="ml-2">Tel: {point.claim.recycler.phone}</span>}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <div className="flex-shrink-0 md:ml-4 mt-4 md:mt-0 flex items-center">
-                        <button
-                          onClick={(e) => {
-                            const btn = e.currentTarget;
-                            const ripple = document.createElement('span');
-                            ripple.className = 'ripple-effect';
-                            const rect = btn.getBoundingClientRect();
-                            ripple.style.left = `${e.clientX - rect.left}px`;
-                            ripple.style.top = `${e.clientY - rect.top}px`;
-                            btn.appendChild(ripple);
-                            setTimeout(() => ripple.remove(), 600);
-                            handleDelete(point.id);
-                          }}
-                          className="bg-red-500 text-white rounded-lg px-4 py-2 flex items-center overflow-hidden relative ripple-btn"
-                          disabled={isDeleting}
-                        >
-                          {isDeleting ? <Clock className="animate-spin h-5 w-5 mr-2" /> : <Trash2 className="h-5 w-5 mr-2" />}
-                          Eliminar
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
+                        {/* GIF animado a la derecha */}
+                        <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
+                          <div className={`transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}>
+                            <img
+                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747453055/Reduce_Climate_Change_GIF_by_Bhumi_Pednekar_uazzk6.gif"
+                              alt="Reduce Climate Change GIF"
+                              className={`w-40 h-28 object-contain rounded-lg shadow-md border border-green-200 ${isInactive ? 'grayscale' : ''}`}
+                              style={{ background: '#f0fdf4' }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 md:ml-4 mt-4 md:mt-0 flex items-center">
+                          <button
+                            onClick={(e) => {
+                              const btn = e.currentTarget;
+                              const ripple = document.createElement('span');
+                              ripple.className = 'ripple-effect';
+                              const rect = btn.getBoundingClientRect();
+                              ripple.style.left = `${e.clientX - rect.left}px`;
+                              ripple.style.top = `${e.clientY - rect.top}px`;
+                              btn.appendChild(ripple);
+                              setTimeout(() => ripple.remove(), 600);
+                              handleDelete(point.id);
+                            }}
+                            className={`bg-red-500 text-white rounded-lg px-4 py-2 flex items-center overflow-hidden relative ripple-btn ${isInactive ? 'opacity-50 pointer-events-none' : ''}`}
+                            disabled={isDeleting || isInactive}
+                          >
+                            {isDeleting ? <Clock className="animate-spin h-5 w-5 mr-2" /> : <Trash2 className="h-5 w-5 mr-2" />}Eliminar
+                          </button>
+                        </div>
+                      </li>
+                    );
+      })}
+    </ul>
+  );
+})()}
           </div>
           <div className="bg-white shadow-md rounded-lg p-6">
             <Map

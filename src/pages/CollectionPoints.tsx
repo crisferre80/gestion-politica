@@ -80,8 +80,8 @@ function PuntosRecoleccion() {
       const { error } = await supabase
         .from('collection_points')
         .update({ 
-          status: 'claimed',
-          recycler_id: user.id,
+          status: 'pending',
+          claimed_by: user.id,
           claimed_at: new Date().toISOString(),
           additional_info: pickupExtra // Actualiza si corresponde
         })
@@ -107,7 +107,7 @@ function PuntosRecoleccion() {
     try {
       const { error } = await supabase
         .from('collection_points')
-        .update({ status: 'available', claimed_by: null, pickup_time: null, recycler_id: null, claimed_at: null })
+        .update({ status: 'available', claimed_by: null, pickup_time: null, claimed_at: null })
         .eq('id', pointId);
 
       if (error) throw error;

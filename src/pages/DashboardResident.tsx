@@ -356,7 +356,9 @@ const DashboardResident: React.FC = () => {
   const [activePointsTab, setActivePointsTab] = useState<'todos' | 'reclamados' | 'demorados' | 'retirados'>('todos');
   type DetailedPoint = CollectionPoint & {
     status?: string;
+    claim_id?: string | null; // <-- Añadido para acceso seguro
     claim?: {
+      id?: string; // <-- Añadido para fallback
       status?: string;
       pickup_time?: string;
       recycler?: {
@@ -443,6 +445,33 @@ const DashboardResident: React.FC = () => {
     if (status === 'pending') return 'Pendiente';
     if (status === 'demorado') return 'Demorado';
     return status;
+  };
+
+  const handleMakeAvailableAgain = async (point: DetailedPoint) => {
+    if (!user || !point.claim || !point.claim.status || !point.claim.pickup_time) return;
+    try {
+      setError(null);
+      // Usa claim_id del punto o id del claim anidado
+      let claimId: string | undefined = undefined;
+      if (point.claim_id != null) {
+        claimId = String(point.claim_id);
+      } else if (point.claim && point.claim.id) {
+        claimId = String(point.claim.id);
+      }
+      const pointId = String(point.id);
+      if (!claimId || !pointId) throw new Error('Faltan datos para actualizar el punto');
+      // Llama a la función de supabase
+      await import('../lib/supabase').then(({ cancelClaim }) =>
+        cancelClaim(claimId!, pointId, user.id, 'Reabierto por residente (demorado)')
+      );
+      setSuccess('El punto está disponible nuevamente para todos.');
+    } catch (err) {
+      let msg = 'Error al volver a poner el punto disponible';
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+        msg = (err as { message: string }).message;
+      }
+      setError(msg);
+    }
   };
 
   return (
@@ -671,6 +700,15 @@ const DashboardResident: React.FC = () => {
                             {isDeleting ? <Clock className="animate-spin h-5 w-5 mr-2" /> : <Trash2 className="h-5 w-5 mr-2" />}Eliminar
                           </button>
                         </div>
+                        {/* Botón para volver a disponible solo en tab demorados */}
+                        {activePointsTab === 'demorados' && (
+                          <button
+                            onClick={() => handleMakeAvailableAgain(point)}
+                            className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md animate-bounce"
+                          >
+                           Disponible
+                          </button>
+                        )}
                       </li>
                     );
       })}

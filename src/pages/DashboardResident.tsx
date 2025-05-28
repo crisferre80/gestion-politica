@@ -384,15 +384,43 @@ const DashboardResident: React.FC = () => {
       else setDetailedPoints([]);
     };
     fetchDetailedPoints();
+
+    // --- SUSCRIPCIÓN EN TIEMPO REAL PARA ACTUALIZAR PUNTOS ---
+    const channelPoints = supabase.channel('resident-collection-points')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'collection_points',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchDetailedPoints();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'collection_claims',
+      }, () => {
+        // Si el claim afecta a uno de los puntos de este usuario, refresca
+        fetchDetailedPoints();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channelPoints);
+    };
   }, [user]);
 
   // Filtrado por sub-tab
   const now = new Date();
-  const puntosTodos = detailedPoints;
-  const puntosReclamados = detailedPoints.filter(p => p.status === 'claimed' && p.claim && p.claim.status === 'pending');
+  const puntosTodos = detailedPoints.filter(p =>
+    (!p.status || p.status === 'available') && // Solo los que están disponibles
+    (!p.claim || p.claim.status !== 'pending') // Y que no tengan un reclamo pendiente
+  );
+  const puntosReclamados = detailedPoints.filter(p =>
+    (p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'pending'
+  );
   const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || (p.claim && p.claim.status === 'completed'));
   const puntosDemorados = detailedPoints.filter(p => {
-    if (p.status === 'claimed' && p.claim && p.claim.status === 'pending' && p.claim.pickup_time) {
+    if ((p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'pending' && p.claim.pickup_time) {
       const pickup = new Date(p.claim.pickup_time);
       return pickup < now;
     }
@@ -406,6 +434,16 @@ const DashboardResident: React.FC = () => {
     email?: string;
     phone?: string;
   } | null>(null);
+
+  // Traducción para el estado "claimed" en español
+  const getStatusLabel = (status: string) => {
+    if (status === 'claimed' || status === 'reclamado') return 'Reclamado';
+    if (status === 'completed') return 'Retirado';
+    if (status === 'available') return 'Disponible';
+    if (status === 'pending') return 'Pendiente';
+    if (status === 'demorado') return 'Demorado';
+    return status;
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -567,11 +605,17 @@ const DashboardResident: React.FC = () => {
                             <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
                             {/* Etiqueta de estado */}
                             {activePointsTab === 'todos' && (!point.status || point.status === 'available') && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">Disponible</span>
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">{getStatusLabel('available')}</span>
                             )}
-                            {point.status === 'claimed' && point.claim && point.claim.status === 'pending' && <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">Reclamado</span>}
-                            {point.status === 'completed' && <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Retirado</span>}
-                            {activePointsTab==='demorados' && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Demorado</span>}
+                            {(point.status === 'claimed' || point.status === 'reclamado') && point.claim && point.claim.status === 'pending' && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">{getStatusLabel('claimed')}</span>
+                            )}
+                            {point.status === 'completed' && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">{getStatusLabel('completed')}</span>
+                            )}
+                            {activePointsTab==='demorados' && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold">{getStatusLabel('demorado')}</span>
+                            )}
                           </div>
                           <p className="text-gray-500"><MapPin className="inline-block w-4 h-4 mr-1" />{point.district}</p>
                           <p className="text-gray-500"><Calendar className="inline-block w-4 h-4 mr-1" />{point.schedule}</p>
@@ -583,7 +627,7 @@ const DashboardResident: React.FC = () => {
                             <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 shadow-sm">
                               <UserIcon className="w-5 h-5 text-blue-700" />
                               <span className="font-semibold text-blue-900 text-base">
-                                Recuperado por:
+                                Reclamado por:
                                 <button
                                   type="button"
                                   className="ml-1 underline font-bold text-blue-800 hover:text-blue-600 focus:outline-none transition-colors duration-150"

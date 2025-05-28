@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MapPin, Calendar, Phone, Mail, MapIcon, X, User, Clock } from 'lucide-react';
-import { type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection, supabase } from '../lib/supabase';
+import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection } from '../lib/supabase';
 import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
 import HeaderRecycler from '../components/HeaderRecycler';
-import { useMessages } from '../context/MessagesContext';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -38,20 +37,6 @@ const DashboardRecycler: React.FC = () => {
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
-  const [residentNotified, setResidentNotified] = useState(false);
-  const [showMessagesModal, setShowMessagesModal] = useState(false);
-  const { messages, sendMessage } = useMessages();
-  const [hasNewMessage, setHasNewMessage] = useState(false);
-  const navigate = useNavigate();
-
-  // Detectar mensajes recibidos de residentes
-  useEffect(() => {
-    if (!user) return;
-    // Notifica si hay al menos un mensaje recibido
-    setHasNewMessage(messages?.some(
-      (msg) => msg.receiverId === user.id // user.id es el user_id UUID
-    ));
-  }, [messages, user]);
 
   // Cargar puntos reclamados y disponibles
   const fetchData = useCallback(async () => {
@@ -191,10 +176,8 @@ const DashboardRecycler: React.FC = () => {
     try {
       await completeCollection(pointToComplete.claim_id, pointToComplete.id);
       setShowCompleteModal(false);
-      setResidentNotified(true);
       setPointToComplete(null);
       await fetchData();
-      setTimeout(() => setResidentNotified(false), 4000);
     } catch (err: unknown) {
       let message = 'Error al marcar como retirado';
       if (err instanceof Error) {
@@ -281,6 +264,15 @@ const DashboardRecycler: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Enlace a puntos de recolección */}
+        <div className="mb-6 flex justify-end">
+          <Link
+            to="/collection-points"
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md shadow hover:bg-green-700 transition font-semibold"
+          >
+            Ver todos los puntos de recolección
+          </Link>
+        </div>
         <div className="bg-white shadow rounded-lg overflow-hidden">
           {/* Header profesional del reciclador */}
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 px-8 py-8 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100">
@@ -332,16 +324,6 @@ const DashboardRecycler: React.FC = () => {
               )}
               <div className="flex gap-4 mt-4">
                 {/* ...otros botones... */}
-                <button
-                  className="relative flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200 transition"
-                  onClick={() => setShowMessagesModal(true)}
-                >
-                  <Mail className="h-5 w-5" />
-                  Mis Mensajes
-                  {hasNewMessage && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
-                  )}
-                </button>
               </div>
             </div>
           </div>
@@ -889,236 +871,91 @@ const DashboardRecycler: React.FC = () => {
                     <button
                       onClick={handleCompleteCollection}
                       disabled={loading}
-                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {loading ? 'Procesando...' : 'Confirmar Retiro'}
+                      {loading ? 'Procesando...' : 'Aceptar y Notificar'}
                     </button>
                   </div>
                 </div>
               </div>
             )}
-            {/* Modal de notificación al residente */}
-            {residentNotified && (
-              <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-auto text-center">
-                  <h3 className="text-lg font-semibold text-green-700 mb-2">¡El residente ha sido notificado!</h3>
-                  <p className="text-gray-700">El residente recibirá una notificación de que su punto fue retirado exitosamente.</p>
+            {/* Modal para programar recolección */}
+            {showPickupModal && pointToClaim && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg p-6 max-w-md w-full mx-auto">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Programar Recolección</h3>
+                    <button
+                      onClick={() => {
+                        setShowPickupModal(false);
+                        setPointToClaim(null);
+                        setError(null);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-1">Punto: <span className="font-semibold">{pointToClaim?.address || ''}</span></p>
+                  <p className="text-sm text-gray-600 mb-4">Distrito: <span className="font-semibold">{pointToClaim?.district || ''}</span></p>
+
+                  <div className="mb-4">
+                    <label htmlFor="pickupDateTime" className="block text-sm font-medium text-gray-700 mb-1">
+                      Fecha y Hora de Recolección <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Calendar className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="datetime-local"
+                        id="pickupDateTime"
+                        value={pickupDateTimeInput}
+                        onChange={(e) => setPickupDateTimeInput(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md shadow-sm p-2 pl-10 focus:ring-green-500 focus:border-green-500"
+                        min={new Date().toISOString().slice(0, 16)} // Evitar fechas pasadas
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 border-l-4 border-red-400 p-3 mb-4">
+                      <p className="text-sm text-red-700">{error}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => {
+                        setShowPickupModal(false);
+                        setPointToClaim(null);
+                        setError(null);
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleConfirmClaim}
+                      disabled={loading || !pickupDateTimeInput}
+                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      {loading ? 'Procesando...' : 'Confirmar Reclamo'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
-      {/* Modal para programar recolección */}
-      {showPickupModal && pointToClaim && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Programar Recolección</h3>
-              <button
-                onClick={() => {
-                  setShowPickupModal(false);
-                  setPointToClaim(null);
-                  setError(null);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">Punto: <span className="font-semibold">{pointToClaim?.address || ''}</span></p>
-            <p className="text-sm text-gray-600 mb-4">Distrito: <span className="font-semibold">{pointToClaim?.district || ''}</span></p>
-
-            <div className="mb-4">
-              <label htmlFor="pickupDateTime" className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha y Hora de Recolección <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Calendar className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="datetime-local"
-                  id="pickupDateTime"
-                  value={pickupDateTimeInput}
-                  onChange={(e) => setPickupDateTimeInput(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md shadow-sm p-2 pl-10 focus:ring-green-500 focus:border-green-500"
-                  min={new Date().toISOString().slice(0, 16)} // Evitar fechas pasadas
-                  required
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-400 p-3 mb-4">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
-
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowPickupModal(false);
-                  setPointToClaim(null);
-                  setError(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmClaim}
-                disabled={loading || !pickupDateTimeInput}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center"
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                {loading ? 'Procesando...' : 'Confirmar Reclamo'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Modal de mensajes */}
-      {showMessagesModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Mensajes de Residentes</h3>
-              <button
-                onClick={() => setShowMessagesModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            {messages && messages.filter(msg => msg.receiverId === user.id).length > 0 ? (
-              <ul className="divide-y divide-gray-200 max-h-64 overflow-y-auto">
-                {messages.filter(msg => msg.receiverId === user.id).map(msg => (
-                  <ResidentAvatarName key={msg.id} userId={msg.senderId}>
-                    {(resident) => (
-                      <li className="py-2 flex items-center gap-3">
-                        {/* Avatar y nombre del residente */}
-                        <div className="flex items-center gap-2 min-w-[120px]">
-                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
-                            {resident.avatar_url ? (
-                              <img src={resident.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
-                            ) : (
-                              <User className="w-6 h-6 text-gray-400" />
-                            )}
-                          </div>
-                          <span className="font-medium text-gray-800 text-sm">{resident.name || 'Residente'}</span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm text-gray-700 flex items-center gap-2">
-                            <span className="font-semibold">De:</span>
-                          </div>
-                          <div className="text-gray-600 text-sm mt-1">{msg.content}</div>
-                          <div className="text-xs text-gray-400 mt-1">{msg.timestamp && new Date(msg.timestamp).toLocaleString()}</div>
-                          <button
-                            className="mt-2 text-blue-600 hover:underline text-xs"
-                            onClick={async () => {
-                              // Defensive check: verify senderId exists in profiles before navigating
-                              const { data, error } = await supabase
-                                .from('profiles')
-                                .select('user_id')
-                                .eq('user_id', msg.senderId)
-                                .single();
-                              if (error || !data) {
-                                alert('El perfil del residente ya no existe. No se puede abrir el chat.');
-                                return;
-                              }
-                              setShowMessagesModal(false);
-                              navigate(`/chat/${msg.senderId}`);
-                            }}
-                          >
-                            Ir al chat
-                          </button>
-                          <ResponderMensaje msg={msg} userId={user.id} sendMessage={sendMessage} />
-                        </div>
-                      </li>
-                    )}
-                  </ResidentAvatarName>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-gray-500">No tienes mensajes de residentes.</div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
 export default DashboardRecycler;
-
-// --- Componente para responder mensajes ---
-import type { Message } from '../context/MessagesContext';
-
-const ResponderMensaje: React.FC<{ msg: Message; userId: string; sendMessage: (senderId: string, receiverId: string, content: string) => Promise<void>; }> = ({ msg, userId, sendMessage }) => {
-  const [respuesta, setRespuesta] = useState('');
-  const [enviando, setEnviando] = useState(false);
-  const [enviado, setEnviado] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleResponder = async () => {
-    if (!respuesta.trim()) return;
-    setEnviando(true);
-    setError(null);
-    try {
-      await sendMessage(userId, msg.senderId, respuesta);
-      setRespuesta('');
-      setEnviado(true);
-      setTimeout(() => setEnviado(false), 2000);
-    } catch {
-      setError('No se pudo enviar la respuesta');
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  return (
-    <div className="mt-2">
-      <input
-        type="text"
-        className="border rounded px-2 py-1 text-xs w-full"
-        placeholder="Escribe una respuesta..."
-        value={respuesta}
-        onChange={e => setRespuesta(e.target.value)}
-        disabled={enviando}
-      />
-      <button
-        className="mt-1 px-2 py-1 bg-green-600 text-white text-xs rounded disabled:opacity-50"
-        onClick={handleResponder}
-        disabled={enviando || !respuesta.trim()}
-      >
-        {enviando ? 'Enviando...' : 'Responder'}
-      </button>
-      {enviado && <span className="ml-2 text-green-600 text-xs">¡Enviado!</span>}
-      {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
-    </div>
-  );
-};
-
-// --- Componente auxiliar para obtener nombre y avatar del residente ---
-type ResidentProfile = { name: string; avatar_url: string | null };
-import React from 'react';
-const ResidentAvatarName: React.FC<{ userId: string; children: (resident: ResidentProfile) => React.ReactNode }> = ({ userId, children }) => {
-  const [resident, setResident] = React.useState<ResidentProfile>({ name: '', avatar_url: null });
-  React.useEffect(() => {
-    let isMounted = true;
-    supabase
-      .from('profiles')
-      .select('name, avatar_url')
-      .eq('user_id', userId)
-      .single()
-      .then(({ data }) => {
-        if (isMounted && data) setResident({ name: data.name, avatar_url: data.avatar_url });
-      });
-    return () => { isMounted = false; };
-  }, [userId]);
-  return <>{children(resident)}</>;
-};
 
 
 

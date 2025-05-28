@@ -17,7 +17,7 @@ const DashboardRecycler: React.FC = () => {
   const [showCancelClaimModal, setShowCancelClaimModal] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<{ id: string; pointId: string } | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
-  const [activeTab, setActiveTab] = useState('mis-puntos-reclamados');
+  const [activeTab, setActiveTab] = useState('mis-puntos-disponibles');
   // Estado para el modal de programar recolección
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [pointToClaim, setPointToClaim] = useState<CollectionPoint | null>(null);

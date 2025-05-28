@@ -291,7 +291,7 @@ const DashboardRecycler: React.FC = () => {
       }
     };
     updateLocation(); // Actualiza al cargar
-    const intervalId = setInterval(updateLocation, 30000); // Cada 30 segundos
+    const intervalId = setInterval(updateLocation,5000); // Cada 5 segundos 
     return () => clearInterval(intervalId);
   }, [user]);
 

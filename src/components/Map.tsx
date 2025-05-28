@@ -200,10 +200,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   <img
                     src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png"
                     alt="Reciclador"
-                    className="w-10 h-10 object-contain drop-shadow-lg z-0"
+                    className="w-16 h-16 object-contain drop-shadow-lg z-0" // Agranda la bicicleta
                   />
                   {point.avatar_url && (
-                    <div className="w-10 h-10 rounded-full border-2 border-green-600 shadow-lg overflow-hidden z-10 absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <div className="w-12 h-12 rounded-full border-4 border-green-600 shadow-lg overflow-hidden z-10 absolute -top-4 left-1/2 -translate-x-1/2" style={{ background: '#fff' }}>
                       <img
                         src={point.avatar_url}
                         alt={point.title}

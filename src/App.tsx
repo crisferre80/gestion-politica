@@ -14,6 +14,7 @@ import AdminAds from './pages/AdminAds';
 import { UserProvider } from './context/UserContext';
 import Chat from './pages/Chat';
 import { MessagesProvider } from './context/MessagesContext';
+import DashboardRecycler from './pages/DashboardRecycler';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
               <Route path="/collection-points" element={<CollectionPoints />} />
               <Route path="/add-collection-point" element={<AddCollectionPoint />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard-recycler" element={<DashboardRecycler />} />
               <Route path="/admin/ads" element={<AdminAds />} />
               <Route path="/chat/:otherUserId" element={<Chat />} />
               <Route path="*" element={<Navigate to="/" replace />} />

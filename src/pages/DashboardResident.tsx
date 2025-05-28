@@ -751,7 +751,14 @@ const DashboardResident: React.FC = () => {
                       <UserIcon className="w-10 h-10 text-gray-400" />
                     )}
                   </div>
-                  <h3 className="text-lg font-semibold text-green-700 mb-1">{rec.profiles?.name || 'Reciclador'}</h3>
+                  <h3 className="text-lg font-semibold text-green-700 mb-1 flex items-center gap-2">
+                    {rec.profiles?.name || 'Reciclador'}
+                    {rec.online && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold animate-pulse ml-2">
+                        <span className="w-2 h-2 bg-white rounded-full mr-1"></span>En línea
+                      </span>
+                    )}
+                  </h3>
                   <div className="flex items-center mb-1">
                     <Star className="h-5 w-5 text-yellow-400 mr-1" />
                     <span className="font-medium">{rec.rating_average?.toFixed(1) || '0.0'}</span>

@@ -129,14 +129,20 @@ function PuntosRecoleccion() {
         {/* Botón volver al Panel del reciclador (ahora dentro y arriba del título, con margen inferior en mobile) */}
         <div className="w-full flex justify-end md:justify-end mb-4 md:mb-0">
           <button
-            onClick={() => navigate('/dashboard-recycler', { replace: true })}
+            onClick={() => {
+              if (user?.type === 'recycler') {
+                navigate('/dashboard-recycler', { replace: true });
+              } else {
+                navigate('/dashboard', { replace: true });
+              }
+            }}
             className="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-md flex items-center gap-2 shadow-lg transition-colors border border-green-200 md:static md:mt-0 mt-2"
             style={{ position: 'static' }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Panel Reciclador
+            {user?.type === 'recycler' ? 'Panel Reciclador' : 'Panel Residente'}
           </button>
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">

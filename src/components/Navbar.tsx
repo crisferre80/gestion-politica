@@ -109,6 +109,12 @@ const Navbar: React.FC = () => {
             {isAuthenticated ? (
               <>
                 <Link to="/dashboard" className="block px-3 py-2 rounded-md hover:bg-green-800">Mi Panel</Link>
+                <button
+                  onClick={async (e) => { e.stopPropagation(); await handleLogout(); setShowAccountMenu(false); setIsOpen(false); }}
+                  className="block w-full text-left px-3 py-2 rounded-md hover:bg-green-800 flex items-center text-red-100 font-semibold"
+                >
+                  <LogOut className="h-5 w-5 mr-2" />Cerrar sesión
+                </button>
                 {/* Avatar como botón para desplegar menú */}
                 <button
                   onClick={() => setShowAccountMenu(!showAccountMenu)}
@@ -134,7 +140,6 @@ const Navbar: React.FC = () => {
                     </div>
                     <Link to="/profile" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Settings className="h-4 w-4 mr-2" />Configuración</Link>
                     <Link to="/change-password" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Key className="h-4 w-4 mr-2" />Cambiar contraseña</Link>
-                    <button onClick={async (e) => { e.stopPropagation(); await handleLogout(); setShowAccountMenu(false); setIsOpen(false); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><LogOut className="h-4 w-4 mr-2" />Cerrar sesión</button>
                   </div>
                 )}
               </>

@@ -83,6 +83,8 @@ function PuntosRecoleccion() {
       if (error) throw error;
 
       await fetchPoints();
+      // Notificación de éxito
+      // Opcional: podrías crear una notificación en la tabla desde el backend, pero aquí solo mostramos toast
       alert('Punto de recolección eliminado exitosamente');
     } catch (err) {
       console.error('Error eliminando punto:', err);
@@ -123,17 +125,20 @@ function PuntosRecoleccion() {
   
   return (
     <div className="bg-gray-50 min-h-screen py-8 relative bg-[url('https://res.cloudinary.com/dhvrrxejo/image/upload/v1748456546/reciclaje_fondo_rj36fm.jpg')] bg-cover bg-center bg-no-repeat">
-      {/* Botón volver al Panel del reciclador */}
-      <button
-        onClick={() => navigate('/dashboard-recycler', { replace: true })}
-        className="absolute right-4 top-4 z-20 bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-md flex items-center gap-2 shadow-lg transition-colors border border-green-200"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Panel Reciclador
-      </button>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        {/* Botón volver al Panel del reciclador (ahora dentro y arriba del título, con margen inferior en mobile) */}
+        <div className="w-full flex justify-end md:justify-end mb-4 md:mb-0">
+          <button
+            onClick={() => navigate('/dashboard-recycler', { replace: true })}
+            className="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-md flex items-center gap-2 shadow-lg transition-colors border border-green-200 md:static md:mt-0 mt-2"
+            style={{ position: 'static' }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Panel Reciclador
+          </button>
+        </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-extrabold text-green-700 animate-bounce drop-shadow-lg tracking-wide bg-white/70 px-4 py-2 rounded-lg shadow-md">

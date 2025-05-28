@@ -15,31 +15,36 @@ import { UserProvider } from './context/UserContext';
 import Chat from './pages/Chat';
 import { MessagesProvider } from './context/MessagesContext';
 import DashboardRecycler from './pages/DashboardRecycler';
+import { NotificationsProvider } from './context/NotificationsContext';
+import Notifications from './components/Notifications';
 
 function App() {
   return (
     <UserProvider>
       <MessagesProvider>
-        <div className="flex flex-col min-h-screen bg-gray-50">
-          <Toaster position="top-right" />
-          <Navbar />
-          <main className="flex-grow">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/recycler-profile/:id" element={<RecyclerProfile />} />
-              <Route path="/collection-points" element={<CollectionPoints />} />
-              <Route path="/add-collection-point" element={<AddCollectionPoint />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard-recycler" element={<DashboardRecycler />} />
-              <Route path="/admin/ads" element={<AdminAds />} />
-              <Route path="/chat/:otherUserId" element={<Chat />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
+        <NotificationsProvider>
+          <div className="flex flex-col min-h-screen bg-gray-50">
+            <Toaster position="top-right" />
+            <Navbar />
+            <main className="flex-grow">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/recycler-profile/:id" element={<RecyclerProfile />} />
+                <Route path="/collection-points" element={<CollectionPoints />} />
+                <Route path="/add-collection-point" element={<AddCollectionPoint />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard-recycler" element={<DashboardRecycler />} />
+                <Route path="/admin/ads" element={<AdminAds />} />
+                <Route path="/chat/:otherUserId" element={<Chat />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+            <Footer />
+            <Notifications />
+          </div>
+        </NotificationsProvider>
       </MessagesProvider>
     </UserProvider>
   );

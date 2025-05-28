@@ -58,12 +58,34 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
 
     // Enviar mensaje y recargar la conversación
     const sendMessage = async (senderId: string, receiverId: string, content: string) => {
-        // senderId y receiverId deben ser UUID (user_id)
+        // Validar sender
+        const { data: sender, error: senderError } = await supabase
+            .from('profiles')
+            .select('user_id')
+            .eq('user_id', senderId)
+            .single();
+        if (senderError || !sender) {
+            console.error('El remitente no existe en la tabla de perfiles.');
+            return;
+        }
+        // Validar receiver
+        const { data: receiver, error: receiverError } = await supabase
+            .from('profiles')
+            .select('user_id')
+            .eq('user_id', receiverId)
+            .single();
+        if (receiverError || !receiver) {
+            console.error('El destinatario no existe en la tabla de perfiles.');
+            return;
+        }
+        // Insertar mensaje
         const { error } = await supabase.from('messages').insert([
             {
                 sender_id: senderId, // UUID
                 receiver_id: receiverId, // UUID
                 content,
+                is_read: false,
+                // timestamp: new Date().toISOString(), // Si tu tabla lo requiere
             },
         ]);
         if (error) {

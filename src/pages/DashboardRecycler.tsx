@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MapPin, Calendar, Phone, Mail, MapIcon, X, User, Clock } from 'lucide-react';
-import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection } from '../lib/supabase';
+import { type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection, supabase } from '../lib/supabase';
 import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
@@ -40,7 +40,7 @@ const DashboardRecycler: React.FC = () => {
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
   const [residentNotified, setResidentNotified] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
-  const { messages } = useMessages();
+  const { messages, sendMessage } = useMessages();
   const [hasNewMessage, setHasNewMessage] = useState(false);
   const navigate = useNavigate();
 
@@ -994,22 +994,50 @@ const DashboardRecycler: React.FC = () => {
             {messages && messages.filter(msg => msg.receiverId === user.id).length > 0 ? (
               <ul className="divide-y divide-gray-200 max-h-64 overflow-y-auto">
                 {messages.filter(msg => msg.receiverId === user.id).map(msg => (
-                  <li key={msg.id} className="py-2">
-                    <div className="text-sm text-gray-700">
-                      <span className="font-semibold">De:</span> {msg.senderId}
-                    </div>
-                    <div className="text-gray-600 text-sm mt-1">{msg.content}</div>
-                    <div className="text-xs text-gray-400 mt-1">{msg.timestamp && new Date(msg.timestamp).toLocaleString()}</div>
-                    <button
-                      className="mt-2 text-blue-600 hover:underline text-xs"
-                      onClick={() => {
-                        setShowMessagesModal(false);
-                        navigate(`/chat/${msg.senderId}`); // msg.senderId es el user_id UUID
-                      }}
-                    >
-                      Ir al chat
-                    </button>
-                  </li>
+                  <ResidentAvatarName key={msg.id} userId={msg.senderId}>
+                    {(resident) => (
+                      <li className="py-2 flex items-center gap-3">
+                        {/* Avatar y nombre del residente */}
+                        <div className="flex items-center gap-2 min-w-[120px]">
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
+                            {resident.avatar_url ? (
+                              <img src={resident.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-6 h-6 text-gray-400" />
+                            )}
+                          </div>
+                          <span className="font-medium text-gray-800 text-sm">{resident.name || 'Residente'}</span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-700 flex items-center gap-2">
+                            <span className="font-semibold">De:</span>
+                          </div>
+                          <div className="text-gray-600 text-sm mt-1">{msg.content}</div>
+                          <div className="text-xs text-gray-400 mt-1">{msg.timestamp && new Date(msg.timestamp).toLocaleString()}</div>
+                          <button
+                            className="mt-2 text-blue-600 hover:underline text-xs"
+                            onClick={async () => {
+                              // Defensive check: verify senderId exists in profiles before navigating
+                              const { data, error } = await supabase
+                                .from('profiles')
+                                .select('user_id')
+                                .eq('user_id', msg.senderId)
+                                .single();
+                              if (error || !data) {
+                                alert('El perfil del residente ya no existe. No se puede abrir el chat.');
+                                return;
+                              }
+                              setShowMessagesModal(false);
+                              navigate(`/chat/${msg.senderId}`);
+                            }}
+                          >
+                            Ir al chat
+                          </button>
+                          <ResponderMensaje msg={msg} userId={user.id} sendMessage={sendMessage} />
+                        </div>
+                      </li>
+                    )}
+                  </ResidentAvatarName>
                 ))}
               </ul>
             ) : (
@@ -1023,6 +1051,74 @@ const DashboardRecycler: React.FC = () => {
 };
 
 export default DashboardRecycler;
+
+// --- Componente para responder mensajes ---
+import type { Message } from '../context/MessagesContext';
+
+const ResponderMensaje: React.FC<{ msg: Message; userId: string; sendMessage: (senderId: string, receiverId: string, content: string) => Promise<void>; }> = ({ msg, userId, sendMessage }) => {
+  const [respuesta, setRespuesta] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleResponder = async () => {
+    if (!respuesta.trim()) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      await sendMessage(userId, msg.senderId, respuesta);
+      setRespuesta('');
+      setEnviado(true);
+      setTimeout(() => setEnviado(false), 2000);
+    } catch {
+      setError('No se pudo enviar la respuesta');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="mt-2">
+      <input
+        type="text"
+        className="border rounded px-2 py-1 text-xs w-full"
+        placeholder="Escribe una respuesta..."
+        value={respuesta}
+        onChange={e => setRespuesta(e.target.value)}
+        disabled={enviando}
+      />
+      <button
+        className="mt-1 px-2 py-1 bg-green-600 text-white text-xs rounded disabled:opacity-50"
+        onClick={handleResponder}
+        disabled={enviando || !respuesta.trim()}
+      >
+        {enviando ? 'Enviando...' : 'Responder'}
+      </button>
+      {enviado && <span className="ml-2 text-green-600 text-xs">¡Enviado!</span>}
+      {error && <div className="text-red-500 text-xs mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// --- Componente auxiliar para obtener nombre y avatar del residente ---
+type ResidentProfile = { name: string; avatar_url: string | null };
+import React from 'react';
+const ResidentAvatarName: React.FC<{ userId: string; children: (resident: ResidentProfile) => React.ReactNode }> = ({ userId, children }) => {
+  const [resident, setResident] = React.useState<ResidentProfile>({ name: '', avatar_url: null });
+  React.useEffect(() => {
+    let isMounted = true;
+    supabase
+      .from('profiles')
+      .select('name, avatar_url')
+      .eq('user_id', userId)
+      .single()
+      .then(({ data }) => {
+        if (isMounted && data) setResident({ name: data.name, avatar_url: data.avatar_url });
+      });
+    return () => { isMounted = false; };
+  }, [userId]);
+  return <>{children(resident)}</>;
+};
 
 
 

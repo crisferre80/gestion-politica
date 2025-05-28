@@ -482,6 +482,19 @@ const DashboardRecycler: React.FC = () => {
                               <Clock className="h-4 w-4 mr-2" />
                               Retirado
                             </button>
+                            {/* Enlace robusto al chat con residente */}
+                            {point.user_id ? (
+                              <Link
+                                to={`/chat/${point.user_id}`}
+                                className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 col-span-3 md:col-span-1 mt-2 md:mt-0"
+                              >
+                                💬 Chat con residente
+                              </Link>
+                            ) : (
+                              <span className="flex items-center justify-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-gray-400 bg-gray-100 col-span-3 md:col-span-1 mt-2 md:mt-0 cursor-not-allowed">
+                                No disponible para chat
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

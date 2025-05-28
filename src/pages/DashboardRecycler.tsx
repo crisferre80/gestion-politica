@@ -273,6 +273,28 @@ const DashboardRecycler: React.FC = () => {
     setUnreadChats(prev => ({ ...prev, [userId]: 0 }));
   };
 
+  // Actualización automática de ubicación cada 30 segundos
+  useEffect(() => {
+    if (!user?.id) return;
+    const updateLocation = () => {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            await supabase
+              .from('profiles')
+              .update({ lat, lng })
+              .eq('user_id', user.id);
+          }
+        );
+      }
+    };
+    updateLocation(); // Actualiza al cargar
+    const intervalId = setInterval(updateLocation, 30000); // Cada 30 segundos
+    return () => clearInterval(intervalId);
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">

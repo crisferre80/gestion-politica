@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { signUpUser } from '../lib/supabase';
 import { uploadAvatar, updateProfileAvatar } from '../lib/uploadAvatar';
+import { supabase } from '../lib/supabase';
 import PhotoCapture from '../components/PhotoCapture';
 
 const Register: React.FC = () => {
@@ -53,6 +54,16 @@ const Register: React.FC = () => {
         }
       }
       if (data?.user) {
+        // Fetch perfil actualizado para obtener avatar_url real
+        let updatedProfile = null;
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+          updatedProfile = profile;
+        } catch {}
         login({
           id: data.user.id,
           name,
@@ -60,7 +71,7 @@ const Register: React.FC = () => {
           type: userType,
           lng: 0,
           lat: 0,
-          avatar_url: avatarUrl,
+          avatar_url: updatedProfile?.avatar_url || avatarUrl,
         });
         navigate('/dashboard');
       } else {

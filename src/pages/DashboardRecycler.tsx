@@ -38,6 +38,9 @@ const DashboardRecycler: React.FC = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
 
+  // NOTIFICACIONES DE MENSAJES NUEVOS
+  const [unreadChats, setUnreadChats] = useState<{ [userId: string]: number }>({});
+
   // Cargar puntos reclamados y disponibles
   const fetchData = useCallback(async () => {
     try {
@@ -242,6 +245,33 @@ const DashboardRecycler: React.FC = () => {
       setEditAvatarFile(null);
     }
   }, [user]);
+
+  // Escucha en tiempo real los mensajes recibidos
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase.channel('dashboard-messages-unread')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${user.id}`,
+      }, (payload) => {
+        const msg = payload.new;
+        if (msg && msg.sender_id) {
+          setUnreadChats(prev => ({
+            ...prev,
+            [msg.sender_id]: (prev[msg.sender_id] || 0) + 1
+          }));
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // Cuando se abre el chat con un usuario, limpiar el contador
+  const handleOpenChat = (userId: string) => {
+    setUnreadChats(prev => ({ ...prev, [userId]: 0 }));
+  };
 
   if (!user) {
     return (
@@ -486,9 +516,13 @@ const DashboardRecycler: React.FC = () => {
                             {point.user_id ? (
                               <Link
                                 to={`/chat/${point.user_id}`}
-                                className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 col-span-3 md:col-span-1 mt-2 md:mt-0"
+                                onClick={() => handleOpenChat(point.user_id)}
+                                className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 col-span-3 md:col-span-1 mt-2 md:mt-0 relative"
                               >
                                 💬 Chat con residente
+                                {unreadChats[point.user_id] > 0 && (
+                                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-2 py-0.5 font-bold animate-bounce shadow">{unreadChats[point.user_id]}</span>
+                                )}
                               </Link>
                             ) : (
                               <span className="flex items-center justify-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-gray-400 bg-gray-100 col-span-3 md:col-span-1 mt-2 md:mt-0 cursor-not-allowed">

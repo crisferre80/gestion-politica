@@ -109,69 +109,92 @@ const Chat = () => {
   if (!otherUserId) return <div>No se encontró el usuario para chatear.</div>;
 
   return (
-    <div className="max-w-3xl mx-auto p-4 bg-white rounded shadow flex flex-row gap-4">
-      {/* Conversación a la izquierda */}
-      <div className="flex flex-col w-2/3 border-r pr-4">
-        <h2 className="text-xl font-bold mb-4">Chat con reciclador</h2>
-        {error && <div className="text-red-500 mb-2">{error}</div>}
-        {loading ? (
-          <div className="h-64 flex items-center justify-center border p-2 mb-4 bg-gray-50">Cargando...</div>
-        ) : (
-          <div className="h-96 overflow-y-auto border p-2 mb-4 bg-gray-50">
-            {messages.map(msg => {
-              const isMe = msg.senderId === myUserId;
-              const profile = isMe ? myProfile : otherProfile;
-              return (
-                <div
-                  key={msg.id}
-                  className={`mb-2 flex items-start gap-2 ${isMe ? '' : ''}`}
-                >
-                  <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
-                    {profile.avatar_url ? (
-                      <img src={profile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-lg bg-gray-100">{profile.name?.[0] || '?'}</span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs text-gray-500 font-semibold">{profile.name || (isMe ? 'Tú' : 'Usuario')}</span>
-                      <span className="text-[10px] text-gray-400">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                    </div>
-                    <span
-                      className={`px-3 py-1 rounded block max-w-xs break-words ${
-                        isMe ? 'bg-green-200 text-gray-900' : 'bg-gray-200 text-gray-900'
-                      }`}
-                    >
-                      {msg.content}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+    <div className="max-w-3xl mx-auto p-0 md:p-6 bg-white rounded-2xl shadow-xl flex flex-col md:flex-row gap-0 md:gap-6 border border-gray-200">
+      {/* Conversación principal */}
+      <div className="flex flex-col w-full md:w-2/3 border-b md:border-b-0 md:border-r border-gray-200 px-4 py-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-green-400 bg-white flex items-center justify-center">
+            {otherProfile.avatar_url ? (
+              <img src={otherProfile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+            ) : (
+              <span className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-2xl bg-gray-100">{otherProfile.name?.[0] || '?'}</span>
+            )}
           </div>
-        )}
-      </div>
-      {/* Input a la derecha */}
-      <div className="flex flex-col w-1/3 justify-end">
-        <div className="flex flex-col h-full justify-end">
+          <div>
+            <h2 className="text-lg md:text-xl font-bold text-green-800 mb-0 leading-tight">{otherProfile.name || 'Usuario'}</h2>
+            <span className="text-xs text-gray-500">Chat privado</span>
+          </div>
+        </div>
+        {error && <div className="text-red-500 mb-2">{error}</div>}
+        <div className="flex-1 flex flex-col justify-end">
+          {loading ? (
+            <div className="h-64 flex items-center justify-center border p-2 mb-4 bg-gray-50 rounded-lg">Cargando...</div>
+          ) : (
+            <div className="h-96 md:h-[32rem] overflow-y-auto border p-3 mb-4 bg-white rounded-lg shadow-inner flex flex-col gap-2 scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent">
+              {messages.map(msg => {
+                const isMe = msg.senderId === myUserId;
+                const profile = isMe ? myProfile : otherProfile;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex items-end gap-2 ${isMe ? 'justify-end flex-row-reverse' : ''}`}
+                  >
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
+                      {profile.avatar_url ? (
+                        <img src={profile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-lg bg-gray-100">{profile.name?.[0] || '?'}</span>
+                      )}
+                    </div>
+                    <div className={`flex flex-col items-${isMe ? 'end' : 'start'} max-w-[70%]`}>
+                      <div className={`flex items-center gap-2 mb-0.5 ${isMe ? 'flex-row-reverse' : ''}`}> 
+                        <span className="text-xs text-gray-500 font-semibold">{profile.name || (isMe ? 'Tú' : 'Usuario')}</span>
+                        <span className="text-[10px] text-gray-400">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                      </div>
+                      <span
+                        className={`px-4 py-2 rounded-2xl block break-words shadow text-sm ${
+                          isMe
+                            ? 'bg-gradient-to-br from-green-400 to-green-600 text-white rounded-br-md'
+                            : 'bg-gray-100 text-gray-900 rounded-bl-md'
+                        }`}
+                      >
+                        {msg.content}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {/* Input abajo de la conversación */}
+        <form
+          className="flex items-center gap-2 mt-2 bg-white rounded-xl shadow px-3 py-2 border border-gray-200"
+          onSubmit={e => {
+            e.preventDefault();
+            handleSend();
+          }}
+        >
           <input
-            className="border rounded-l px-2 py-1 mb-2"
+            className="flex-1 border-none outline-none bg-transparent px-2 py-2 text-gray-700 placeholder-gray-400 text-base"
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="Escribe un mensaje..."
             disabled={loading}
+            autoComplete="off"
+            maxLength={500}
           />
           <button
-            type="button"
-            className="bg-green-500 text-white px-4 py-2 rounded disabled:opacity-50"
-            onClick={handleSend}
+            type="submit"
+            className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl font-semibold shadow disabled:opacity-50 transition"
             disabled={loading || !input.trim()}
           >
             Enviar
           </button>
-        </div>
+        </form>
       </div>
+      {/* Panel derecho para info extra o usuarios (opcional, placeholder) */}
+      {/* <div className="flex flex-col w-1/3 justify-end"> ... </div> */}
     </div>
   );
 };

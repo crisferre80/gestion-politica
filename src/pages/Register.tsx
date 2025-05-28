@@ -50,12 +50,14 @@ const Register: React.FC = () => {
           name,
           email: data.user.email!,
           type: userType,
+          lng: 0,
+          lat: 0
         });
         navigate('/dashboard');
       } else {
         setError('Error al crear el usuario. Por favor, intenta nuevamente.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Registration error:', err);
       setError('Error al registrarse. Por favor, intenta nuevamente.');
     } finally {
@@ -204,7 +206,9 @@ const Register: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Foto de perfil
               </label>
-              <PhotoCapture onCapture={handlePhotoCapture} onClose={() => {}} />
+              <PhotoCapture onCapture={handlePhotoCapture} onCancel={function (): void {
+                throw new Error('Function not implemented.');
+              } } />
               {profilePhoto && (
                 <p className="mt-2 text-sm text-green-600">
                   Foto seleccionada: {profilePhoto.name}

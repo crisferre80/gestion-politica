@@ -2,33 +2,80 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useMessages } from '../context/MessagesContext';
+import { supabase } from '../lib/supabase';
+
+// Función utilitaria para validar IDs y enviar mensaje
+async function enviarMensajeSeguro(senderId: string, receiverId: string, content: string) {
+  // Validar sender
+  const { data: sender, error: senderError } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('user_id', senderId)
+    .single();
+  if (senderError || !sender) {
+    throw new Error('El remitente no existe en la tabla de perfiles.');
+  }
+  // Validar receiver
+  const { data: receiver, error: receiverError } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('user_id', receiverId)
+    .single();
+  if (receiverError || !receiver) {
+    throw new Error('El destinatario no existe en la tabla de perfiles.');
+  }
+  // Insertar mensaje
+  const { error } = await supabase
+    .from('messages')
+    .insert([
+      {
+        sender_id: senderId,
+        receiver_id: receiverId,
+        content: content,
+        is_read: false,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+  if (error) throw error;
+}
 
 const Chat = () => {
-  const { otherUserId } = useParams<{ otherUserId: string }>(); // ID del reciclador
+  // El parámetro debe ser el user_id (UUID de Supabase Auth)
+  const { otherUserId } = useParams<{ otherUserId: string }>(); // Debe ser user_id
   const { user } = useUser(); // El residente autenticado
-  const { messages, fetchConversation, sendMessage } = useMessages();
+  const { messages, fetchConversation } = useMessages();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // El user_id real es user.id (UUID de Supabase Auth)
+  const myUserId = user?.id;
+
   useEffect(() => {
-    if (user?.id && otherUserId) {
+    if (myUserId && otherUserId) {
       setLoading(true);
       setError(null);
-      fetchConversation(user.id, otherUserId)
+      fetchConversation(myUserId, otherUserId)
         .catch(() => setError('Error al cargar mensajes'))
         .finally(() => setLoading(false));
     }
     // eslint-disable-next-line
-  }, [user, otherUserId]);
+  }, [myUserId, otherUserId]);
 
   const handleSend = async () => {
-    if (user?.id && otherUserId && input.trim()) {
+    if (myUserId && otherUserId && input.trim()) {
+      // Log para depuración de IDs
+      console.log('myUserId:', myUserId, 'typeof:', typeof myUserId);
+      console.log('otherUserId:', otherUserId, 'typeof:', typeof otherUserId);
       try {
-        await sendMessage(user.id, otherUserId, input);
+        await enviarMensajeSeguro(myUserId, otherUserId, input);
         setInput('');
-      } catch {
-        setError('No se pudo enviar el mensaje');
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('No se pudo enviar el mensaje');
+        }
       }
     }
   };
@@ -47,11 +94,11 @@ const Chat = () => {
           {messages.map(msg => (
             <div
               key={msg.id}
-              className={`mb-2 flex ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}
+              className={`mb-2 flex ${msg.senderId === myUserId ? 'justify-end' : 'justify-start'}`}
             >
               <span
                 className={`px-3 py-1 rounded ${
-                  msg.senderId === user.id ? 'bg-green-200' : 'bg-gray-200'
+                  msg.senderId === myUserId ? 'bg-green-200' : 'bg-gray-200'
                 }`}
               >
                 {msg.content}

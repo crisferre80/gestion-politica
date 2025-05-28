@@ -48,10 +48,9 @@ const DashboardRecycler: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     // Notifica si hay al menos un mensaje recibido
-    const nuevos = messages?.some(
-      (msg) => msg.receiverId === user.id
-    );
-    setHasNewMessage(!!nuevos);
+    setHasNewMessage(messages?.some(
+      (msg) => msg.receiverId === user.id // user.id es el user_id UUID
+    ));
   }, [messages, user]);
 
   // Cargar puntos reclamados y disponibles
@@ -1005,7 +1004,7 @@ const DashboardRecycler: React.FC = () => {
                       className="mt-2 text-blue-600 hover:underline text-xs"
                       onClick={() => {
                         setShowMessagesModal(false);
-                        navigate(`/chat/${msg.senderId}`);
+                        navigate(`/chat/${msg.senderId}`); // msg.senderId es el user_id UUID
                       }}
                     >
                       Ir al chat

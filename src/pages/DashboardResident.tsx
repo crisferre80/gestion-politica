@@ -53,7 +53,7 @@ export type User = {
 };
 
 const DashboardResident: React.FC = () => {
-  const { user } = useUser();
+  const { user, login } = useUser();
   const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -69,11 +69,13 @@ const DashboardResident: React.FC = () => {
   // const [] = useState(false);
   type Recycler = {
     id: number;
+    user_id?: string; // <-- Añadir user_id (UUID) aquí
     profiles?: {
       avatar_url?: string;
       name?: string;
       email?: string;
       phone?: string;
+      // Add more specific fields if needed
     };
     rating_average?: number;
     total_ratings?: number;
@@ -82,6 +84,7 @@ const DashboardResident: React.FC = () => {
     lat?: number;
     lng?: number;
     online?: boolean;
+    // Add more specific fields if needed
   };
   
     const [recyclers, setRecyclers] = useState<Recycler[]>([]);
@@ -118,7 +121,8 @@ const DashboardResident: React.FC = () => {
         (data || [])
           .filter(rec => (rec.role && typeof rec.role === 'string' && rec.role.toLowerCase() === 'recycler'))
           .map((rec) => ({
-            id: rec.id,
+            id: rec.id, // id numérico de la tabla profiles
+            user_id: rec.user_id, // <-- Agregar el user_id (UUID)
             profiles: {
               avatar_url: rec.avatar_url,
               name: rec.name,
@@ -318,11 +322,31 @@ const DashboardResident: React.FC = () => {
   const handlePhotoUpload = async (file: File) => {
     try {
       if (!user?.id) return;
-      uploadProfilePhoto(file);
-      // Actualiza el estado local y/o contexto si es necesario
-      toast.success('Foto actualizada correctamente');
-      // Opcional: recarga el usuario o la página para ver el cambio
-      window.location.reload();
+      await uploadProfilePhoto(file, user);
+      // Obtener el perfil actualizado
+      const { data: updatedProfile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      if (!error && updatedProfile) {
+        // Normaliza los campos según el UserContext
+        login({
+          ...user,
+          ...updatedProfile,
+          type: updatedProfile.role || user.type,
+          materials: Array.isArray(updatedProfile.materials)
+            ? updatedProfile.materials
+            : (typeof updatedProfile.materials === 'string' && updatedProfile.materials.length > 0
+                ? [updatedProfile.materials]
+                : []),
+          bio: typeof updatedProfile.bio === 'string' ? updatedProfile.bio : '',
+        });
+        toast.success('Foto actualizada correctamente');
+      } else {
+        toast.error('Error al actualizar el usuario');
+      }
+      // No recargar la página
     } catch (err) {
       toast.error('Error al subir la foto');
       console.error(err);
@@ -658,7 +682,7 @@ const DashboardResident: React.FC = () => {
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
                   <Link
-                    to={rec.profiles?.email ? `/chat/${rec.id}` : '#'}
+                    to={rec.profiles?.email && rec.user_id ? `/chat/${rec.user_id}` : '#'}
                     className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
                     onClick={e => {
                       if (!rec.profiles?.email) {
@@ -861,8 +885,25 @@ export default DashboardResident;
   to { width: 80%; opacity: 0.8; }
 }
 `}</style>
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function uploadProfilePhoto(_file: File) {
-  throw new Error('Function not implemented.');
+ 
+async function uploadProfilePhoto(file: File, user: User | null | undefined) {
+  if (!user?.id) throw new Error('Usuario no autenticado');
+  // 1. Subir la imagen a Supabase Storage
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(fileName, file, { upsert: true });
+  if (uploadError) throw new Error('Error al subir la imagen');
+  // 2. Obtener la URL pública
+  const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+  const publicUrl = data.publicUrl;
+  if (!publicUrl) throw new Error('No se pudo obtener la URL de la imagen');
+  // 3. Actualizar el perfil del usuario
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ avatar_url: publicUrl })
+    .eq('user_id', user.id);
+  if (updateError) throw new Error('No se pudo actualizar el perfil con la foto');
 }
 

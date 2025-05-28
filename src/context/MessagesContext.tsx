@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase';
 
 export type Message = {
     id: string;
-    senderId: string;
-    receiverId: string;
+    senderId: string; // UUID de Supabase Auth (user_id)
+    receiverId: string; // UUID de Supabase Auth (user_id)
     content: string;
     timestamp: Date;
 };
@@ -37,11 +37,19 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // Adaptar los datos a tu tipo Message
+        type SupabaseMessage = {
+            id: string | number;
+            sender_id: string; // UUID de Supabase Auth
+            receiver_id: string; // UUID de Supabase Auth
+            content: string;
+            created_at: string;
+        };
+
         setMessages(
-            (data ?? []).map((msg: any) => ({
+            (data ?? []).map((msg: SupabaseMessage) => ({
                 id: msg.id.toString(),
-                senderId: msg.sender_id,
-                receiverId: msg.receiver_id,
+                senderId: msg.sender_id, // UUID
+                receiverId: msg.receiver_id, // UUID
                 content: msg.content,
                 timestamp: new Date(msg.created_at),
             }))
@@ -50,10 +58,11 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
 
     // Enviar mensaje y recargar la conversación
     const sendMessage = async (senderId: string, receiverId: string, content: string) => {
+        // senderId y receiverId deben ser UUID (user_id)
         const { error } = await supabase.from('messages').insert([
             {
-                sender_id: senderId,
-                receiver_id: receiverId,
+                sender_id: senderId, // UUID
+                receiver_id: receiverId, // UUID
                 content,
             },
         ]);
@@ -72,6 +81,7 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useMessages = () => {
     const context = useContext(MessagesContext);
     if (!context) {

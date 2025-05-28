@@ -5,6 +5,8 @@ import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
 import HeaderRecycler from '../components/HeaderRecycler';
+import { useMessages } from '../context/MessagesContext';
+import { useNavigate } from 'react-router-dom';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -37,6 +39,20 @@ const DashboardRecycler: React.FC = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
   const [residentNotified, setResidentNotified] = useState(false);
+  const [showMessagesModal, setShowMessagesModal] = useState(false);
+  const { messages } = useMessages();
+  const [hasNewMessage, setHasNewMessage] = useState(false);
+  const navigate = useNavigate();
+
+  // Detectar mensajes recibidos de residentes
+  useEffect(() => {
+    if (!user) return;
+    // Notifica si hay al menos un mensaje recibido
+    const nuevos = messages?.some(
+      (msg) => msg.receiverId === user.id
+    );
+    setHasNewMessage(!!nuevos);
+  }, [messages, user]);
 
   // Cargar puntos reclamados y disponibles
   const fetchData = useCallback(async () => {
@@ -180,8 +196,12 @@ const DashboardRecycler: React.FC = () => {
       setPointToComplete(null);
       await fetchData();
       setTimeout(() => setResidentNotified(false), 4000);
-    } catch (err: any) {
-      setError(err?.message || 'Error al marcar como retirado');
+    } catch (err: unknown) {
+      let message = 'Error al marcar como retirado';
+      if (err instanceof Error) {
+        message = err.message;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -311,6 +331,19 @@ const DashboardRecycler: React.FC = () => {
               {user?.bio && (
                 <div className="mt-3 text-gray-600 text-sm italic max-w-2xl">{user.bio}</div>
               )}
+              <div className="flex gap-4 mt-4">
+                {/* ...otros botones... */}
+                <button
+                  className="relative flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200 transition"
+                  onClick={() => setShowMessagesModal(true)}
+                >
+                  <Mail className="h-5 w-5" />
+                  Mis Mensajes
+                  {hasNewMessage && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
           {/* Header con tabs y submenus */}
@@ -943,6 +976,46 @@ const DashboardRecycler: React.FC = () => {
                 {loading ? 'Procesando...' : 'Confirmar Reclamo'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de mensajes */}
+      {showMessagesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Mensajes de Residentes</h3>
+              <button
+                onClick={() => setShowMessagesModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            {messages && messages.filter(msg => msg.receiverId === user.id).length > 0 ? (
+              <ul className="divide-y divide-gray-200 max-h-64 overflow-y-auto">
+                {messages.filter(msg => msg.receiverId === user.id).map(msg => (
+                  <li key={msg.id} className="py-2">
+                    <div className="text-sm text-gray-700">
+                      <span className="font-semibold">De:</span> {msg.senderId}
+                    </div>
+                    <div className="text-gray-600 text-sm mt-1">{msg.content}</div>
+                    <div className="text-xs text-gray-400 mt-1">{msg.timestamp && new Date(msg.timestamp).toLocaleString()}</div>
+                    <button
+                      className="mt-2 text-blue-600 hover:underline text-xs"
+                      onClick={() => {
+                        setShowMessagesModal(false);
+                        navigate(`/chat/${msg.senderId}`);
+                      }}
+                    >
+                      Ir al chat
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-gray-500">No tienes mensajes de residentes.</div>
+            )}
           </div>
         </div>
       )}

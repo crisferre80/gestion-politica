@@ -1,74 +1,35 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-
-type Message = {
-  id: string;
-  sender_id: string;
-  content: string;
-};
-
-type MessagesContextType = {
-  messages: Message[];
-  fetchMessages: (otherUserId: string) => void;
-  sendMessage: (otherUserId: string, content: string) => Promise<void>;
-};
-
-const MessagesContext = createContext<MessagesContextType | undefined>(undefined);
-
-export const MessagesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-
-  const fetchMessages = (otherUserId: string) => {
-    // Replace with real API call
-    setMessages([
-      { id: '1', sender_id: otherUserId, content: 'Hola!' },
-      { id: '2', sender_id: 'me', content: '¡Hola! ¿Cómo estás?' },
-    ]);
-  };
-
-  const sendMessage = async (otherUserId: string, content: string) => {
-    // Replace with real API call
-    const newMsg: Message = {
-      id: Math.random().toString(),
-      sender_id: 'me',
-      content: `[To: ${otherUserId}] ${content}`,
-    };
-    setMessages(prev => [...prev, newMsg]);
-  };
-
-  return (
-    <MessagesContext.Provider value={{ messages, fetchMessages, sendMessage }}>
-      {children}
-    </MessagesContext.Provider>
-  );
-};
-
-export const useMessages = () => {
-  const context = useContext(MessagesContext);
-  if (!context) {
-    throw new Error('useMessages must be used within a MessagesProvider');
-  }
-  return context;
-};
+import { useMessages } from '../context/MessagesContext';
 
 const Chat = () => {
   const { otherUserId } = useParams<{ otherUserId: string }>(); // ID del reciclador
   const { user } = useUser(); // El residente autenticado
-  const { messages, fetchMessages, sendMessage } = useMessages();
+  const { messages, fetchConversation, sendMessage } = useMessages();
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.id && otherUserId) {
-      fetchMessages(otherUserId);
+      setLoading(true);
+      setError(null);
+      fetchConversation(user.id, otherUserId)
+        .catch(() => setError('Error al cargar mensajes'))
+        .finally(() => setLoading(false));
     }
     // eslint-disable-next-line
   }, [user, otherUserId]);
 
   const handleSend = async () => {
-    if (otherUserId && input.trim()) {
-      await sendMessage(otherUserId, input);
-      setInput('');
+    if (user?.id && otherUserId && input.trim()) {
+      try {
+        await sendMessage(user.id, otherUserId, input);
+        setInput('');
+      } catch {
+        setError('No se pudo enviar el mensaje');
+      }
     }
   };
 
@@ -78,42 +39,44 @@ const Chat = () => {
   return (
     <div className="max-w-xl mx-auto p-4 bg-white rounded shadow">
       <h2 className="text-xl font-bold mb-4">Chat con reciclador</h2>
-      <div className="h-64 overflow-y-auto border p-2 mb-4 bg-gray-50">
-        {messages.map(msg => (
-          <div
-            key={msg.id}
-            className={`mb-2 flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
-          >
-            <span
-              className={`px-3 py-1 rounded ${
-                msg.sender_id === user.id ? 'bg-green-200' : 'bg-gray-200'
-              }`}
+      {error && <div className="text-red-500 mb-2">{error}</div>}
+      {loading ? (
+        <div className="h-64 flex items-center justify-center border p-2 mb-4 bg-gray-50">Cargando...</div>
+      ) : (
+        <div className="h-64 overflow-y-auto border p-2 mb-4 bg-gray-50">
+          {messages.map(msg => (
+            <div
+              key={msg.id}
+              className={`mb-2 flex ${msg.senderId === user.id ? 'justify-end' : 'justify-start'}`}
             >
-              {msg.content}
-            </span>
-          </div>
-        ))}
-      </div>
+              <span
+                className={`px-3 py-1 rounded ${
+                  msg.senderId === user.id ? 'bg-green-200' : 'bg-gray-200'
+                }`}
+              >
+                {msg.content}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex">
         <input
           className="flex-grow border rounded-l px-2 py-1"
           value={input}
           onChange={e => setInput(e.target.value)}
           placeholder="Escribe un mensaje..."
+          disabled={loading}
         />
         <button
-          className="bg-green-500 text-white px-4 rounded-r"
+          type="button"
+          className="bg-green-500 text-white px-4 rounded-r disabled:opacity-50"
           onClick={handleSend}
+          disabled={loading || !input.trim()}
         >
           Enviar
         </button>
       </div>
-      <Link
-        to={`/chat/${otherUserId}`}
-        className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-      >
-        Enviar mensaje
-      </Link>
     </div>
   );
 };

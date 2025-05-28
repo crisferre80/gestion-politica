@@ -330,7 +330,20 @@ const DashboardResident: React.FC = () => {
   };
 
   const [activePointsTab, setActivePointsTab] = useState<'todos' | 'reclamados' | 'demorados' | 'retirados'>('todos');
-  const [detailedPoints, setDetailedPoints] = useState<any[]>([]);
+  type DetailedPoint = CollectionPoint & {
+    status?: string;
+    claim?: {
+      status?: string;
+      pickup_time?: string;
+      recycler?: {
+        name?: string;
+        avatar_url?: string;
+        email?: string;
+        phone?: string;
+      };
+    };
+  };
+  const [detailedPoints, setDetailedPoints] = useState<DetailedPoint[]>([]);
 
   // Cargar puntos con detalles de reclamo y reciclador
   useEffect(() => {
@@ -361,6 +374,14 @@ const DashboardResident: React.FC = () => {
     }
     return false;
   });
+
+  // Estado para el modal de reciclador
+  const [selectedRecycler, setSelectedRecycler] = useState<{
+    name?: string;
+    avatar_url?: string;
+    email?: string;
+    phone?: string;
+  } | null>(null);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -504,7 +525,12 @@ const DashboardResident: React.FC = () => {
                 <ul className="space-y-4">
                   {pointsToShow.map((point) => {
                     // Determinar si el punto debe verse apagado
-                    const isInactive = activePointsTab !== 'todos';
+                    let isInactive = false;
+                    if (activePointsTab === 'todos') {
+                      isInactive = point.status === 'completed' || !!(point.claim && point.claim.status === 'completed');
+                    } else if (activePointsTab === 'reclamados' || activePointsTab === 'demorados') {
+                      isInactive = true;
+                    } // En 'retirados' nunca se apaga
                     return (
                       <li
                         key={point.id}
@@ -516,6 +542,9 @@ const DashboardResident: React.FC = () => {
                             <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Marcador" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
                             <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
                             {/* Etiqueta de estado */}
+                            {activePointsTab === 'todos' && (!point.status || point.status === 'available') && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">Disponible</span>
+                            )}
                             {point.status === 'claimed' && point.claim && point.claim.status === 'pending' && <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">Reclamado</span>}
                             {point.status === 'completed' && <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">Retirado</span>}
                             {activePointsTab==='demorados' && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold">Demorado</span>}
@@ -527,10 +556,20 @@ const DashboardResident: React.FC = () => {
                           {point.additional_info && (<p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>)}
                           {/* Info del reciclador reclamante */}
                           {point.claim && point.claim.recycler && (
-                            <div className="mt-2 text-sm text-blue-700 flex items-center gap-2">
-                              <UserIcon className="w-4 h-4" />
-                              <span>Reclamado por: <b>{point.claim.recycler.name}</b></span>
-                              {point.claim.recycler.phone && <span className="ml-2">Tel: {point.claim.recycler.phone}</span>}
+                            <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 shadow-sm">
+                              <UserIcon className="w-5 h-5 text-blue-700" />
+                              <span className="font-semibold text-blue-900 text-base">
+                                Recuperado por:
+                                <button
+                                  type="button"
+                                  className="ml-1 underline font-bold text-blue-800 hover:text-blue-600 focus:outline-none transition-colors duration-150"
+                                  onClick={() => setSelectedRecycler(point.claim?.recycler || null)}
+                                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                                >
+                                  {point.claim.recycler.name}
+                                </button>
+                              </span>
+                              {point.claim.recycler.phone && <span className="ml-3 text-blue-700 text-sm font-medium">Tel: {point.claim.recycler.phone}</span>}
                             </div>
                           )}
                         </div>
@@ -619,8 +658,14 @@ const DashboardResident: React.FC = () => {
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
                   <Link
-                    to={`/chat/${rec.id.toString()}`}
-                    className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                    to={rec.profiles?.email ? `/chat/${rec.id}` : '#'}
+                    className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
+                    onClick={e => {
+                      if (!rec.profiles?.email) {
+                        e.preventDefault();
+                        toast.error('Este reciclador no tiene chat disponible.');
+                      }
+                    }}
                   >
                     Enviar mensaje
                   </Link>
@@ -743,6 +788,29 @@ const DashboardResident: React.FC = () => {
                 {deletingAccount ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de información del reciclador */}
+      {selectedRecycler && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-lg max-w-xs w-full flex flex-col items-center">
+            <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
+              {selectedRecycler.avatar_url ? (
+                <img src={selectedRecycler.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon className="w-12 h-12 text-gray-400" />
+              )}
+            </div>
+            <h3 className="text-xl font-bold text-green-700 mb-2">{selectedRecycler.name}</h3>
+            {selectedRecycler.email && <p className="text-gray-600 mb-1">Email: {selectedRecycler.email}</p>}
+            {selectedRecycler.phone && <p className="text-gray-600 mb-3">Teléfono: {selectedRecycler.phone}</p>}
+            <button
+              className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              onClick={() => setSelectedRecycler(null)}
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       )}

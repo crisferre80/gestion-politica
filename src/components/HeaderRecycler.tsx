@@ -39,7 +39,8 @@ const HeaderRecycler: React.FC<HeaderRecyclerProps> = ({ activeTab, setActiveTab
   // Subtab local para Mis Puntos
   const [subTab, setSubTab] = useState('mis-puntos-disponibles');
 
-  // Sincronizar subTab con activeTab externo
+  // Asegúrate de que el tab activo por defecto sea 'mis-puntos-disponibles' y no 'mis-puntos-reclamados'.
+  // Si hay lógica que fuerza el tab al montar, elimínala o ajústala para respetar el prop activeTab.
   React.useEffect(() => {
     if (isMisPuntos && !MIS_PUNTOS_SUBTABS.some(t => t.value === activeTab)) {
       setActiveTab(subTab);

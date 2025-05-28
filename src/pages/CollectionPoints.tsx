@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Filter, Search, Plus, List, Map as MapIcon, Clock } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import Map from '../components/Map';
-import { supabase, type CollectionPoint } from '../lib/supabase';
+import { supabase, type CollectionPoint, claimCollectionPoint } from '../lib/supabase';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -70,30 +70,16 @@ function PuntosRecoleccion() {
       setError('Debes iniciar sesión para reclamar puntos de recolección');
       return;
     }
-
     if (!selectedPickupTime) {
       setError('Por favor selecciona una fecha y hora de recolección');
       return;
     }
-
     try {
-      const { error } = await supabase
-        .from('collection_points')
-        .update({ 
-          status: 'pending',
-          claimed_by: user.id,
-          claimed_at: new Date().toISOString(),
-          additional_info: pickupExtra // Actualiza si corresponde
-        })
-        .eq('id', pointId)
-        .eq('status', 'available');
-
-      if (error) throw error;
-
+      await claimCollectionPoint(pointId, user.id, selectedPickupTime.toISOString());
       setShowPickupModal(false);
       setSelectedPointId(null);
       setSelectedPickupTime(null);
-      setPickupExtra(''); // limpia el campo
+      setPickupExtra('');
       alert('Punto de recolección reclamado exitosamente');
       await fetchPoints();
     } catch (err) {

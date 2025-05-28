@@ -591,12 +591,12 @@ const DashboardResident: React.FC = () => {
                     if (activePointsTab === 'todos') {
                       isInactive = point.status === 'completed' || !!(point.claim && point.claim.status === 'completed');
                     } else if (activePointsTab === 'reclamados' || activePointsTab === 'demorados') {
-                      isInactive = true;
+                      isInactive = false; // Ahora los puntos reclamados y demorados están activos
                     } // En 'retirados' nunca se apaga
                     return (
                       <li
                         key={point.id}
-                        className={`border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in ${isInactive ? 'opacity-60 grayscale-[0.7] pointer-events-none' : ''}`}
+                        className={`border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in ${isInactive ? 'opacity-80 grayscale-[0.2] pointer-events-none' : ''}`}
                         style={{ animation: 'fadeInUp 0.7s' }}
                       >
                         <div className="flex-1 mb-2 md:mb-0">

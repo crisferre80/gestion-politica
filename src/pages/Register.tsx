@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { signUpUser } from '../lib/supabase';
+import { uploadAvatar, updateProfileAvatar } from '../lib/uploadAvatar';
 import PhotoCapture from '../components/PhotoCapture';
 
 const Register: React.FC = () => {
@@ -20,21 +21,17 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
     }
-    
     setLoading(true);
-    
     try {
       const { data, error } = await signUpUser(email, password, {
         name,
         type: userType,
         email,
       });
-
       if (error) {
         if (error.message === 'User already registered') {
           setError('Este correo electrónico ya está registrado. Por favor, inicia sesión o utiliza otro correo.');
@@ -43,7 +40,18 @@ const Register: React.FC = () => {
         }
         return;
       }
-
+      let avatarUrl: string | undefined = undefined;
+      if (data?.user && profilePhoto) {
+        try {
+          const url = await uploadAvatar(data.user.id, profilePhoto);
+          if (url) {
+            await updateProfileAvatar(data.user.id, url);
+            avatarUrl = url;
+          }
+        } catch (err) {
+          console.error('Error subiendo avatar:', err);
+        }
+      }
       if (data?.user) {
         login({
           id: data.user.id,
@@ -51,7 +59,8 @@ const Register: React.FC = () => {
           email: data.user.email!,
           type: userType,
           lng: 0,
-          lat: 0
+          lat: 0,
+          avatar_url: avatarUrl,
         });
         navigate('/dashboard');
       } else {

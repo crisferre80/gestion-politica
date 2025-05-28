@@ -170,11 +170,11 @@ function PuntosRecoleccion() {
 
   // NUEVO: Separa los puntos reclamados por el recolector logueado
   const claimedByMe = user && user.type === 'recycler'
-    ? filteredPoints.filter(p => p.status === 'claimed' && p.recycler_id === user.id)
+    ? filteredPoints.filter(p => p.status === 'pending' && p.recycler_id === user.id)
     : [];
 
   const availablePoints = filteredPoints.filter(
-    p => !(user && user.type === 'recycler' && p.status === 'claimed' && p.recycler_id === user.id)
+    p => !(user && user.type === 'recycler' && p.status === 'pending' && p.recycler_id === user.id)
   );
 
   const mapPoints = viewMode === 'map' ? filteredPoints.map(point => ({

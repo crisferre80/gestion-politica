@@ -718,14 +718,16 @@ const DashboardResident: React.FC = () => {
           </div>
           <div className="bg-white shadow-md rounded-lg p-6">
             <Map
-              points={recyclers.filter(r => r.lat && r.lng && r.online !== false).map((rec) => ({
-                id: rec.id.toString(),
-                lat: rec.lat ?? 0,
-                lng: rec.lng ?? 0,
-                title: rec.profiles?.name || 'Reciclador',
-                // No avatar_url aquí, para forzar el pin personalizado
-                isRecycler: true
-              }))}
+              points={recyclers
+                .filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true)
+                .map((rec) => ({
+                  id: rec.id.toString(),
+                  lat: rec.lat ?? 0,
+                  lng: rec.lng ?? 0,
+                  title: rec.profiles?.name || 'Reciclador',
+                  avatar_url: rec.profiles?.avatar_url || undefined,
+                  isRecycler: true
+                }))}
               showUserLocation={true}
             />
           </div>

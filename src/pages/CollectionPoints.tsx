@@ -120,22 +120,7 @@ function PuntosRecoleccion() {
     isRecycler: false
   }));
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[url('/assets/recycling-marker.svg')] bg-cover bg-center bg-no-repeat">
-        <p className="text-xl text-gray-600">Cargando...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[url('/assets/recycling-marker.svg')] bg-cover bg-center bg-no-repeat">
-        <p className="text-xl text-red-600">{error}</p>
-      </div>
-    );
-  }
-
+  
   return (
     <div className="bg-gray-50 min-h-screen py-8 relative bg-[url('https://res.cloudinary.com/dhvrrxejo/image/upload/v1748456546/reciclaje_fondo_rj36fm.jpg')] bg-cover bg-center bg-no-repeat">
       {/* Botón volver al Panel del reciclador */}
@@ -235,7 +220,11 @@ function PuntosRecoleccion() {
 
         {/* Lista de puntos disponibles */}
         <h2 className="text-lg font-bold text-gray-900 mb-4">Puntos de Recolección Disponibles</h2>
-        {filteredPoints.length > 0 ? (
+        {loading ? (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <p className="text-gray-500 mb-4">Cargando puntos de recolección...</p>
+          </div>
+        ) : filteredPoints.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredPoints.map(point => (
               <div key={point.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 hover:shadow-md transition-shadow">

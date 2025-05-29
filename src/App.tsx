@@ -17,6 +17,8 @@ import { MessagesProvider } from './context/MessagesContext';
 import DashboardRecycler from './pages/DashboardRecycler';
 import { NotificationsProvider } from './context/NotificationsContext';
 import Notifications from './components/Notifications';
+import AdminPanel from './pages/AdminPanel';
+import ProtectedAdminRoute from './pages/ProtectedAdminRoute';
 
 function App() {
   return (
@@ -38,6 +40,11 @@ function App() {
                 <Route path="/dashboard-recycler" element={<DashboardRecycler />} />
                 <Route path="/admin/ads" element={<AdminAds />} />
                 <Route path="/chat/:otherUserId" element={<Chat />} />
+                <Route path="/admin-panel" element={
+                  <ProtectedAdminRoute>
+                    <AdminPanel />
+                  </ProtectedAdminRoute>
+                } />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>

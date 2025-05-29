@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
+import AdminAds from './AdminAds';
 
 interface UserRow {
   id: string;
@@ -34,47 +35,107 @@ const AdminPanel: React.FC = () => {
           stats[role] = (stats[role] || 0) + 1;
         });
         setStats(stats);
+        // Si el usuario seleccionado ya no existe, deseleccionarlo
+        if (selectedUser && !data.find(u => u.id === selectedUser.id)) {
+          setSelectedUser(null);
+        }
       } else {
         setError('Error al cargar usuarios');
       }
       setLoading(false);
     };
     fetchUsers();
+    // Refrescar usuarios cada vez que se envía/elimina uno
   }, []);
+
+  // Refrescar usuarios después de enviar notificación global o eliminar usuario
+  const refreshUsers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('profiles').select('id, name, email, role');
+    if (!error && data) {
+      setUsers(data);
+      const stats: {[role: string]: number} = {};
+      data.forEach((u: UserRow) => {
+        const role = u.role || 'sin rol';
+        stats[role] = (stats[role] || 0) + 1;
+      });
+      setStats(stats);
+      if (selectedUser && !data.find(u => u.id === selectedUser.id)) {
+        setSelectedUser(null);
+      }
+    } else {
+      setError('Error al cargar usuarios');
+    }
+    setLoading(false);
+  };
 
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar este usuario?')) return;
     await supabase.from('profiles').delete().eq('id', userId);
-    setUsers(users.filter(u => u.id !== userId));
+    await refreshUsers();
   };
 
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     setNotifStatus('');
-    if (notifTarget === 'global') {
-      // Notificación global a todos
-      const { data: allUsers } = await supabase.from('profiles').select('id');
-      if (allUsers) {
-        await Promise.all(
-          allUsers.map((u: UserRow) =>
-            createNotification({
+    try {
+      if (notifTarget === 'global') {
+        // Notificación global a todos SOLO a usuarios válidos en el estado
+        for (const u of users) {
+          if (!u.id) continue;
+          console.log('[NOTIF] Intentando enviar notificación global', {
+            user_id: u.id,
+            notifTitle,
+            notifMsg,
+            type: 'admin',
+            fecha: new Date().toISOString(),
+            existeEnProfiles: true // porque users viene de profiles
+          });
+          try {
+            await createNotification({
               user_id: u.id,
               title: notifTitle,
               content: notifMsg,
               type: 'admin',
-            })
-          )
-        );
+            });
+          } catch (err) {
+            console.error('[NOTIF][ERROR] Falló envío a', u.id, err);
+          }
+        }
         setNotifStatus('Notificación global enviada');
+        await refreshUsers();
+      } else if (selectedUser) {
+        // Verifica que el usuario seleccionado existe en el estado
+        const validUser = users.find(u => u.id === selectedUser.id);
+        if (!validUser) {
+          setNotifStatus('El usuario seleccionado ya no existe.');
+          setSelectedUser(null);
+          return;
+        }
+        console.log('[NOTIF] Intentando enviar notificación individual', {
+          user_id: selectedUser.id,
+          notifTitle,
+          notifMsg,
+          type: 'admin',
+          fecha: new Date().toISOString(),
+          existeEnProfiles: true
+        });
+        try {
+          await createNotification({
+            user_id: selectedUser.id,
+            title: notifTitle,
+            content: notifMsg,
+            type: 'admin',
+          });
+          setNotifStatus('Notificación enviada al usuario');
+        } catch (err) {
+          setNotifStatus('Error al enviar la notificación');
+          console.error('[NOTIF][ERROR] Falló envío individual a', selectedUser.id, err);
+        }
       }
-    } else if (selectedUser) {
-      await createNotification({
-        user_id: selectedUser.id,
-        title: notifTitle,
-        content: notifMsg,
-        type: 'admin',
-      });
-      setNotifStatus('Notificación enviada al usuario');
+    } catch (err) {
+      setNotifStatus('Error al enviar notificaciones');
+      console.error('[NOTIF][ERROR] Error global al enviar notificaciones:', err);
     }
     setNotifTitle('');
     setNotifMsg('');
@@ -138,6 +199,9 @@ const AdminPanel: React.FC = () => {
           <button className="bg-green-600 text-white px-4 py-2 rounded mt-2" type="submit">Enviar notificación</button>
           {notifStatus && <p className="text-green-700 mt-2">{notifStatus}</p>}
         </form>
+      </div>
+      <div className="mb-12">
+        <AdminAds />
       </div>
     </div>
   );

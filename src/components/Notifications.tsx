@@ -1,10 +1,54 @@
 import { useNotifications } from '../context/NotificationsContext';
 import { Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+
+function getClosedIdsFromStorage(userId: string | undefined) {
+  if (!userId) return [];
+  try {
+    const raw = localStorage.getItem(`eco_closed_notifications_${userId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function saveClosedIdsToStorage(userId: string | undefined, ids: string[]) {
+  if (!userId) return;
+  localStorage.setItem(`eco_closed_notifications_${userId}`, JSON.stringify(ids));
+}
 
 export default function Notifications() {
   const { notifications, markAsRead } = useNotifications();
-  // Solo mostrar notificaciones no leídas en el popup
-  const unread = notifications.filter(n => !n.read);
+  const userId = notifications[0]?.user_id;
+  const [closedIds, setClosedIds] = useState<string[]>(() => getClosedIdsFromStorage(userId));
+  const [shownIds, setShownIds] = useState<string[]>([]);
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    // Cargar cerradas de storage al cambiar de usuario
+    setClosedIds(getClosedIdsFromStorage(userId));
+  }, [userId]);
+
+  useEffect(() => {
+    if (firstRender.current) {
+      setShownIds(
+        notifications
+          .filter(n => !n.read && !closedIds.includes(n.id))
+          .map(n => n.id)
+      );
+      firstRender.current = false;
+    }
+  }, [notifications, closedIds]);
+
+  // Solo mostrar las no leídas y que estén en shownIds
+  const unread = notifications.filter(n => !n.read && shownIds.includes(n.id));
+
+  const handleClose = (id: string) => {
+    markAsRead(id);
+    setShownIds(ids => ids.filter(i => i !== id));
+    const updatedClosed = [...closedIds, id];
+    setClosedIds(updatedClosed);
+    saveClosedIdsToStorage(userId, updatedClosed);
+  };
 
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 max-w-xs w-full">
@@ -33,7 +77,7 @@ export default function Notifications() {
           </div>
           <button
             className="ml-2 text-gray-400 hover:text-green-600 transition-colors"
-            onClick={() => markAsRead(n.id)}
+            onClick={() => handleClose(n.id)}
             aria-label="Marcar como leída"
           >
             ×

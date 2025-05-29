@@ -16,10 +16,8 @@ const Login: React.FC = () => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    
     try {
       const { data, profile } = await signInUser(email, password);
-      
       if (data.user && profile) {
         // Marcar online en el backend
         await import('../lib/supabase').then(({ supabase }) =>
@@ -37,7 +35,13 @@ const Login: React.FC = () => {
             lng: 0,
             lat: 0
         });
-        navigate('/dashboard');
+        // Guardar email en localStorage para mostrar acceso admin en Home
+        window.localStorage.setItem('eco_user_email', data.user.email!);
+        if (email === 'cristianferreyra8076@gmail.com') {
+          navigate('/admin-panel');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setError('No se pudo iniciar sesión. Por favor, verifica tus credenciales.');
       }

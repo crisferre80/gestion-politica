@@ -762,8 +762,9 @@ const handleSubmitRating = async () => {
                             className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
                             onClick={() => {
                               // Usar email como ID único si existe, si no, fallback a nombre
-                              const recyclerId = point.claim?.recycler?.email || point.claim?.recycler?.phone || point.claim?.recycler?.name || '';
-                              handleOpenRating(recyclerId, point.claim?.recycler?.name || 'Reciclador');
+                              const recyclerId = (point.claim && point.claim.recycler && (point.claim.recycler.email || point.claim.recycler.phone || point.claim.recycler.name)) || '';
+                              const recyclerName = (point.claim && point.claim.recycler && point.claim.recycler.name) || 'Reciclador';
+                              handleOpenRating(recyclerId, recyclerName);
                             }}
                           >
                             Calificar reciclador

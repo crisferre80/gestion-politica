@@ -167,8 +167,8 @@ export async function signInUser(email: string, password: string) {
         .insert([{
           user_id: authData.user.id,
           email: authData.user.email!,
-          name: authData.user.user_metadata.name || '',
-          role: authData.user.user_metadata.type || 'resident',
+          name: authData.user.user_metadata?.name || '',
+          role: authData.user.user_metadata?.type || 'resident',
         }]);
 
       if (createProfileError) throw new Error('Failed to create profile');
@@ -182,19 +182,16 @@ export async function signInUser(email: string, password: string) {
 
       if (fetchError || !newProfile) throw new Error('Failed to fetch profile');
 
-   
-      return { 
-        data: authData, 
-        profile: { ...newProfile, type: newProfile.role }
+      return {
+        data: authData,
+        profile: { ...newProfile, type: newProfile.role, role: newProfile.role }
       };
     }
 
-    
-
-    // Map role to type for consistency with the User interface
-    return { 
-      data: authData, 
-      profile: { ...profile, type: profile.role }
+    // Map role a type y role para el UserContext
+    return {
+      data: authData,
+      profile: { ...profile, type: profile.role, role: profile.role }
     };
   } catch (error: unknown) {
     console.error('SignIn error:', error);

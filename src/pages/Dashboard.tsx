@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import DashboardRecycler from './DashboardRecycler';
 import DashboardResident from './DashboardResident';
+import AdminPanel from './AdminPanel';
 
 const Dashboard: React.FC = () => {
   const { user } = useUser();
@@ -17,6 +18,9 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
     );
+  }
+  if (user.role === 'admin') {
+    return <AdminPanel />;
   }
   if (user.type === 'recycler') {
     return <DashboardRecycler />;

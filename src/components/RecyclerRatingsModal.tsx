@@ -63,7 +63,8 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 shadow-lg max-w-md w-full flex flex-col items-center">
+      <div className="bg-white rounded-lg p-6 shadow-lg max-w-md w-full flex flex-col items-center relative">
+        <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl font-bold" onClick={onClose} aria-label="Cerrar modal">×</button>
         <div className="w-20 h-20 rounded-full overflow-hidden mb-2 flex items-center justify-center bg-gray-200 border-2 border-green-600">
           {avatarUrl ? (
             <img src={avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
@@ -79,9 +80,6 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
             <span className="ml-2 text-gray-400 text-sm">({ratings.length})</span>
           </div>
         )}
-        <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={onClose}>
-          ✕
-        </button>
         <div className="w-full mt-2 max-h-72 overflow-y-auto">
           {loading ? (
             <p className="text-gray-500 text-center">Cargando calificaciones...</p>

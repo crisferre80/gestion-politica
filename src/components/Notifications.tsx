@@ -10,6 +10,7 @@ const typeColors: Record<string, string> = {
 
 export default function Notifications() {
   const { notifications, markAsRead } = useNotifications();
+  // Solo mostrar notificaciones no leídas en el popup
   const unread = notifications.filter(n => !n.read);
 
   return (

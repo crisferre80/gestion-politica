@@ -368,15 +368,12 @@ const DashboardRecycler: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-green-800 mb-6">Panel del Reciclador</h1>
-        {/* Enlace a puntos de recolección */}
-        <div className="mb-6 flex justify-end">
-          <Link
-            to="/collection-points"
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md shadow hover:bg-green-700 transition font-semibold"
-          >
-            Ver todos los puntos de recolección
-          </Link>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <h1 className="text-3xl font-bold text-green-800">Panel del Reciclador</h1>
+          <div className="flex items-center gap-4">
+            <NotificationBell />
+            <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
+          </div>
         </div>
         <div className="bg-white shadow rounded-lg overflow-hidden">
           {/* Header profesional del reciclador */}

@@ -52,6 +52,10 @@ const Navbar: React.FC = () => {
             {isAuthenticated ? (
               <>
                 <Link to="/dashboard" className="px-3 py-2 rounded-md hover:bg-green-700">Mi Panel</Link>
+                {/* Acceso Admin solo para el usuario admin */}
+                {user?.email === 'cristianferreyra8076@gmail.com' && (
+                  <Link to="/admin-panel" className="px-3 py-2 rounded-md bg-yellow-400 text-green-900 font-bold hover:bg-yellow-500 transition">Acceso Administrador</Link>
+                )}
                 <div className="relative" ref={accountMenuRef}>
                   <button 
                     onClick={() => setShowAccountMenu(!showAccountMenu)}

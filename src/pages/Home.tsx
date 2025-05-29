@@ -13,9 +13,6 @@ type Advertisement = {
 };
 
 const Home: React.FC = () => {
-  const [, setShowAdminLogin] = useState(false);
-  // Removed invalid empty array destructuring
-  // Removed invalid empty array destructuring
   const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
 
   useEffect(() => {
@@ -217,13 +214,13 @@ const Home: React.FC = () => {
             <Link to="/collection-points" className="bg-green-700 text-white px-6 py-3 rounded-md font-medium hover:bg-green-800 border border-white transition">
               Explorar puntos de recolección
             </Link>
-            <button
-              onClick={() => setShowAdminLogin(true)}
-              className="bg-gray-800 text-white px-6 py-3 rounded-md font-medium hover:bg-gray-900 transition flex items-center"
-            >
-              <Lock className="h-5 w-5 mr-2" />
-              Acceso Administrador
-            </button>
+            {/* Acceso Admin solo si está logueado como admin */}
+            {window.localStorage.getItem('eco_user_email') === 'cristianferreyra8076@gmail.com' && (
+              <Link to="/admin-panel" className="bg-yellow-400 text-green-900 px-6 py-3 rounded-md font-bold hover:bg-yellow-500 transition flex items-center">
+                <Lock className="h-5 w-5 mr-2" />
+                Acceso Administrador
+              </Link>
+            )}
           </div>
         </div>
       </section>

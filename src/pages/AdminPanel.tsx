@@ -46,7 +46,7 @@ const AdminPanel: React.FC = () => {
     };
     fetchUsers();
     // Refrescar usuarios cada vez que se envía/elimina uno
-  }, []);
+  }, [selectedUser]);
 
   // Refrescar usuarios después de enviar notificación global o eliminar usuario
   const refreshUsers = async () => {

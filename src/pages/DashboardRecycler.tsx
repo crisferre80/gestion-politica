@@ -207,7 +207,11 @@ const DashboardRecycler: React.FC = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          if (payload.new && typeof payload.new.online === 'boolean') {
+          if (
+            payload.new &&
+            typeof payload.new.online === 'boolean' &&
+            payload.new.online !== user.online // Solo si cambia el estado online
+          ) {
             login({ ...user, online: payload.new.online });
           }
         }
@@ -291,7 +295,7 @@ const DashboardRecycler: React.FC = () => {
       }
     };
     updateLocation(); // Actualiza al cargar
-    const intervalId = setInterval(updateLocation,5000); // Cada 5 segundos 
+    const intervalId = setInterval(updateLocation, 30000); // Cada 30 segundos
     return () => clearInterval(intervalId);
   }, [user]);
 

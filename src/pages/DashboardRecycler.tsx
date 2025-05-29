@@ -6,6 +6,7 @@ import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
 import HeaderRecycler from '../components/HeaderRecycler';
 import { Link } from 'react-router-dom';
+import NotificationBell from '../components/NotificationBell';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -367,6 +368,7 @@ const DashboardRecycler: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-bold text-green-800 mb-6">Panel del Reciclador</h1>
         {/* Enlace a puntos de recolección */}
         <div className="mb-6 flex justify-end">
           <Link
@@ -402,7 +404,11 @@ const DashboardRecycler: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
+                <div className="flex items-center gap-4">
+                  {/* Dejar solo el nuevo NotificationBell en el header, eliminar cualquier otro anterior */}
+                  <NotificationBell />
+                  <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
+                </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-8 gap-y-2 text-gray-700 text-sm">
                 <div className="flex items-center gap-2">
@@ -528,17 +534,19 @@ const DashboardRecycler: React.FC = () => {
                           >
                             Reclamar
                           </button>
-                          <button
-                            onClick={() => {
-                              setSelectedPoint(point);
-                              setShowMap(true);
-                            }}
-                            className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400 flex items-center"
-                          >
-                            <MapIcon className="h-4 w-4 mr-2" />
-                            Ver en Mapa
+                          <div className="flex items-center">
+                            <button
+                              onClick={() => {
+                                setSelectedPoint(point);
+                                setShowMap(true);
+                              }}
+                              className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400 flex items-center"
+                            >
+                              <MapIcon className="h-4 w-4 mr-2" />
+                              Ver en Mapa
+                            </button>
                             {/* Botón Google Maps justo al lado */}
-                            {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
+                            {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' ? (
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
@@ -554,8 +562,10 @@ const DashboardRecycler: React.FC = () => {
                               >
                                 <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 animate-bounce-map" />
                               </button>
+                            ) : (
+                              <span className="ml-2 text-xs text-gray-400 italic">Ubicación no disponible</span>
                             )}
-                          </button>
+                          </div>
                         </div>
                       </div>
                     </div>

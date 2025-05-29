@@ -13,7 +13,7 @@ export async function createNotification({
   type: string;
   related_id?: string;
 }) {
-  await supabase.from('notifications').insert([
+  const { error } = await supabase.from('notifications').insert([
     {
       user_id,
       title,
@@ -24,4 +24,8 @@ export async function createNotification({
       created_at: new Date().toISOString(),
     },
   ]);
+  if (error) {
+    console.error('Error insertando notificación:', error);
+    throw error;
+  }
 }

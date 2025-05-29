@@ -413,24 +413,7 @@ const DashboardRecycler: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             {/* Botón Google Maps navegación usando coordenadas Mapbox */}
-                            {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
-                              <button
-                                onClick={() => {
-                                  // Si user.lat/lng no son válidos, usar 'current+location' para Google Maps
-                                  const origin = (user.lat && user.lng && Math.abs(user.lat) > 0.01 && Math.abs(user.lng) > 0.01)
-                                    ? `${user.lat},${user.lng}`
-                                    : 'current+location';
-                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
-                                  window.open(url, '_blank', 'noopener,noreferrer');
-                                }}
-                                title="Ver ruta en Google Maps"
-                                className="inline-flex items-center px-2 py-1 rounded bg-white hover:bg-green-50 border border-green-200 shadow ml-2 transition focus:outline-none focus:ring-2 focus:ring-green-400"
-                                style={{ minWidth: 0 }}
-                              >
-                                <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 mr-1 animate-bounce-map" />
-                                <span className="hidden md:inline text-xs font-semibold text-green-700">Ruta</span>
-                              </button>
-                            )}
+                            {/* Eliminado el botón de la esquina, solo se deja el botón junto a 'Ver en Mapa' */}
                           </div>
                         </div>
                         <div className="mt-4">
@@ -443,8 +426,39 @@ const DashboardRecycler: React.FC = () => {
                         </div>
                         <div className="mt-4 flex items-center text-sm text-gray-500">
                           <Calendar className="h-4 w-4 mr-2" />
-                          <span>{point.schedule}</span>
+                          <span>{point.schedule
+                            ? (() => {
+                                // Si es una fecha válida, formatear en español
+                                const date = new Date(point.schedule);
+                                if (!isNaN(date.getTime())) {
+                                  return date.toLocaleString('es-ES', {
+                                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  });
+                                }
+                                // Traducción manual para horarios tipo "Thursday, 07:30 - 17:00"
+                                const dias = [
+                                  { en: 'Monday', es: 'Lunes' },
+                                  { en: 'Tuesday', es: 'Martes' },
+                                  { en: 'Wednesday', es: 'Miércoles' },
+                                  { en: 'Thursday', es: 'Jueves' },
+                                  { en: 'Friday', es: 'Viernes' },
+                                  { en: 'Saturday', es: 'Sábado' },
+                                  { en: 'Sunday', es: 'Domingo' },
+                                ];
+                                let texto = point.schedule;
+                                dias.forEach(d => {
+                                  texto = texto.replace(new RegExp(d.en, 'g'), d.es);
+                                });
+                                return texto.replace(/\b(AM|PM)\b/gi, m => m.toLowerCase());
+                              })()
+                            : ''}</span>
                         </div>
+                        {/* Información adicional del residente */}
+                        {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            <strong>Información adicional:</strong> {point.additional_info}
+                          </div>
+                        )}
                         {/* Botón reclamar */}
                         <div className="mt-4 flex gap-2">
                           <button
@@ -458,9 +472,28 @@ const DashboardRecycler: React.FC = () => {
                               setSelectedPoint(point);
                               setShowMap(true);
                             }}
-                            className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400"
+                            className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400 flex items-center"
                           >
+                            <MapIcon className="h-4 w-4 mr-2" />
                             Ver en Mapa
+                            {/* Botón Google Maps justo al lado */}
+                            {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const origin = (user.lat && user.lng && Math.abs(user.lat) > 0.01 && Math.abs(user.lng) > 0.01)
+                                    ? `${user.lat},${user.lng}`
+                                    : 'current+location';
+                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
+                                  window.open(url, '_blank', 'noopener,noreferrer');
+                                }}
+                                title="Ver ruta en Google Maps"
+                                className="ml-2 p-0 bg-transparent border-none shadow-none focus:outline-none"
+                                style={{ minWidth: 0 }}
+                              >
+                                <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 animate-bounce-map" />
+                              </button>
+                            )}
                           </button>
                         </div>
                       </div>
@@ -549,7 +582,6 @@ const DashboardRecycler: React.FC = () => {
                               >
                                 <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 mr-1 animate-bounce-map" />
                               </button>
-                              <span className="text-base font-semibold text-green-700">Ver ruta en Google Maps</span>
                             </div>
                           )}
                           </div>

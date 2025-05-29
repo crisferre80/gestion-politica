@@ -470,19 +470,20 @@ const DashboardRecycler: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
-                            {/* Botón Google Maps navegación */}
-                            {typeof point.lat === 'number' && typeof point.lng === 'number' && typeof user?.lat === 'number' && typeof user?.lng === 'number' && (
-                              <a
-                                href={`https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.lat},${point.lng}&travelmode=driving`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            {/* Botón Google Maps navegación usando coordenadas Mapbox */}
+                            {typeof point.lng === 'number' && typeof point.lat === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
+                              <button
+                                onClick={() => {
+                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.lat},${point.lng}&travelmode=driving`;
+                                  window.open(url, '_blank', 'noopener,noreferrer');
+                                }}
                                 title="Ver ruta en Google Maps"
-                                className="inline-flex items-center px-2 py-1 rounded bg-green-100 hover:bg-green-200 text-green-700 border border-green-300 shadow ml-2 transition"
+                                className="inline-flex items-center px-2 py-1 rounded bg-white hover:bg-green-50 border border-green-200 shadow ml-2 transition focus:outline-none focus:ring-2 focus:ring-green-400"
                                 style={{ minWidth: 0 }}
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A2 2 0 013 15.382V6.618a2 2 0 011.553-1.894L9 2m0 0l6 3m-6-3v18m6-15l5.447 2.724A2 2 0 0121 8.618v8.764a2 2 0 01-1.553 1.894L15 22m0 0V4" /></svg>
-                                <span className="hidden md:inline text-xs font-semibold">Ruta</span>
-                              </a>
+                                <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-6 w-6 mr-1" />
+                                <span className="hidden md:inline text-xs font-semibold text-green-700">Ruta</span>
+                              </button>
                             )}
                           </div>
                         </div>

@@ -14,6 +14,7 @@ export type User = {
   type?: string;
   bio?: string;
   online?: boolean;
+  role?: string; // <-- Agregado para soporte de roles admin/recycler/resident
   // otros campos...
 };
 

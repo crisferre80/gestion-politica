@@ -53,6 +53,7 @@ export type User = {
   schedule?: string;
   type?: string;
   bio?: string;         // <-- agrega esto si falta
+  role?: string;        // <-- asegúrate de que este campo exista para evitar el error
   // otros campos...
 };
 

@@ -411,6 +411,27 @@ const DashboardRecycler: React.FC = () => {
                               <p className="mt-1 text-sm text-gray-500">{point.district}</p>
                             </div>
                           </div>
+                          <div className="flex items-center gap-2">
+                            {/* Botón Google Maps navegación usando coordenadas Mapbox */}
+                            {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
+                              <button
+                                onClick={() => {
+                                  // Si user.lat/lng no son válidos, usar 'current+location' para Google Maps
+                                  const origin = (user.lat && user.lng && Math.abs(user.lat) > 0.01 && Math.abs(user.lng) > 0.01)
+                                    ? `${user.lat},${user.lng}`
+                                    : 'current+location';
+                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
+                                  window.open(url, '_blank', 'noopener,noreferrer');
+                                }}
+                                title="Ver ruta en Google Maps"
+                                className="inline-flex items-center px-2 py-1 rounded bg-white hover:bg-green-50 border border-green-200 shadow ml-2 transition focus:outline-none focus:ring-2 focus:ring-green-400"
+                                style={{ minWidth: 0 }}
+                              >
+                                <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-6 w-6 mr-1" />
+                                <span className="hidden md:inline text-xs font-semibold text-green-700">Ruta</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="mt-4">
                           <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
@@ -474,7 +495,10 @@ const DashboardRecycler: React.FC = () => {
                             {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
                               <button
                                 onClick={() => {
-                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
+                                  const origin = (user.lat && user.lng && Math.abs(user.lat) > 0.01 && Math.abs(user.lng) > 0.01)
+                                    ? `${user.lat},${user.lng}`
+                                    : 'current+location';
+                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
                                   window.open(url, '_blank', 'noopener,noreferrer');
                                 }}
                                 title="Ver ruta en Google Maps"

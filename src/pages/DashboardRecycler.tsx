@@ -469,6 +469,19 @@ const DashboardRecycler: React.FC = () => {
                             </div>
                           </div>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
+                          {/* Botón Google Maps navegación */}
+                          {typeof point.latitude === 'number' && typeof point.longitude === 'number' && typeof user?.lat === 'number' && typeof user?.lng === 'number' && (
+                            <a
+                              href={`https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.latitude},${point.longitude}&travelmode=driving`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ver ruta en Google Maps"
+                              className="ml-3 text-green-600 hover:text-green-800 flex items-center gap-1"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A2 2 0 013 15.382V6.618a2 2 0 011.553-1.894L9 2m0 0l6 3m-6-3v18m6-15l5.447 2.724A2 2 0 0121 8.618v8.764a2 2 0 01-1.553 1.894L15 22m0 0V4" /></svg>
+                              <span className="hidden md:inline text-xs">Ruta</span>
+                            </a>
+                          )}
                         </div>
                         <div className="mt-4">
                           <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>

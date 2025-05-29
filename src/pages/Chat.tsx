@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useMessages } from '../context/MessagesContext';
 import { supabase } from '../lib/supabase';
+import { createNotification } from '../lib/notifications';
 
 // Función utilitaria para validar IDs y enviar mensaje
 async function enviarMensajeSeguro(senderId: string, receiverId: string, content: string) {
@@ -87,14 +88,18 @@ const Chat = () => {
 
   const handleSend = async () => {
     if (myUserId && otherUserId && input.trim()) {
-      // Log para depuración de IDs
-      console.log('myUserId:', myUserId, 'typeof:', typeof myUserId);
-      console.log('otherUserId:', otherUserId, 'typeof:', typeof otherUserId);
       try {
         await enviarMensajeSeguro(myUserId, otherUserId, input);
         setInput('');
-        // Recargar la conversación para mostrar el mensaje enviado
         await fetchConversation(myUserId, otherUserId);
+        // Notificación para el receptor
+        await createNotification({
+          user_id: otherUserId,
+          title: 'Nuevo mensaje',
+          content: `Has recibido un nuevo mensaje de ${user?.name || 'un residente'}.`,
+          type: 'new_message',
+          related_id: myUserId
+        });
       } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message);

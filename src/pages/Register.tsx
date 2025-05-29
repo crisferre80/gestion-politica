@@ -5,6 +5,7 @@ import { signUpUser } from '../lib/supabase';
 import { uploadAvatar, updateProfileAvatar } from '../lib/uploadAvatar';
 import { supabase } from '../lib/supabase';
 import PhotoCapture from '../components/PhotoCapture';
+import { createNotification } from '../lib/notifications';
 
 const Register: React.FC = () => {
   const [name, setName] = useState('');
@@ -53,7 +54,14 @@ const Register: React.FC = () => {
           console.error('Error subiendo avatar:', err);
         }
       }
+      // Notificación para el nuevo usuario
       if (data?.user) {
+        await createNotification({
+          user_id: data.user.id,
+          title: '¡Bienvenido a EcoConecta!',
+          content: 'Tu registro fue exitoso. Ya puedes comenzar a usar la plataforma.',
+          type: 'user_registered',
+        });
         // Fetch perfil actualizado para obtener avatar_url real
         let updatedProfile = null;
         try {
@@ -63,7 +71,9 @@ const Register: React.FC = () => {
             .eq('user_id', data.user.id)
             .maybeSingle();
           updatedProfile = profile;
-        } catch {}
+        } catch {
+          // Error al obtener el perfil actualizado, se ignora intencionalmente
+        }
         login({
           id: data.user.id,
           name,

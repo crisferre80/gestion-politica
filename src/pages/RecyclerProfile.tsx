@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Mail, Phone, MapPin, Star, ArrowLeft } from 'lucide-react';
+import { createNotification } from '../lib/notifications';
 
 // Mock data for recycler profile
 const mockRecycler = {
@@ -34,6 +35,45 @@ const mockRecycler = {
 const RecyclerProfile: React.FC = () => {
   // In a real app, you would fetch the recycler data based on the ID
   const recycler = mockRecycler;
+
+  // Estado para la reseña
+  const [reviewRating, setReviewRating] = React.useState(0);
+  const [reviewComment, setReviewComment] = React.useState('');
+  const [reviewLoading, setReviewLoading] = React.useState(false);
+  const [reviewSuccess, setReviewSuccess] = React.useState('');
+  const [reviewError, setReviewError] = React.useState('');
+
+  // Manejar envío de reseña
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setReviewError('');
+    setReviewSuccess('');
+    if (!reviewRating) {
+      setReviewError('Por favor selecciona una calificación.');
+      return;
+    }
+    setReviewLoading(true);
+    try {
+      // Aquí deberías guardar la reseña en la base de datos (tabla recycler_ratings)
+      // Simulación: await supabase.from('recycler_ratings').insert(...)
+      // Notificación para el reciclador
+      await createNotification({
+        user_id: mockRecycler.id, // En real: el id del reciclador
+        title: 'Nueva calificación',
+        content: 'Has recibido una nueva calificación de un residente.',
+        type: 'recycler_rated',
+        related_id: mockRecycler.id
+      });
+      setReviewSuccess('¡Reseña enviada correctamente!');
+      setReviewRating(0);
+      setReviewComment('');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (err) {
+      setReviewError('Error al enviar la reseña.');
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -140,7 +180,7 @@ const RecyclerProfile: React.FC = () => {
                 {/* Add Review Form */}
                 <div className="mt-8 border-t border-gray-200 pt-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Dejar una Reseña</h3>
-                  <form>
+                  <form onSubmit={handleReviewSubmit}>
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Calificación
@@ -150,7 +190,8 @@ const RecyclerProfile: React.FC = () => {
                           <button
                             key={rating}
                             type="button"
-                            className="text-gray-300 hover:text-yellow-400"
+                            className={"" + (reviewRating >= rating ? 'text-yellow-400' : 'text-gray-300')}
+                            onClick={() => setReviewRating(rating)}
                           >
                             <Star className="h-6 w-6" />
                           </button>
@@ -166,13 +207,18 @@ const RecyclerProfile: React.FC = () => {
                         rows={4}
                         className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
                         placeholder="Comparte tu experiencia con este reciclador..."
+                        value={reviewComment}
+                        onChange={e => setReviewComment(e.target.value)}
                       />
                     </div>
+                    {reviewError && <div className="text-red-600 text-sm mb-2">{reviewError}</div>}
+                    {reviewSuccess && <div className="text-green-600 text-sm mb-2">{reviewSuccess}</div>}
                     <button
                       type="submit"
                       className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition"
+                      disabled={reviewLoading}
                     >
-                      Enviar Reseña
+                      {reviewLoading ? 'Enviando...' : 'Enviar Reseña'}
                     </button>
                   </form>
                 </div>

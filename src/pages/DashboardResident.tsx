@@ -8,6 +8,7 @@ import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
 import NotificationBell from '../components/NotificationBell';
+import { createNotification } from '../lib/notifications';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -447,80 +448,64 @@ const [ratingLoading, setRatingLoading] = useState(false);
 const [ratingSuccess, setRatingSuccess] = useState<string|null>(null);
 const [ratingError, setRatingError] = useState<string|null>(null);
 
-// Lógica para enviar calificación
-const handleOpenRating = (recyclerId: string, recyclerName: string) => {
-  setRatingTarget({ recyclerId, recyclerName });
-  setShowRatingModal(true);
-  setRatingValue(0);
-  setRatingComment('');
-  setRatingSuccess(null);
-  setRatingError(null);
+// --- Donación Mercado Pago ---
+const [showDonationModal, setShowDonationModal] = useState(false);
+const [donationTarget, setDonationTarget] = useState<{ recyclerName: string; aliasOrCVU: string } | null>(null);
+const [copySuccess, setCopySuccess] = useState(false);
+
+const handleOpenDonation = (recycler: { name?: string; aliasOrCVU?: string } | null | undefined) => {
+  if (!recycler) return;
+  // Puedes cambiar 'aliasOrCVU' por el campo real que tengas en tu base de datos
+  setDonationTarget({
+    recyclerName: recycler.name || 'Reciclador',
+    aliasOrCVU: recycler.aliasOrCVU || 'ALIAS.OFICIAL.MP', // Fallback si no hay alias
+  });
+  setShowDonationModal(true);
+  setCopySuccess(false);
+};
+
+const handleCopyAlias = () => {
+  if (donationTarget?.aliasOrCVU) {
+    navigator.clipboard.writeText(donationTarget.aliasOrCVU);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 1200);
+  }
 };
 
 const handleSubmitRating = async () => {
-  if (!user?.id || !ratingTarget || ratingValue < 1) {
-    setRatingError('Por favor selecciona una calificación.');
-    return;
-  }
+  if (!user || !ratingTarget || ratingValue < 1) return;
   setRatingLoading(true);
   setRatingError(null);
   setRatingSuccess(null);
   try {
-    // Guardar la calificación en la tabla ratings (debe existir en la base de datos)
+    // Insertar calificación en la tabla recycler_ratings
     const { error } = await supabase.from('recycler_ratings').insert({
       recycler_id: ratingTarget.recyclerId,
       resident_id: user.id,
       rating: ratingValue,
       comment: ratingComment,
-      created_at: new Date().toISOString(),
     });
     if (error) throw error;
+    // Notificación para el reciclador
+    await createNotification({
+      user_id: ratingTarget.recyclerId,
+      title: 'Nueva calificación',
+      content: `Has recibido una nueva calificación de un residente.`,
+      type: 'recycler_rated',
+    });
     setRatingSuccess('¡Calificación enviada correctamente!');
-    setShowRatingModal(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (err) {
+    setRatingValue(0);
+    setRatingComment('');
+    setTimeout(() => {
+      setShowRatingModal(false);
+      setRatingSuccess(null);
+    }, 1200);
+  } catch {
     setRatingError('Error al enviar la calificación.');
   } finally {
     setRatingLoading(false);
   }
 };
-
-  // Traducción para el estado "claimed" en español
-  const getStatusLabel = (status: string) => {
-    if (status === 'claimed' || status === 'reclamado') return 'Reclamado';
-    if (status === 'completed') return 'Retirado';
-    if (status === 'available') return 'Disponible';
-    if (status === 'pending') return 'Pendiente';
-    if (status === 'demorado') return 'Demorado';
-    return status;
-  };
-
-  const handleMakeAvailableAgain = async (point: DetailedPoint) => {
-    if (!user || !point.claim || !point.claim.status || !point.claim.pickup_time) return;
-    try {
-      setError(null);
-      // Usa claim_id del punto o id del claim anidado
-      let claimId: string | undefined = undefined;
-      if (point.claim_id != null) {
-        claimId = String(point.claim_id);
-      } else if (point.claim && point.claim.id) {
-        claimId = String(point.claim.id);
-      }
-      const pointId = String(point.id);
-      if (!claimId || !pointId) throw new Error('Faltan datos para actualizar el punto');
-      // Llama a la función de supabase
-      await import('../lib/supabase').then(({ cancelClaim }) =>
-        cancelClaim(claimId!, pointId, user.id, 'Reabierto por residente (demorado)')
-      );
-      setSuccess('El punto está disponible nuevamente para todos.');
-    } catch (err) {
-      let msg = 'Error al volver a poner el punto disponible';
-      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
-        msg = (err as { message: string }).message;
-      }
-      setError(msg);
-    }
-  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -673,6 +658,44 @@ const handleSubmitRating = async () => {
                     } else if (activePointsTab === 'reclamados' || activePointsTab === 'demorados') {
                       isInactive = false; // Ahora los puntos reclamados y demorados están activos
                     } // En 'retirados' nunca se apaga
+                    function getStatusLabel(status: string): React.ReactNode {
+                      switch (status) {
+                        case 'available':
+                          return 'Disponible';
+                        case 'claimed':
+                        case 'reclamado':
+                          return 'Reclamado';
+                        case 'completed':
+                          return 'Retirado';
+                        case 'demorado':
+                          return 'Demorado';
+                        default:
+                          return status;
+                      }
+                    }
+
+
+
+
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    function handleMakeAvailableAgain(_point: CollectionPoint & {
+                      status?: string; claim_id?: string | null; // <-- Añadido para acceso seguro
+                      // <-- Añadido para acceso seguro
+                      claim?: {
+                        id?: string; // <-- Añadido para fallback
+                        status?: string;
+                        pickup_time?: string;
+                        recycler?: {
+                          name?: string;
+                          avatar_url?: string;
+                          email?: string;
+                          phone?: string;
+                        };
+                      };
+                    }): void {
+                      throw new Error('Function not implemented.');
+                    }
+
                     return (
                       <li
                         key={point.id}
@@ -725,7 +748,7 @@ const handleSubmitRating = async () => {
                         <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
                           <div className={`transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}>
                             <img
-                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747453055/Reduce_Climate_Change_GIF_by_Bhumi_Pednekar_uazzk6.gif"
+                              src="https://res.cloudinary.com/dhvrrxejo/image/upload_v1747453055/Reduce_Climate_Change_GIF_by_Bhumi_Pednekar_uazzk6.gif"
                               alt="Reduce Climate Change GIF"
                               className={`w-40 h-28 object-contain rounded-lg shadow-md border border-green-200 ${isInactive ? 'grayscale' : ''}`}
                               style={{ background: '#f0fdf4' }}
@@ -762,17 +785,28 @@ const handleSubmitRating = async () => {
                         )}
                         {/* Botón para calificar reciclador en puntos retirados */}
                         {activePointsTab === 'retirados' && point.claim && point.claim.recycler && (
-                          <button
-                            className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
-                            onClick={() => {
-                              // Usar email como ID único si existe, si no, fallback a nombre
-                              const recyclerId = (point.claim && point.claim.recycler && (point.claim.recycler.email || point.claim.recycler.phone || point.claim.recycler.name)) || '';
-                              const recyclerName = (point.claim && point.claim.recycler && point.claim.recycler.name) || 'Reciclador';
-                              handleOpenRating(recyclerId, recyclerName);
-                            }}
-                          >
-                            Calificar reciclador
-                          </button>
+                          <>
+                            <button
+                              className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
+                              onClick={() => {
+                                // Usar email como ID único si existe, si no, fallback a nombre
+                                const recyclerId = point.claim?.recycler?.email || point.claim?.recycler?.phone || point.claim?.recycler?.name || '';
+                                const recyclerName = point.claim?.recycler?.name || 'Reciclador';
+                                setRatingTarget({ recyclerId, recyclerName });
+                                setShowRatingModal(true);
+                              }}
+                            >
+                              Calificar reciclador
+                            </button>
+                            {/* Donar botón Mercado Pago */}
+                            <button
+                              className="mt-2 ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md"
+                              onClick={() => handleOpenDonation(point.claim?.recycler)}
+                              type="button"
+                            >
+                              Donar
+                            </button>
+                          </>
                         )}
                       </li>
                     );
@@ -1051,6 +1085,38 @@ const handleSubmitRating = async () => {
           disabled={ratingLoading || ratingValue < 1}
         >{ratingLoading ? 'Enviando...' : 'Enviar Calificación'}</button>
       </div>
+    </div>
+  </div>
+)}
+      {/* --- Modal de donación Mercado Pago --- */}
+      {showDonationModal && donationTarget && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
+      <h2 className="text-lg font-bold mb-2 text-blue-700">Donar a {donationTarget.recyclerName}</h2>
+      <p className="mb-2 text-gray-700 text-center">Puedes donar a este reciclador usando Mercado Pago.<br />Copia el alias o CVU y pégalo en tu app bancaria o Mercado Pago.</p>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="font-mono bg-gray-100 px-3 py-1 rounded text-blue-800 select-all text-sm">{donationTarget.aliasOrCVU}</span>
+        <button
+          className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs"
+          onClick={handleCopyAlias}
+        >
+          {copySuccess ? '¡Copiado!' : 'Copiar'}
+        </button>
+      </div>
+      <a
+        href={`https://www.mercadopago.com.ar/transferir-dinero?alias=${encodeURIComponent(donationTarget.aliasOrCVU)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md"
+      >
+        Ir a Mercado Pago
+      </a>
+      <button
+        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+        onClick={() => setShowDonationModal(false)}
+      >
+        Cerrar
+      </button>
     </div>
   </div>
 )}

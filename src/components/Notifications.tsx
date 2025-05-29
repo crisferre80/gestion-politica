@@ -17,14 +17,14 @@ export default function Notifications() {
       {unread.slice(0, 3).map(n => (
         <div
           key={n.id}
-          className={`flex items-start gap-3 p-4 rounded-lg shadow-lg border-l-4 animate-slide-in ${typeColors[n.type] || 'bg-gray-100 text-gray-800'} relative`}
+          className={`flex items-start gap-3 p-4 rounded-lg shadow-lg border-l-4 animate-slide-in ${typeColors[n.type] || 'bg-green-50 text-gray-800'} relative`}
           style={{ animation: 'slide-in 0.4s cubic-bezier(.4,2,.6,1)'}}
         >
           <Bell className="w-5 h-5 mt-1 flex-shrink-0" />
           <div className="flex-1">
             <div className="font-bold">{n.title}</div>
-            <div className="text-sm">{n.content}</div>
-            <div className="text-xs text-gray-500 mt-1">{new Date(n.created_at).toLocaleString()}</div>
+            <div className="text-sx">{n.content}</div>
+            <div className="text-xs text-red-500 mt-1">{new Date(n.created_at).toLocaleString()}</div>
           </div>
           <button
             className="ml-2 text-gray-400 hover:text-gray-700"

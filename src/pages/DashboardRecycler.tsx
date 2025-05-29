@@ -345,6 +345,7 @@ const DashboardRecycler: React.FC = () => {
     };
   }, [user]);
 
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">

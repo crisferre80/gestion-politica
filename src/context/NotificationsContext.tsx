@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useUser } from './UserContext';
 
@@ -21,6 +21,7 @@ type NotificationsContextType = {
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNotifications = () => {
   const ctx = useContext(NotificationsContext);
   if (!ctx) throw new Error('useNotifications debe usarse dentro de NotificationsProvider');
@@ -32,7 +33,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Fetch inicial y en tiempo real
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase
       .from('notifications')
@@ -40,7 +41,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (!error && data) setNotifications(data);
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchNotifications();
@@ -57,7 +58,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       )
       .subscribe();
     return () => { channel.unsubscribe(); };
-  }, [user]);
+  }, [fetchNotifications, user]);
 
   const markAsRead = async (id: string) => {
     await supabase.from('notifications').update({ read: true }).eq('id', id);

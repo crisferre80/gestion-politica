@@ -8,6 +8,7 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { createNotification } from '../lib/notifications';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -172,7 +173,7 @@ const AddCollectionPoint: React.FC = () => {
     const formattedSchedule = `${format(collectionDate, 'EEEE')}s, ${format(collectionTimeStart, 'HH:mm')} - ${format(collectionTimeEnd, 'HH:mm')}`;
     
     try {
-      const { error: supabaseError } = await supabase
+      const { error: supabaseError, data: newPoint } = await supabase
         .from('collection_points')
         .insert([
           {
@@ -190,7 +191,14 @@ const AddCollectionPoint: React.FC = () => {
         .single();
 
       if (supabaseError) throw supabaseError;
-      
+      // Notificación para el residente (creador)
+      await createNotification({
+        user_id: user.id,
+        title: 'Punto de recolección creado',
+        content: `Has creado un nuevo punto de recolección en ${address}.`,
+        type: 'collection_point_created',
+        related_id: newPoint?.id
+      });
       navigate('/dashboard');
     } catch (err) {
       console.error('Error:', err);

@@ -437,6 +437,53 @@ const DashboardResident: React.FC = () => {
     phone?: string;
   } | null>(null);
 
+  // --- Calificación de recicladores ---
+const [showRatingModal, setShowRatingModal] = useState(false);
+const [ratingTarget, setRatingTarget] = useState<{recyclerId: string, recyclerName: string} | null>(null);
+const [ratingValue, setRatingValue] = useState(0);
+const [ratingComment, setRatingComment] = useState('');
+const [ratingLoading, setRatingLoading] = useState(false);
+const [ratingSuccess, setRatingSuccess] = useState<string|null>(null);
+const [ratingError, setRatingError] = useState<string|null>(null);
+
+// Lógica para enviar calificación
+const handleOpenRating = (recyclerId: string, recyclerName: string) => {
+  setRatingTarget({ recyclerId, recyclerName });
+  setShowRatingModal(true);
+  setRatingValue(0);
+  setRatingComment('');
+  setRatingSuccess(null);
+  setRatingError(null);
+};
+
+const handleSubmitRating = async () => {
+  if (!user?.id || !ratingTarget || ratingValue < 1) {
+    setRatingError('Por favor selecciona una calificación.');
+    return;
+  }
+  setRatingLoading(true);
+  setRatingError(null);
+  setRatingSuccess(null);
+  try {
+    // Guardar la calificación en la tabla ratings (debe existir en la base de datos)
+    const { error } = await supabase.from('recycler_ratings').insert({
+      recycler_id: ratingTarget.recyclerId,
+      resident_id: user.id,
+      rating: ratingValue,
+      comment: ratingComment,
+      created_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+    setRatingSuccess('¡Calificación enviada correctamente!');
+    setShowRatingModal(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (err) {
+    setRatingError('Error al enviar la calificación.');
+  } finally {
+    setRatingLoading(false);
+  }
+};
+
   // Traducción para el estado "claimed" en español
   const getStatusLabel = (status: string) => {
     if (status === 'claimed' || status === 'reclamado') return 'Reclamado';
@@ -709,6 +756,19 @@ const DashboardResident: React.FC = () => {
                            Disponible
                           </button>
                         )}
+                        {/* Botón para calificar reciclador en puntos retirados */}
+                        {activePointsTab === 'retirados' && point.claim && point.claim.recycler && (
+                          <button
+                            className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
+                            onClick={() => {
+                              // Usar email como ID único si existe, si no, fallback a nombre
+                              const recyclerId = point.claim?.recycler?.email || point.claim?.recycler?.phone || point.claim?.recycler?.name || '';
+                              handleOpenRating(recyclerId, point.claim?.recycler?.name || 'Reciclador');
+                            }}
+                          >
+                            Calificar reciclador
+                          </button>
+                        )}
                       </li>
                     );
       })}
@@ -948,6 +1008,47 @@ const DashboardResident: React.FC = () => {
           </div>
         </div>
       )}
+      {/* --- Modal de calificación de reciclador --- */}
+      {showRatingModal && ratingTarget && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
+      <h2 className="text-lg font-bold mb-2 text-green-700">Calificar a {ratingTarget.recyclerName}</h2>
+      <div className="flex gap-1 mb-3">
+        {[1,2,3,4,5].map(star => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => setRatingValue(star)}
+            className={star <= ratingValue ? 'text-yellow-400' : 'text-gray-300'}
+            style={{ fontSize: 32, lineHeight: 1 }}
+            aria-label={`Calificar con ${star} estrellas`}
+          >★</button>
+        ))}
+      </div>
+      <textarea
+        className="w-full border border-gray-300 rounded-md p-2 mb-3"
+        rows={3}
+        placeholder="Comentario (opcional)"
+        value={ratingComment}
+        onChange={e => setRatingComment(e.target.value)}
+      />
+      {ratingError && <div className="text-red-600 text-sm mb-2">{ratingError}</div>}
+      {ratingSuccess && <div className="text-green-600 text-sm mb-2">{ratingSuccess}</div>}
+      <div className="flex gap-2 mt-2">
+        <button
+          className="px-4 py-2 rounded bg-gray-200"
+          onClick={() => setShowRatingModal(false)}
+          disabled={ratingLoading}
+        >Cancelar</button>
+        <button
+          className="px-4 py-2 rounded bg-green-600 text-white"
+          onClick={handleSubmitRating}
+          disabled={ratingLoading || ratingValue < 1}
+        >{ratingLoading ? 'Enviando...' : 'Enviar Calificación'}</button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

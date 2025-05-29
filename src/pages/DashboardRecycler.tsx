@@ -41,6 +41,9 @@ const DashboardRecycler: React.FC = () => {
   // NOTIFICACIONES DE MENSAJES NUEVOS
   const [unreadChats, setUnreadChats] = useState<{ [userId: string]: number }>({});
 
+  // --- Notificaciones de eventos del residente ---
+  const [eventNotifications, setEventNotifications] = useState<Array<{id: string, type: string, message: string, created_at: string}>>([]);
+
   // Cargar puntos reclamados y disponibles
   const fetchData = useCallback(async () => {
     try {
@@ -299,6 +302,49 @@ const DashboardRecycler: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [user]);
 
+  // Escuchar eventos relevantes del residente (puntos reclamados, calificaciones, etc.)
+  useEffect(() => {
+    if (!user?.id) return;
+    // Suscribirse a eventos de collection_claims y recycler_ratings relacionados con el usuario
+    const channel = supabase.channel('resident-events')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'collection_claims',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setEventNotifications(prev => [
+            { id: payload.new.id, type: 'claim', message: 'Un reciclador ha reclamado tu punto de recolección.', created_at: payload.new.created_at },
+            ...prev
+          ]);
+        }
+        if (payload.eventType === 'UPDATE' && payload.new.status === 'completed') {
+          setEventNotifications(prev => [
+            { id: payload.new.id, type: 'completed', message: 'Un reciclador ha marcado tu punto como retirado.', created_at: payload.new.updated_at },
+            ...prev
+          ]);
+        }
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'recycler_ratings',
+        filter: `resident_id=eq.${user.id}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setEventNotifications(prev => [
+            { id: payload.new.id, type: 'rating', message: 'Has calificado a un reciclador.', created_at: payload.new.created_at },
+            ...prev
+          ]);
+        }
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -389,6 +435,20 @@ const DashboardRecycler: React.FC = () => {
             {error && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
                 <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+            {/* Mostrar notificaciones de eventos del residente */}
+            {eventNotifications.length > 0 && (
+              <div className="mb-4 w-full max-w-2xl bg-blue-50 border border-blue-300 text-blue-800 px-4 py-3 rounded relative" role="alert">
+                <h4 className="font-bold mb-2">Notificaciones recientes</h4>
+                <ul className="space-y-1">
+                  {eventNotifications.slice(0, 5).map(ev => (
+                    <li key={ev.id} className="text-sm flex items-center gap-2">
+                      <span className="font-semibold">[{new Date(ev.created_at).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}]</span>
+                      <span>{ev.message}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             {/* Secciones de Mis Puntos */}

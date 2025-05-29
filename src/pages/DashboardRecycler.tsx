@@ -470,9 +470,9 @@ const DashboardRecycler: React.FC = () => {
                           </div>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
                           {/* Botón Google Maps navegación */}
-                          {typeof point.latitude === 'number' && typeof point.longitude === 'number' && typeof user?.lat === 'number' && typeof user?.lng === 'number' && (
+                          {typeof point.lat === 'number' && typeof point.lng === 'number' && typeof user?.lat === 'number' && typeof user?.lng === 'number' && (
                             <a
-                              href={`https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.latitude},${point.longitude}&travelmode=driving`}
+                              href={`https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.lat},${point.lng}&travelmode=driving`}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Ver ruta en Google Maps"

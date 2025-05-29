@@ -717,6 +717,25 @@ const DashboardResident: React.FC = () => {
 })()}
           </div>
           <div className="bg-white shadow-md rounded-lg p-6">
+            <h3 className="text-xl font-bold mb-4 flex flex-col items-center justify-center text-center">
+              <span>
+                <span className="text-black">Ver Recicladores </span>
+                <span className="inline-flex items-center relative -top-1.5">
+      
+      <button
+        type="button"
+        className="px-3 py-1 rounded-full bg-green-600 text-white font-semibold shadow-md border border-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200 text-sm flex items-center gap-1 animate-pulse"
+        style={{ boxShadow: '0 0 0 2px #bbf7d0' }}
+        tabIndex={-1}
+        disabled
+      >
+        <span className="w-2 h-2 bg-white rounded-full mr-1 animate-pulse"></span>
+        En Línea
+      </button>
+    </span>
+                <span className="text-black"> en el Mapa</span>
+              </span>
+            </h3>
             <Map
               points={recyclers
                 .filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true)

@@ -471,10 +471,10 @@ const DashboardRecycler: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
                             {/* Botón Google Maps navegación usando coordenadas Mapbox */}
-                            {typeof point.lng === 'number' && typeof point.lat === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
+                            {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
                               <button
                                 onClick={() => {
-                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.lat},${point.lng}&travelmode=driving`;
+                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${user.lat},${user.lng}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
                                   window.open(url, '_blank', 'noopener,noreferrer');
                                 }}
                                 title="Ver ruta en Google Maps"

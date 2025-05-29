@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favor
 import NotificationBell from '../components/NotificationBell';
 import { createNotification } from '../lib/notifications';
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
+import AdminNotifications from '../components/AdminNotifications';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -1153,6 +1154,7 @@ const handleSubmitRating = async () => {
     </div>
   </div>
 )}
+      {user?.role === 'admin' && <AdminNotifications />}
     </div>
   );
 };

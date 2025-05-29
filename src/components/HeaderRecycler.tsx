@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import NotificationBell from './NotificationBell';
 
 interface Tab {
   label: string;
@@ -83,6 +84,9 @@ const HeaderRecycler: React.FC<HeaderRecyclerProps> = ({ activeTab, setActiveTab
             )}
           </React.Fragment>
         ))}
+        <div className="ml-auto flex items-center">
+          <NotificationBell />
+        </div>
       </div>
       {/* Subtabs de Mis Puntos */}
       {isMisPuntos && (

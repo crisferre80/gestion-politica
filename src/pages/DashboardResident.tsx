@@ -7,6 +7,7 @@ import { supabase, deleteCollectionPoint } from '../lib/supabase';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
+import NotificationBell from '../components/NotificationBell';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -536,6 +537,10 @@ const handleSubmitRating = async () => {
         </div>
       )}
       {/* Header con nombre, foto y rol */}
+      <div className="w-full flex items-center justify-between bg-white shadow rounded-t-lg px-4 py-2 mb-4">
+        <h2 className="text-xl font-bold text-green-700">Panel de Residente</h2>
+        <NotificationBell />
+      </div>
       <div className="flex items-center gap-4 mb-8 bg-white shadow rounded-lg px-6 py-4 w-full max-w-2xl">
         <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
           <img
@@ -574,7 +579,6 @@ const handleSubmitRating = async () => {
           </div>
         </div>
       </div>
-      <h1 className="text-4xl font-extrabold text-green-700 mb-8">Panel de Residente</h1>
       <Link to="/collection-points" className="block px-6 py-4 rounded-md font-bold text-green-700 hover:bg-green-700 hover:text-white">
         <img
           src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747796657/icon_map.mp4_uphkzx.gif"
@@ -1058,7 +1062,7 @@ export default DashboardResident;
 <style>{`
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1, transform: translateY(0); }
 }
 .animate-fade-in { animation: fadeInUp 0.7s; }
 .ripple-btn .ripple-effect {

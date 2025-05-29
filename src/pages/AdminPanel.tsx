@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
+import AdminAds from './AdminAds';
 
 interface UserRow {
   id: string;
@@ -138,6 +139,9 @@ const AdminPanel: React.FC = () => {
           <button className="bg-green-600 text-white px-4 py-2 rounded mt-2" type="submit">Enviar notificación</button>
           {notifStatus && <p className="text-green-700 mt-2">{notifStatus}</p>}
         </form>
+      </div>
+      <div className="mb-12">
+        <AdminAds />
       </div>
     </div>
   );

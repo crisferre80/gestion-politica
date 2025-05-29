@@ -363,3 +363,27 @@ export async function updateOnlineStatus(userId: string, online: boolean): Promi
     throw error;
   }
 }
+
+export async function submitRecyclerRating(
+  user: User,
+  ratingTarget: {
+    recyclerId: string;
+    collectionClaimId: string;
+  },
+  ratingValue: number,
+  ratingComment?: string
+): Promise<void> {
+  try {
+    // Insert the rating into the database
+    await supabase.from('recycler_ratings').insert({
+      recycler_id: ratingTarget.recyclerId, // UUID
+      resident_id: user.id, // UUID
+      collection_claim_id: ratingTarget.collectionClaimId, // UUID
+      rating: ratingValue,
+      comment: ratingComment,
+    });
+  } catch (error) {
+    console.error('Error submitting recycler rating:', error);
+    throw error;
+  }
+}

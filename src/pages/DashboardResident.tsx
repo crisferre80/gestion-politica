@@ -9,6 +9,7 @@ import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
 import NotificationBell from '../components/NotificationBell';
 import { createNotification } from '../lib/notifications';
+import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -364,6 +365,7 @@ const DashboardResident: React.FC = () => {
       status?: string;
       pickup_time?: string;
       recycler?: {
+        user_id?: string;
         name?: string;
         avatar_url?: string;
         email?: string;
@@ -380,7 +382,7 @@ const DashboardResident: React.FC = () => {
       const { data, error } = await supabase
         .from('collection_points')
         .select(`*,
-          claim:collection_claims!claim_id (*, recycler:profiles!collection_claims_recycler_id_fkey (name, avatar_url, email, phone))
+          claim:collection_claims!claim_id (*, recycler:profiles!collection_claims_recycler_id_fkey (user_id, name, avatar_url, email, phone))
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -441,7 +443,11 @@ const DashboardResident: React.FC = () => {
 
   // --- Calificación de recicladores ---
 const [showRatingModal, setShowRatingModal] = useState(false);
-const [ratingTarget, setRatingTarget] = useState<{recyclerId: string, recyclerName: string} | null>(null);
+const [ratingTarget, setRatingTarget] = useState<{
+  recyclerId: string,
+  recyclerName: string,
+  collectionClaimId: string
+} | null>(null);
 const [ratingValue, setRatingValue] = useState(0);
 const [ratingComment, setRatingComment] = useState('');
 const [ratingLoading, setRatingLoading] = useState(false);
@@ -482,6 +488,7 @@ const handleSubmitRating = async () => {
     const { error } = await supabase.from('recycler_ratings').insert({
       recycler_id: ratingTarget.recyclerId,
       resident_id: user.id,
+      collection_claim_id: ratingTarget.collectionClaimId,
       rating: ratingValue,
       comment: ratingComment,
     });
@@ -506,6 +513,10 @@ const handleSubmitRating = async () => {
     setRatingLoading(false);
   }
 };
+
+  // --- Estado para modal de ratings de reciclador ---
+  const [showRatingsModal, setShowRatingsModal] = useState(false);
+  const [ratingsModalTarget, setRatingsModalTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -789,10 +800,11 @@ const handleSubmitRating = async () => {
                             <button
                               className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
                               onClick={() => {
-                                // Usar email como ID único si existe, si no, fallback a nombre
-                                const recyclerId = point.claim?.recycler?.email || point.claim?.recycler?.phone || point.claim?.recycler?.name || '';
+                                // Usar el UUID real del reciclador y del claim
+                                const recyclerId = point.claim?.recycler?.user_id || '';
                                 const recyclerName = point.claim?.recycler?.name || 'Reciclador';
-                                setRatingTarget({ recyclerId, recyclerName });
+                                const collectionClaimId = point.claim_id || point.claim?.id || '';
+                                setRatingTarget({ recyclerId, recyclerName, collectionClaimId });
                                 setShowRatingModal(true);
                               }}
                             >
@@ -881,6 +893,19 @@ const handleSubmitRating = async () => {
                     <Star className="h-5 w-5 text-yellow-400 mr-1" />
                     <span className="font-medium">{rec.rating_average?.toFixed(1) || '0.0'}</span>
                     <span className="ml-2 text-gray-400 text-sm">({rec.total_ratings || 0})</span>
+                    <button
+                      className="ml-3 px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 border border-yellow-200"
+                      onClick={() => {
+                        setRatingsModalTarget({
+                          recyclerId: rec.user_id || '',
+                          recyclerName: rec.profiles?.name || 'Reciclador',
+                          avatarUrl: rec.profiles?.avatar_url,
+                        });
+                        setShowRatingsModal(true);
+                      }}
+                    >
+                      Ver comentarios
+                    </button>
                   </div>
                   <p className="text-gray-500 text-sm mb-1 flex items-center"><Mail className="h-4 w-4 mr-1" />{rec.profiles?.email}</p>
                   {rec.profiles?.phone && <p className="text-gray-500 text-sm mb-1 flex items-center"><Phone className="h-4 w-4 mr-1" />{rec.profiles.phone}</p>}
@@ -906,7 +931,15 @@ const handleSubmitRating = async () => {
               ))}
             </div>
           )}
-         
+          {showRatingsModal && ratingsModalTarget && (
+      <RecyclerRatingsModal
+        recyclerId={ratingsModalTarget.recyclerId}
+        recyclerName={ratingsModalTarget.recyclerName}
+        avatarUrl={ratingsModalTarget.avatarUrl}
+        open={showRatingsModal}
+        onClose={() => setShowRatingsModal(false)}
+      />
+    )}
         </div>
       )}
       {activeTab === 'perfil' && (

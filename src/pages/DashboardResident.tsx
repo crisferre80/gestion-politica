@@ -119,30 +119,29 @@ const DashboardResident: React.FC = () => {
     setLoadingRecyclers(true);
     const { data, error } = await supabase
       .from('profiles')
-      .select('*');
+      .select('id, avatar_url, name, email, phone, rating_average, total_ratings, materials, bio, lat, lng, online, role, user_id')
+      .eq('role', 'recycler');
     if (error) {
       setRecyclers([]);
     } else {
       setRecyclers(
-        (data || [])
-          .filter(rec => (rec.role && typeof rec.role === 'string' && rec.role.toLowerCase() === 'recycler'))
-          .map((rec) => ({
-            id: rec.id, // id numérico de la tabla profiles
-            user_id: rec.user_id, // <-- Agregar el user_id (UUID)
-            profiles: {
-              avatar_url: rec.avatar_url,
-              name: rec.name,
-              email: rec.email,
-              phone: rec.phone,
-            },
-            rating_average: rec.rating_average || 0,
-            total_ratings: rec.total_ratings || 0,
-            materials: Array.isArray(rec.materials) ? rec.materials : [],
-            bio: typeof rec.bio === 'string' ? rec.bio : '',
-            lat: rec.lat,
-            lng: rec.lng,
-            online: !!rec.online,
-          }))
+        (data || []).map((rec) => ({
+          id: rec.id,
+          user_id: rec.user_id || rec.id, // fallback por si user_id no existe
+          profiles: {
+            avatar_url: rec.avatar_url,
+            name: rec.name,
+            email: rec.email,
+            phone: rec.phone,
+          },
+          rating_average: rec.rating_average || 0,
+          total_ratings: rec.total_ratings || 0,
+          materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
+          bio: typeof rec.bio === 'string' ? rec.bio : '',
+          lat: rec.lat,
+          lng: rec.lng,
+          online: !!rec.online,
+        }))
       );
     }
     setLoadingRecyclers(false);
@@ -307,8 +306,8 @@ const DashboardResident: React.FC = () => {
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  const [editLat, setEditLat] = useState(user?.lat || '');
-  const [editLng, setEditLng] = useState(user?.lng || '');
+  const [editLat] = useState(user?.lat || '');
+  const [editLng] = useState(user?.lng || '');
   
   // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
 

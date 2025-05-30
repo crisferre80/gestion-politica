@@ -23,6 +23,8 @@ export interface User {
   bio?: string;
   experience_years?: number;
   service_areas?: string[];
+  lat?: number;
+  lng?: number;
 }
 
 export type CollectionPoint = {
@@ -112,7 +114,16 @@ export async function signUpUser(email: string, password: string, userData: Part
     if (signUpError) throw signUpError;
     if (!authData.user) throw new Error('Failed to create user');
 
-    // Crea el perfil solo si el usuario fue creado en Auth
+    // Si no hay sesión activa, probablemente el usuario debe confirmar su email
+    const session = authData.session || (await supabase.auth.getSession()).data.session;
+    if (!session) {
+      return {
+        data: authData,
+        error: new Error('Registro exitoso. Por favor, confirma tu correo electrónico antes de iniciar sesión.')
+      };
+    }
+
+    // Crea el perfil solo si el usuario fue creado en Auth y la sesión está activa
     const { error: profileError } = await supabase
       .from('profiles')
       .insert([{
@@ -120,18 +131,20 @@ export async function signUpUser(email: string, password: string, userData: Part
         email: email,
         name: userData.name,
         role: userData.type,
+        bio: userData.bio || '',
+        materials: userData.materials || [],
+        experience_years: userData.experience_years || 0,
+        lat: userData.lat ?? null,
+        lng: userData.lng ?? null,
       }]);
 
     if (profileError) {
-      // Si falla la creación del perfil, elimina el usuario Auth
-      await supabase.auth.admin.deleteUser(authData.user.id);
       throw profileError;
     }
 
     return { data: authData, error: null };
-  } catch (error: unknown) {
-    console.error('SignUp error:', error);
-    return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
   }
 }
 
@@ -161,31 +174,7 @@ export async function signInUser(email: string, password: string) {
 
     if (profileError) throw profileError;
     if (!profile) {
-      // Create profile if it doesn't exist
-      const { error: createProfileError } = await supabase
-        .from('profiles')
-        .insert([{
-          user_id: authData.user.id,
-          email: authData.user.email!,
-          name: authData.user.user_metadata?.name || '',
-          role: authData.user.user_metadata?.type || 'resident',
-        }]);
-
-      if (createProfileError) throw new Error('Failed to create profile');
-
-      // Fetch the newly created profile
-      const { data: newProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', authData.user.id)
-        .single();
-
-      if (fetchError || !newProfile) throw new Error('Failed to fetch profile');
-
-      return {
-        data: authData,
-        profile: { ...newProfile, type: newProfile.role, role: newProfile.role }
-      };
+      throw new Error('Profile not found. Please contact support.');
     }
 
     // Map role a type y role para el UserContext
@@ -199,188 +188,75 @@ export async function signInUser(email: string, password: string) {
   }
 }
 
-export async function claimCollectionPoint(
-  pointId: string,
-  recyclerId: string,
-  pickupTime: string
-): Promise<void> {
-  try {
-    // Create claim with status 'pending'
-    const { data: claim, error: claimError } = await supabase
-      .from('collection_claims')
-      .insert([
-        {
-          collection_point_id: pointId,
-          recycler_id: recyclerId,
-          status: 'pending',
-          pickup_time: pickupTime
-        }
-      ])
-      .select()
-      .single();
+export async function cancelClaim(claimId: string, pointId: string, userId: string, reason: string) {
+  // Cancela el reclamo y actualiza el punto
+  // 1. Actualiza el estado del claim a 'cancelled' y guarda el motivo
+  const { error: claimError } = await supabase
+    .from('collection_claims')
+    .update({ status: 'cancelled', cancellation_reason: reason, cancelled_at: new Date().toISOString(), cancelled_by: userId })
+    .eq('id', claimId);
+  if (claimError) throw claimError;
 
-    if (claimError) throw claimError;
+  // 2. Actualiza el punto para dejarlo disponible nuevamente
+  const { error: pointError } = await supabase
+    .from('collection_points')
+    .update({ status: 'available', claim_id: null, pickup_time: null })
+    .eq('id', pointId);
+  if (pointError) throw pointError;
+}
 
-    // Update collection point status
-    const { error: updateError } = await supabase
-      .from('collection_points')
-      .update({
-        status: 'claimed',
-        claim_id: claim.id,
+export async function claimCollectionPoint(pointId: string, recyclerId: string, pickupTime: string) {
+  // 1. Crear el claim con status 'pending'
+  const { data: claim, error: claimError } = await supabase
+    .from('collection_claims')
+    .insert([
+      {
+        collection_point_id: pointId,
+        recycler_id: recyclerId,
+        status: 'pending',
         pickup_time: pickupTime
-        // NO actualizar recycler_id aquí para evitar error de clave foránea
-      })
-      .eq('id', pointId);
+      }
+    ])
+    .select()
+    .single();
 
-    if (updateError) throw updateError;
+  if (claimError) throw claimError;
 
-  } catch (error) {
-    console.error('Error claiming collection point:', error);
-    throw error;
-  }
+  // 2. Actualizar el punto de recolección
+  const { error: updateError } = await supabase
+    .from('collection_points')
+    .update({
+      status: 'claimed',
+      claim_id: claim.id,
+      pickup_time: pickupTime
+    })
+    .eq('id', pointId);
+
+  if (updateError) throw updateError;
 }
 
-export async function cancelClaim(
-  claimId: string,
-  pointId: string,
-  userId: string,
-  reason: string
-): Promise<void> {
-  try {
-    // Update claim status
-    const { error: claimError } = await supabase
-      .from('collection_claims')
-      .update({
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
-        cancelled_by: userId,
-        cancellation_reason: reason
-      })
-      .eq('id', claimId);
+export async function completeCollection(claimId: string, pointId: string) {
+  // 1. Marcar el claim como completado
+  const { error: claimError } = await supabase
+    .from('collection_claims')
+    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .eq('id', claimId);
+  if (claimError) throw claimError;
 
-    if (claimError) throw claimError;
-
-    // Update collection point status
-    const { error: pointError } = await supabase
-      .from('collection_points')
-      .update({
-        status: 'available',
-        claim_id: null,
-        pickup_time: null,
-        recycler_id: null
-      })
-      .eq('id', pointId);
-
-    if (pointError) throw pointError;
-
-  } catch (error) {
-    console.error('Error cancelling claim:', error);
-    throw error;
-  }
+  // 2. Marcar el punto como completado
+  const { error: pointError } = await supabase
+    .from('collection_points')
+    .update({ status: 'completed' })
+    .eq('id', pointId);
+  if (pointError) throw pointError;
 }
 
-export async function completeCollection(
-  claimId: string,
-  pointId: string
-): Promise<void> {
-  try {
-    // Update claim status
-    const { error: claimError } = await supabase
-      .from('collection_claims')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', claimId);
-
-    if (claimError) throw claimError;
-
-    // Update collection point status
-    const { error: pointError } = await supabase
-      .from('collection_points')
-      .update({
-        status: 'completed'
-      })
-      .eq('id', pointId);
-
-    if (pointError) throw pointError;
-
-    // Get resident ID
-    const { data: point, error: pointFetchError } = await supabase
-      .from('collection_points')
-      .select('user_id')
-      .eq('id', pointId)
-      .single();
-
-    if (pointFetchError) throw pointFetchError;
-
-    // Create notification for resident
-    const { error: notificationError } = await supabase
-      .from('notifications')
-      .insert([{
-        user_id: point.user_id,
-        title: 'Recolección Completada',
-        content: 'Tu punto de recolección ha sido completado exitosamente.',
-        type: 'collection_completed',
-        related_id: pointId
-      }]);
-
-    if (notificationError) throw notificationError;
-
-  } catch (error) {
-    console.error('Error completing collection:', error);
-    throw error;
-  }
-}
-
-export async function deleteCollectionPoint(pointId: string): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('collection_points')
-      .delete()
-      .eq('id', pointId);
-
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error deleting collection point:', error);
-    throw error;
-  }
-}
-
-export async function updateOnlineStatus(userId: string, online: boolean): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ online })
-      .eq('user_id', userId);
-
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error updating online status:', error);
-    throw error;
-  }
-}
-
-export async function submitRecyclerRating(
-  user: User,
-  ratingTarget: {
-    recyclerId: string;
-    collectionClaimId: string;
-  },
-  ratingValue: number,
-  ratingComment?: string
-): Promise<void> {
-  try {
-    // Insert the rating into the database
-    await supabase.from('recycler_ratings').insert({
-      recycler_id: ratingTarget.recyclerId, // UUID
-      resident_id: user.id, // UUID
-      collection_claim_id: ratingTarget.collectionClaimId, // UUID
-      rating: ratingValue,
-      comment: ratingComment,
-    });
-  } catch (error) {
-    console.error('Error submitting recycler rating:', error);
-    throw error;
-  }
+export async function deleteCollectionPoint(pointId: string, userId: string) {
+  // Elimina el punto de recolección solo si pertenece al usuario
+  const { error } = await supabase
+    .from('collection_points')
+    .delete()
+    .eq('id', pointId)
+    .eq('user_id', userId);
+  if (error) throw error;
 }

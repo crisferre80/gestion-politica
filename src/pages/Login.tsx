@@ -28,6 +28,7 @@ const Login: React.FC = () => {
             email: data.user.email!,
             name: profile.name || '',
             type: profile.type,
+            role: profile.role, // <-- Asegura que el rol esté presente
             avatar_url: profile.avatar_url,
             phone: profile.phone,
             address: profile.address,

@@ -16,6 +16,9 @@ const Register: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [bio, setBio] = useState('');
+  const [materials, setMaterials] = useState('');
+  const [experienceYears, setExperienceYears] = useState(0);
   
   const { login } = useUser();
   const navigate = useNavigate();
@@ -33,13 +36,20 @@ const Register: React.FC = () => {
         name,
         type: userType,
         email,
+        bio,
+        materials: materials.split(',').map((m) => m.trim()).filter(Boolean),
+        experience_years: userType === 'recycler' ? experienceYears : undefined,
       });
       if (error) {
+        // Mostrar el mensaje real del error
         if (error.message === 'User already registered') {
           setError('Este correo electrónico ya está registrado. Por favor, inicia sesión o utiliza otro correo.');
+        } else if (error.message) {
+          setError(error.message);
         } else {
-          throw error;
+          setError(JSON.stringify(error));
         }
+        setLoading(false);
         return;
       }
       let avatarUrl: string | undefined = undefined;
@@ -88,8 +98,13 @@ const Register: React.FC = () => {
         setError('Error al crear el usuario. Por favor, intenta nuevamente.');
       }
     } catch (err: unknown) {
+      // Mostrar el mensaje real del error
       console.error('Registration error:', err);
-      setError('Error al registrarse. Por favor, intenta nuevamente.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(JSON.stringify(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -245,6 +260,44 @@ const Register: React.FC = () => {
                 </p>
               )}
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Biografía / Nota
+              </label>
+              <textarea
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                value={bio}
+                onChange={e => setBio(e.target.value)}
+                placeholder="Cuéntanos sobre ti o tu experiencia en reciclaje"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Materiales que reciclas (separados por coma)
+              </label>
+              <input
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                value={materials}
+                onChange={e => setMaterials(e.target.value)}
+                placeholder="Ej: Papel, Plástico, Vidrio"
+              />
+            </div>
+            {userType === 'recycler' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Años de experiencia
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  value={experienceYears}
+                  onChange={e => setExperienceYears(Number(e.target.value))}
+                  placeholder="Ej: 5"
+                />
+              </div>
+            )}
 
             <div>
               <button

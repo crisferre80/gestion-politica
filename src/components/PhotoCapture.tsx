@@ -28,6 +28,12 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, onCancel }) => {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Validar tipo de archivo permitido
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Solo se permiten imágenes JPG, PNG o GIF.');
+        return;
+      }
       onCapture(file);
     }
   };
@@ -55,7 +61,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({ onCapture, onCancel }) => {
           type="file"
           ref={fileInputRef}
           onChange={handleFileUpload}
-          accept="image/*"
+          accept="image/jpeg,image/png,image/gif"
           className="hidden"
         />
       </div>

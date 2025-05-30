@@ -35,3 +35,7 @@ CREATE POLICY "Users can delete their own notifications"
   FOR DELETE
   TO authenticated
   USING (user_id = auth.uid());
+
+-- Asegura que el campo related_id permita NULL y no tenga restricciones adicionales
+-- Si necesitas un índice para related_id, puedes agregarlo así:
+CREATE INDEX IF NOT EXISTS notifications_related_id_idx ON notifications(related_id);

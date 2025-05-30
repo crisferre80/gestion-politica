@@ -147,7 +147,12 @@ const DashboardRecycler: React.FC = () => {
       console.log('Point to claim:', pointToClaim);
       console.log('Pickup time:', pickupDateTimeInput);
       try {
-        await claimCollectionPoint(pointToClaim!.id, user.id, new Date(pickupDateTimeInput).toISOString());
+        await claimCollectionPoint(
+          pointToClaim!.id,
+          user.id,
+          new Date(pickupDateTimeInput).toISOString(),
+          pointToClaim.user_id // <-- user_id del residente dueño del punto
+        );
       } catch (err) {
         console.error('Error en claimCollectionPoint:', err);
         throw err;

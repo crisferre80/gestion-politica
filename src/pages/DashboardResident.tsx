@@ -290,7 +290,7 @@ const DashboardResident: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      await deleteCollectionPoint(pointId.toString(), user.id);
+      await deleteCollectionPoint(pointId.toString());
       setSuccess('Punto de recolección eliminado con éxito');
       await refreshCollectionPoints(); // Refresca lista tras eliminar
     } catch {

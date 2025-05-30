@@ -898,6 +898,17 @@ const handleSubmitRating = async () => {
                 }))}
               showUserLocation={true}
             />
+            {/* DEBUG: Mostrar recicladores que deberían aparecer en el mapa */}
+          <div className="mt-4 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-900">
+            <b>Recicladores en línea con coordenadas:</b>
+            <ul>
+              {recyclers.filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true).map(r => (
+                <li key={r.id}>
+                  {r.profiles?.name || 'Reciclador'} | lat: {r.lat}, lng: {r.lng} | online: {String(r.online)}
+                </li>
+              ))}
+            </ul>
+          </div>
           </div>
         </div>
       )}

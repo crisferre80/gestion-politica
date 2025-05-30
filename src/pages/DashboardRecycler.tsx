@@ -144,7 +144,14 @@ const DashboardRecycler: React.FC = () => {
       setLoading(true);
       console.log('User object:', user);
       console.log('User ID being sent as recyclerId:', user.id); // Verifica este valor
-      await claimCollectionPoint(pointToClaim!.id, user.id, new Date(pickupDateTimeInput).toISOString());
+      console.log('Point to claim:', pointToClaim);
+      console.log('Pickup time:', pickupDateTimeInput);
+      try {
+        await claimCollectionPoint(pointToClaim!.id, user.id, new Date(pickupDateTimeInput).toISOString());
+      } catch (err) {
+        console.error('Error en claimCollectionPoint:', err);
+        throw err;
+      }
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);

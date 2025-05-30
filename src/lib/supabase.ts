@@ -23,6 +23,8 @@ export interface User {
   bio?: string;
   experience_years?: number;
   service_areas?: string[];
+  lat?: number;
+  lng?: number;
 }
 
 export type CollectionPoint = {
@@ -129,6 +131,11 @@ export async function signUpUser(email: string, password: string, userData: Part
         email: email,
         name: userData.name,
         role: userData.type,
+        bio: userData.bio || '',
+        materials: userData.materials || [],
+        experience_years: userData.experience_years || 0,
+        lat: userData.lat ?? null,
+        lng: userData.lng ?? null,
       }]);
 
     if (profileError) {

@@ -30,6 +30,9 @@ const DashboardRecycler: React.FC = () => {
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
+  const [editExperienceYears, setEditExperienceYears] = useState(user?.experience_years || 0);
+  const [editLat, setEditLat] = useState(user?.lat || '');
+  const [editLng, setEditLng] = useState(user?.lng || '');
   const [success, setSuccess] = useState<string | null>(null);
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
@@ -249,6 +252,9 @@ const DashboardRecycler: React.FC = () => {
       setEditAddress(user.address || '');
       setEditBio(user.bio || '');
       setEditMaterials(Array.isArray(user.materials) ? user.materials.join(', ') : (user.materials || ''));
+      setEditExperienceYears(user.experience_years || 0);
+      setEditLat(user.lat || '');
+      setEditLng(user.lng || '');
       setEditAvatarPreview(null);
       setEditAvatarFile(null);
     }
@@ -876,6 +882,7 @@ const DashboardRecycler: React.FC = () => {
                       bio: editBio,
                       materials: formMaterials,
                       avatar_url: avatarUrl,
+                      experience_years: Number(editExperienceYears),
                     }).eq('user_id', user.id);
                     if (!updateError) {
                       // Obtener el perfil actualizado
@@ -898,6 +905,9 @@ const DashboardRecycler: React.FC = () => {
                           type: updatedProfile.role || user.type,
                           materials: safeMaterials,
                           bio: safeBio,
+                          experience_years: updatedProfile.experience_years,
+                          lat: updatedProfile.lat,
+                          lng: updatedProfile.lng,
                         });
                         setEditName(updatedProfile.name || '');
                         setEditEmail(updatedProfile.email || '');
@@ -905,6 +915,9 @@ const DashboardRecycler: React.FC = () => {
                         setEditAddress(updatedProfile.address || '');
                         setEditBio(safeBio);
                         setEditMaterials(safeMaterials.join(', '));
+                        setEditExperienceYears(updatedProfile.experience_years || 0);
+                        setEditLat(updatedProfile.lat || '');
+                        setEditLng(updatedProfile.lng || '');
                         setEditAvatarPreview(null);
                         setEditAvatarFile(null);
                       }
@@ -955,6 +968,18 @@ const DashboardRecycler: React.FC = () => {
                     <div>
                       <label className="text-gray-600 text-sm">Domicilio</label>
                       <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-gray-600 text-sm">Años de experiencia</label>
+                      <input type="number" min="0" className="font-semibold w-full border rounded px-2 py-1" value={editExperienceYears} onChange={e => setEditExperienceYears(Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <label className="text-gray-600 text-sm">Latitud</label>
+                      <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLat} readOnly />
+                    </div>
+                    <div>
+                      <label className="text-gray-600 text-sm">Longitud</label>
+                      <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLng} readOnly />
                     </div>
                     <div className="md:col-span-2">
                       <label className="text-gray-600 text-sm">Biografía / Nota</label>

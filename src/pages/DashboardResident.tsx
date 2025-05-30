@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone, Star } from 'lucide-react';
 import { supabase, deleteCollectionPoint } from '../lib/supabase';
 // Importa uploadProfilePhoto desde el módulo correcto si existe, por ejemplo:
@@ -59,7 +59,8 @@ export type User = {
 
 const DashboardResident: React.FC = () => {
   const { user, login } = useUser();
-  const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
+  const location = useLocation();
+  // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -97,20 +98,20 @@ const DashboardResident: React.FC = () => {
   const avatarUrl = user?.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'Residente') + '&background=22c55e&color=fff&size=128';
 
   useEffect(() => {
-    const fetchCollectionPoints = async () => {
-      const { data, error } = await supabase
-        .from('collection_points')
-        .select('*')
-        .eq('user_id', user?.id);
-      if (error) {
-        setError('Error al cargar los puntos de recolección');
-      } else {
-        setCollectionPoints(data);
-      }
-    };
-    if (user) {
-      fetchCollectionPoints();
-    }
+    // const fetchCollectionPoints = async () => {
+    //   const { data, error } = await supabase
+    //     .from('collection_points')
+    //     .select('*')
+    //     .eq('user_id', user?.id);
+    //   if (error) {
+    //     setError('Error al cargar los puntos de recolección');
+    //   } else {
+    //     setCollectionPoints(data);
+    //   }
+    // };
+    // if (user) {
+    //   fetchCollectionPoints();
+    // }
   }, [user]);
 
   // --- EXTRACTED FETCH RECYCLERS FUNCTION ---
@@ -261,14 +262,38 @@ const DashboardResident: React.FC = () => {
     return () => clearInterval(interval);
   }, [activeTab]);
 
+  // Refresca los puntos de recolección y detalles
+  const refreshCollectionPoints = React.useCallback(async () => {
+    if (!user?.id) return;
+    // Actualiza collectionPoints
+    const { data, error } = await supabase
+      .from('collection_points')
+      .select('*')
+      .eq('user_id', user.id);
+    if (!error && data) setDetailedPoints(data); // Corrige: solo actualiza el estado, no elimina puntos
+    // Actualiza detailedPoints
+    const { data: detailed, error: errorDetailed } = await supabase
+      .from('collection_points')
+      .select(`*,
+        claim:collection_claims!claim_id (*, recycler:profiles!collection_claims_recycler_id_fkey (user_id, name, avatar_url, email, phone))
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (!errorDetailed && detailed) setDetailedPoints(detailed);
+  }, [user?.id]);
+
   const handleDelete = async (pointId: number) => {
+    if (!user?.id) {
+      setError('Usuario no autenticado');
+      return;
+    }
     setIsDeleting(true);
     setError(null);
     setSuccess(null);
     try {
-      await deleteCollectionPoint(pointId.toString());
+      await deleteCollectionPoint(pointId.toString(), user.id);
       setSuccess('Punto de recolección eliminado con éxito');
-      setCollectionPoints(collectionPoints.filter((point) => point.id !== pointId));
+      await refreshCollectionPoints(); // Refresca lista tras eliminar
     } catch {
       setError('Error al eliminar el punto de recolección');
     }
@@ -282,6 +307,8 @@ const DashboardResident: React.FC = () => {
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
+  const [editLat, setEditLat] = useState(user?.lat || '');
+  const [editLng, setEditLng] = useState(user?.lng || '');
   
   // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
 
@@ -520,6 +547,15 @@ const handleSubmitRating = async () => {
   const [showRatingsModal, setShowRatingsModal] = useState(false);
   const [ratingsModalTarget, setRatingsModalTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 
+  useEffect(() => {
+    // Refresca puntos si se navega con el flag refresh (tras crear un punto)
+    if (location.state && location.state.refresh) {
+      refreshCollectionPoints();
+      // Limpia el state para evitar refrescos innecesarios al navegar de nuevo
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, refreshCollectionPoints]);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -647,6 +683,7 @@ const handleSubmitRating = async () => {
           </div>
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
             <h2 className="text-2xl font-bold mb-4">Mis Puntos de Recolección</h2>
+            {/* Enlace para agregar punto: elimina el paso de función por state */}
             <Link
               to="/add-collection-point"
               className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700 focus:ring-2 focus:ring-green-400 focus:outline-none shadow-md transition-all duration-200 w-fit mb-4 group"
@@ -717,7 +754,7 @@ const handleSubmitRating = async () => {
                       >
                         <div className="flex-1 mb-2 md:mb-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Marcador" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
+                            <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Punto de Recolección" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
                             <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
                             {/* Etiqueta de estado */}
                             {activePointsTab === 'todos' && (!point.status || point.status === 'available') && (
@@ -757,12 +794,12 @@ const handleSubmitRating = async () => {
                             </div>
                           )}
                         </div>
-                        {/* GIF animado a la derecha */}
+                        {/* Imagen estática en vez de GIF animado */}
                         <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
-                          <div className={`transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}>
+                          <div className={`transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}> 
                             <img
-                              src="https://res.cloudinary.com/dhvrrxejo/image/upload_v1747453055/Reduce_Climate_Change_GIF_by_Bhumi_Pednekar_uazzk6.gif"
-                              alt="Reduce Climate Change GIF"
+                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                              alt="Punto de Recolección"
                               className={`w-40 h-28 object-contain rounded-lg shadow-md border border-green-200 ${isInactive ? 'grayscale' : ''}`}
                               style={{ background: '#f0fdf4' }}
                             />
@@ -951,15 +988,22 @@ const handleSubmitRating = async () => {
             className="flex flex-col items-center w-full"
             onSubmit={async (e) => {
               e.preventDefault();
-              const { error } = await supabase.from('profiles').update({
-                name: editName,
-                email: editEmail,
-                phone: editPhone,
-                address: editAddress,
-                bio: editBio,
-                materials: editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean),
-                
-              }).eq('user_id', user?.id);
+              // Limpia y valida campos antes de enviar
+              const updateObj: Record<string, unknown> = {};
+              if (editName && editName.trim()) updateObj.name = editName.trim();
+              if (editEmail && editEmail.trim()) updateObj.email = editEmail.trim();
+              if (editPhone && editPhone.trim()) updateObj.phone = editPhone.trim();
+              if (editAddress && editAddress.trim()) updateObj.address = editAddress.trim();
+              if (editBio && editBio.trim()) updateObj.bio = editBio.trim();
+              if (editMaterials && editMaterials.trim()) {
+                updateObj.materials = editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean);
+              }
+              // No permitimos editar lat/lng manualmente, pero los mostramos
+              if (Object.keys(updateObj).length === 0) {
+                setError('No hay cambios para actualizar');
+                return;
+              }
+              const { error } = await supabase.from('profiles').update(updateObj).eq('user_id', user?.id);
               if (!error) {
                 setSuccess('Perfil actualizado correctamente');
               } else {
@@ -1001,6 +1045,14 @@ const handleSubmitRating = async () => {
               <div className="text-left">
                 <label className="text-gray-600 text-sm">Domicilio</label>
                 <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+              </div>
+              <div className="text-left">
+                <label className="text-gray-600 text-sm">Latitud</label>
+                <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLat} readOnly />
+              </div>
+              <div className="text-left">
+                <label className="text-gray-600 text-sm">Longitud</label>
+                <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLng} readOnly />
               </div>
               <div className="text-left md:col-span-2">
                 <label className="text-gray-600 text-sm">Biografía / Nota</label>
@@ -1053,7 +1105,7 @@ const handleSubmitRating = async () => {
                 onClick={handleDeleteAccount}
                 disabled={deletingAccount}
               >
-                {deletingAccount ? 'Eliminando...' : 'Eliminar'}
+                Eliminar
               </button>
             </div>
           </div>
@@ -1064,15 +1116,13 @@ const handleSubmitRating = async () => {
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 shadow-lg max-w-xs w-full flex flex-col items-center">
             <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
-              {selectedRecycler.avatar_url ? (
+              {selectedRecycler.avatar_url && (
                 <img src={selectedRecycler.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
-              ) : (
-                <UserIcon className="w-12 h-12 text-gray-400" />
               )}
             </div>
             <h3 className="text-xl font-bold text-green-700 mb-2">{selectedRecycler.name}</h3>
-            {selectedRecycler.email && <p className="text-gray-600 mb-1">Email: {selectedRecycler.email}</p>}
-            {selectedRecycler.phone && <p className="text-gray-600 mb-3">Teléfono: {selectedRecycler.phone}</p>}
+            {selectedRecycler.email && <p className="text-gray-600 text-sm mb-1">{selectedRecycler.email}</p>}
+            {selectedRecycler.phone && <p className="text-gray-600 text-sm mb-1">{selectedRecycler.phone}</p>}
             <button
               className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
               onClick={() => setSelectedRecycler(null)}
@@ -1084,77 +1134,58 @@ const handleSubmitRating = async () => {
       )}
       {/* --- Modal de calificación de reciclador --- */}
       {showRatingModal && ratingTarget && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
-      <h2 className="text-lg font-bold mb-2 text-green-700">Calificar a {ratingTarget.recyclerName}</h2>
-      <div className="flex gap-1 mb-3">
-        {[1,2,3,4,5].map(star => (
-          <button
-            key={star}
-            type="button"
-            onClick={() => setRatingValue(star)}
-            className={star <= ratingValue ? 'text-yellow-400' : 'text-gray-300'}
-            style={{ fontSize: 32, lineHeight: 1 }}
-            aria-label={`Calificar con ${star} estrellas`}
-          >★</button>
-        ))}
-      </div>
-      <textarea
-        className="w-full border border-gray-300 rounded-md p-2 mb-3"
-        rows={3}
-        placeholder="Comentario (opcional)"
-        value={ratingComment}
-        onChange={e => setRatingComment(e.target.value)}
-      />
-      {ratingError && <div className="text-red-600 text-sm mb-2">{ratingError}</div>}
-      {ratingSuccess && <div className="text-green-600 text-sm mb-2">{ratingSuccess}</div>}
-      <div className="flex gap-2 mt-2">
-        <button
-          className="px-4 py-2 rounded bg-gray-200"
-          onClick={() => setShowRatingModal(false)}
-          disabled={ratingLoading}
-        >Cancelar</button>
-        <button
-          className="px-4 py-2 rounded bg-green-600 text-white"
-          onClick={handleSubmitRating}
-          disabled={ratingLoading || ratingValue < 1}
-        >{ratingLoading ? 'Enviando...' : 'Enviar Calificación'}</button>
-      </div>
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
+            <h2 className="text-lg font-bold mb-2 text-green-700">Calificar a {ratingTarget.recyclerName}</h2>
+            <textarea
+              className="w-full border border-gray-300 rounded-md p-2 mb-3"
+              rows={3}
+              placeholder="Comentario (opcional)"
+              value={ratingComment}
+              onChange={e => setRatingComment(e.target.value)}
+            />
+            <button
+              className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              onClick={handleSubmitRating}
+              disabled={ratingLoading}
+            >
+              {ratingLoading ? 'Enviando...' : 'Enviar Calificación'}
+            </button>
+            {ratingError && <div className="text-red-600 text-sm mt-2">{ratingError}</div>}
+            {ratingSuccess && <div className="text-green-600 text-sm mt-2">{ratingSuccess}</div>}
+            <button
+              className="mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
+              onClick={() => setShowRatingModal(false)}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
       {/* --- Modal de donación Mercado Pago --- */}
       {showDonationModal && donationTarget && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
-      <h2 className="text-lg font-bold mb-2 text-blue-700">Donar a {donationTarget.recyclerName}</h2>
-      <p className="mb-2 text-gray-700 text-center">Puedes donar a este reciclador usando Mercado Pago.<br />Copia el alias o CVU y pégalo en tu app bancaria o Mercado Pago.</p>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="font-mono bg-gray-100 px-3 py-1 rounded text-blue-800 select-all text-sm">{donationTarget.aliasOrCVU}</span>
-        <button
-          className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs"
-          onClick={handleCopyAlias}
-        >
-          {copySuccess ? '¡Copiado!' : 'Copiar'}
-        </button>
-      </div>
-      <a
-        href={`https://www.mercadopago.com.ar/transferir-dinero?alias=${encodeURIComponent(donationTarget.aliasOrCVU)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md"
-      >
-        Ir a Mercado Pago
-      </a>
-      <button
-        className="mt-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-        onClick={() => setShowDonationModal(false)}
-      >
-        Cerrar
-      </button>
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
+            <h2 className="text-lg font-bold mb-2 text-blue-700">Donar a {donationTarget.recyclerName}</h2>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="font-mono bg-gray-100 px-2 py-1 rounded text-blue-800 border border-blue-200">{donationTarget.aliasOrCVU}</span>
+              <button
+                className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                onClick={handleCopyAlias}
+              >
+                Copiar
+              </button>
+              {copySuccess && <span className="text-green-600 text-xs ml-2">¡Copiado!</span>}
+            </div>
+            <button
+              className="mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
+              onClick={() => setShowDonationModal(false)}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
       {user?.role === 'admin' && <AdminNotifications />}
     </div>
   );

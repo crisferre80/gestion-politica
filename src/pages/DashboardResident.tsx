@@ -1206,7 +1206,7 @@ export default DashboardResident;
  
 async function uploadProfilePhoto(file: File, user: User | null | undefined) {
   if (!user?.id) throw new Error('Usuario no autenticado');
-  // 1. Subir la imagen a Supabase Storage
+  // 1. Subir la imagen a Supabase Storage (sin subcarpeta)
   const fileExt = file.name.split('.').pop();
   const fileName = `${user.id}_${Date.now()}.${fileExt}`;
   const { error: uploadError } = await supabase.storage

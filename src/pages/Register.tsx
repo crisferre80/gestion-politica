@@ -35,11 +35,15 @@ const Register: React.FC = () => {
         email,
       });
       if (error) {
+        // Mostrar el mensaje real del error
         if (error.message === 'User already registered') {
           setError('Este correo electrónico ya está registrado. Por favor, inicia sesión o utiliza otro correo.');
+        } else if (error.message) {
+          setError(error.message);
         } else {
-          throw error;
+          setError(JSON.stringify(error));
         }
+        setLoading(false);
         return;
       }
       let avatarUrl: string | undefined = undefined;
@@ -88,8 +92,13 @@ const Register: React.FC = () => {
         setError('Error al crear el usuario. Por favor, intenta nuevamente.');
       }
     } catch (err: unknown) {
+      // Mostrar el mensaje real del error
       console.error('Registration error:', err);
-      setError('Error al registrarse. Por favor, intenta nuevamente.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(JSON.stringify(err));
+      }
     } finally {
       setLoading(false);
     }

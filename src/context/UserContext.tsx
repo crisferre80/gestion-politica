@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export type User = {
+  experience_years: number;
   lng: number;
   lat: number;
   id: string;

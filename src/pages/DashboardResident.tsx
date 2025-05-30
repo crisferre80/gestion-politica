@@ -307,8 +307,8 @@ const DashboardResident: React.FC = () => {
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  const [editLat, setEditLat] = useState(user?.lat || '');
-  const [editLng, setEditLng] = useState(user?.lng || '');
+  const [editLat] = useState(user?.lat || '');
+  const [editLng] = useState(user?.lng || '');
   
   // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
 

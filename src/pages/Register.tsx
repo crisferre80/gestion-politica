@@ -85,13 +85,14 @@ const Register: React.FC = () => {
           // Error al obtener el perfil actualizado, se ignora intencionalmente
         }
         login({
-          id: data.user.id,
-          name,
-          email: data.user.email!,
-          type: userType,
-          lng: 0,
-          lat: 0,
-          avatar_url: updatedProfile?.avatar_url || avatarUrl,
+            id: data.user.id,
+            name,
+            email: data.user.email!,
+            type: userType,
+            lng: 0,
+            lat: 0,
+            avatar_url: updatedProfile?.avatar_url || avatarUrl,
+            experience_years: 0
         });
         navigate('/dashboard');
       } else {

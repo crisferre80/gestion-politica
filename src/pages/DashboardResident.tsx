@@ -117,10 +117,11 @@ const DashboardResident: React.FC = () => {
   // --- EXTRACTED FETCH RECYCLERS FUNCTION ---
   const fetchRecyclers = async () => {
     setLoadingRecyclers(true);
+    // Elimina rating_average y total_ratings del select, ya que no existen en la tabla
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, avatar_url, name, email, phone, rating_average, total_ratings, materials, bio, lat, lng, online, role, user_id')
-      .eq('role', 'recycler');
+      .select('id, avatar_url, name, email, phone, materials, bio, lat, lng, online, role, user_id');
+    console.log('DEBUG fetchRecyclers data:', data, 'error:', error);
     if (error) {
       setRecyclers([]);
     } else {
@@ -134,8 +135,7 @@ const DashboardResident: React.FC = () => {
             email: rec.email,
             phone: rec.phone,
           },
-          rating_average: rec.rating_average || 0,
-          total_ratings: rec.total_ratings || 0,
+          // rating_average y total_ratings eliminados
           materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
           bio: typeof rec.bio === 'string' ? rec.bio : '',
           lat: rec.lat,

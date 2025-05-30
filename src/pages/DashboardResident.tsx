@@ -117,19 +117,17 @@ const DashboardResident: React.FC = () => {
   // --- EXTRACTED FETCH RECYCLERS FUNCTION ---
   const fetchRecyclers = async () => {
     setLoadingRecyclers(true);
-    // Ahora sí puedes pedir rating_average y total_ratings
     const { data, error } = await supabase
       .from('profiles')
       .select('id, avatar_url, name, email, phone, materials, bio, lat, lng, online, role, user_id, rating_average, total_ratings')
       .eq('role', 'recycler');
-    console.log('DEBUG fetchRecyclers data:', data, 'error:', error);
     if (error) {
       setRecyclers([]);
     } else {
       setRecyclers(
         (data || []).map((rec) => ({
           id: rec.id,
-          user_id: rec.user_id || rec.id, // fallback por si user_id no existe
+          user_id: rec.user_id || rec.id,
           profiles: {
             avatar_url: rec.avatar_url,
             name: rec.name,
@@ -140,9 +138,9 @@ const DashboardResident: React.FC = () => {
           total_ratings: rec.total_ratings || 0,
           materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
           bio: typeof rec.bio === 'string' ? rec.bio : '',
-          lat: rec.lat,
-          lng: rec.lng,
-          online: !!rec.online,
+          lat: rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined,
+          lng: rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined,
+          online: rec.online === true || rec.online === 'true' || rec.online === 1,
         }))
       );
     }
@@ -248,11 +246,11 @@ const DashboardResident: React.FC = () => {
               },
               rating_average: rec.rating_average || 0,
               total_ratings: rec.total_ratings || 0,
-              materials: rec.materials || [],
-              bio: rec.bio || '',
-              lat: rec.lat,
-              lng: rec.lng,
-              online: rec.online,
+              materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
+              bio: typeof rec.bio === 'string' ? rec.bio : '',
+              lat: rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined,
+              lng: rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined,
+              online: rec.online === true || rec.online === 'true' || rec.online === 1,
             }))
         );
       }
@@ -728,7 +726,6 @@ const handleSubmitRating = async () => {
 
 
 
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
                     function handleMakeAvailableAgain(_point: CollectionPoint & {
                       status?: string; claim_id?: string | null; // <-- Añadido para acceso seguro
                       // <-- Añadido para acceso seguro
@@ -737,6 +734,7 @@ const handleSubmitRating = async () => {
                         status?: string;
                         pickup_time?: string;
                         recycler?: {
+                          user_id?: string;
                           name?: string;
                           avatar_url?: string;
                           email?: string;
@@ -1202,6 +1200,8 @@ const handleSubmitRating = async () => {
     </div>
   );
 };
+
+// --- FUNCION PARA VOLVER PUNTO A DISPONIBLE ---
 
 export default DashboardResident;
 <style>{`

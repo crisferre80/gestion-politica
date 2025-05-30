@@ -1,21 +1,21 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export type User = {
-  lng: number;
-  lat: number;
+  role: string;
   id: string;
-  name?: string;
-  email?: string;
+  name: string;
+  email: string;
   phone?: string;
-  avatar_url?: string;
   address?: string;
-  materials?: string[];
-  schedule?: string;
-  type?: string;
   bio?: string;
+  avatar_url?: string;
+  materials?: string[];
+  lat?: number | string;
+  lng?: number | string;
   online?: boolean;
-  role?: string; // <-- Agregado para soporte de roles admin/recycler/resident
-  // otros campos...
+  type?: string;
+  experience_years?: number;
+  // ...otros campos
 };
 
 interface UserContextType {

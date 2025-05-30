@@ -14,6 +14,7 @@ interface Advertisement {
 
 const AdminAds: React.FC = () => {
   const { user } = useUser();
+
   const [ads, setAds] = useState<Advertisement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,6 +25,11 @@ const AdminAds: React.FC = () => {
     file: null as File | null,
   });
 
+  if (!user || user.role !== 'admin') {
+    return <div className="text-red-600 text-center mt-10 font-bold text-xl">Acceso no autorizado</div>;
+  }
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     fetchAds();
   }, []);
@@ -113,16 +119,6 @@ const AdminAds: React.FC = () => {
       setError('Error al eliminar la publicidad');
     }
   };
-
-  if (!user || (user.type as string) !== 'admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-gray-600">Acceso no autorizado</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

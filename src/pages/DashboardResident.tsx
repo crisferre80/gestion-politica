@@ -447,14 +447,14 @@ const DashboardResident: React.FC = () => {
   const now = new Date();
   const puntosTodos = detailedPoints.filter(p =>
     (!p.status || p.status === 'available') && // Solo los que están disponibles
-    (!p.claim || p.claim.status !== 'pending') // Y que no tengan un reclamo pendiente
+    (!p.claim || p.claim.status !== 'claimed') // Y que no tengan un reclamo pendiente
   );
   const puntosReclamados = detailedPoints.filter(p =>
-    (p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'pending'
+    (p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'claimed'
   );
   const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || (p.claim && p.claim.status === 'completed'));
   const puntosDemorados = detailedPoints.filter(p => {
-    if ((p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'pending' && p.claim.pickup_time) {
+    if ((p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'claimed' && p.claim.pickup_time) {
       const pickup = new Date(p.claim.pickup_time);
       return pickup < now;
     }
@@ -759,7 +759,7 @@ const handleSubmitRating = async () => {
                             {activePointsTab === 'todos' && (!point.status || point.status === 'available') && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">{getStatusLabel('available')}</span>
                             )}
-                            {(point.status === 'claimed' || point.status === 'reclamado') && point.claim && point.claim.status === 'pending' && (
+                            {(point.status === 'claimed' || point.status === 'reclamado') && point.claim && point.claim.status === 'claimed' && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">{getStatusLabel('claimed')}</span>
                             )}
                             {point.status === 'completed' && (

@@ -498,12 +498,22 @@ const DashboardRecycler: React.FC = () => {
                             {/* Eliminado el botón de la esquina, solo se deja el botón junto a 'Ver en Mapa' */}
                           </div>
                         </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
+                        <div className="flex flex-row items-start mt-4">
+                          <div className="mr-6 flex-shrink-0">
+                            <img
+                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                              alt="Reciclaje"
+                              className="w-36 h-36 object-contain animate-bounce-slow"
+                              style={{ filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {point.materials.map((material: string, idx: number) => (
+                                <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                              ))}
+                            </div>
                           </div>
                         </div>
                         <div className="mt-4 flex items-center text-sm text-gray-500">
@@ -612,29 +622,31 @@ const DashboardRecycler: React.FC = () => {
                           </div>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
                         </div>
-                        {/* Info residente + Google Maps icono */}
-                        <div className="mt-6 pt-6 border-t border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                          
-                          
-                        </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
+                        <div className="flex flex-row justify-between items-start mt-4">
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
+                                <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="ml-4 flex-shrink-0">
+                            <img
+                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                              alt="Reciclaje"
+                              className="w-28 h-28 object-contain bg-white shadow-none"
+                            />
                           </div>
                         </div>
-                        <div className="mt-4 flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          <span>{point.schedule}</span>
+                        <div className="mt-4">
+                          {point.pickup_time && (
+                            <div className="text-xs text-gray-500">Retiro programado: {new Date(point.pickup_time).toLocaleString()}</div>
+                          )}
+                          {point.status === 'claimed' && point.pickup_time && (
+                            <CountdownTimer targetDate={new Date(point.pickup_time)} onComplete={() => fetchData()} />
+                          )}
                         </div>
-                        {point.pickup_time && (
-                          <div className="mt-2 text-xs text-gray-500">Retiro programado: {new Date(point.pickup_time).toLocaleString()}</div>
-                        )}
-                        {point.status === 'claimed' && point.pickup_time && (
-                          <CountdownTimer targetDate={new Date(point.pickup_time)} onComplete={() => fetchData()} />
-                        )}
                         {/* Info residente */}
                         <div className="mt-6 pt-6 border-t border-gray-200">
                           <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
@@ -741,6 +753,7 @@ const DashboardRecycler: React.FC = () => {
                   {claimedPoints.filter(p => p.status === 'cancelled').map(point => (
                     <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="p-6">
+                        {/* Info principal */}
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-3">
                             <MapPin className="h-6 w-6 text-green-500" />
@@ -751,12 +764,21 @@ const DashboardRecycler: React.FC = () => {
                           </div>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Cancelado</span>
                         </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
+                        <div className="flex flex-row justify-between items-start mt-4">
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {point.materials.map((material: string, idx: number) => (
+                                <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="ml-4 flex-shrink-0">
+                            <img
+                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                              alt="Reciclaje"
+                              className="w-28 h-28 object-contain bg-white shadow-none"
+                            />
                           </div>
                         </div>
                         <div className="mt-4 flex items-center text-sm text-gray-500">
@@ -805,6 +827,7 @@ const DashboardRecycler: React.FC = () => {
                   {claimedPoints.filter(p => p.status === 'completed').map(point => (
                     <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="p-6">
+                        {/* Info principal */}
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-3">
                             <MapPin className="h-6 w-6 text-green-500" />
@@ -815,12 +838,21 @@ const DashboardRecycler: React.FC = () => {
                           </div>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
                         </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
+                        <div className="flex flex-row justify-between items-start mt-4">
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {point.materials.map((material: string, idx: number) => (
+                                <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="ml-4 flex-shrink-0">
+                            <img
+                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                              alt="Reciclaje"
+                              className="w-28 h-28 object-contain bg-white shadow-none"
+                            />
                           </div>
                         </div>
                         <div className="mt-4 flex items-center text-sm text-gray-500">

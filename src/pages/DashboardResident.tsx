@@ -74,8 +74,8 @@ const DashboardResident: React.FC = () => {
   // const [] = useState(false);
   // const [] = useState(false);
   type Recycler = {
-    id: number;
-    user_id?: string; // <-- Añadir user_id (UUID) aquí
+    id: string; // <-- Cambiado a string
+    user_id?: string;
     profiles?: {
       avatar_url?: string;
       name?: string;
@@ -121,12 +121,13 @@ const DashboardResident: React.FC = () => {
       .from('profiles')
       .select('id, avatar_url, name, email, phone, materials, bio, lat, lng, online, role, user_id, rating_average, total_ratings')
       .eq('role', 'recycler');
+    console.log('Recyclers fetched from Supabase:', data, error); // DEBUG
     if (error) {
       setRecyclers([]);
     } else {
       setRecyclers(
         (data || []).map((rec) => ({
-          id: rec.id,
+          id: String(rec.id), // <-- Forzamos a string
           user_id: rec.user_id || rec.id,
           profiles: {
             avatar_url: rec.avatar_url,
@@ -165,13 +166,14 @@ const DashboardResident: React.FC = () => {
             const oldRec = payload.old as ProfileRealtimePayload;
             if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
               setRecyclers((prev) => {
-                const exists = prev.find((r) => r.id === newRec.id);
+                const exists = prev.find((r) => r.id === String(newRec.id));
                 if (exists) {
                   // Actualiza el reciclador existente
                   return prev.map((r) =>
-                    r.id === newRec.id
+                    r.id === String(newRec.id)
                       ? {
                           ...r,
+                          id: String(newRec.id),
                           profiles: {
                             avatar_url: newRec.avatar_url,
                             name: newRec.name,
@@ -193,7 +195,7 @@ const DashboardResident: React.FC = () => {
                   return [
                     ...prev,
                     {
-                      id: newRec.id,
+                      id: String(newRec.id),
                       profiles: {
                         avatar_url: newRec.avatar_url,
                         name: newRec.name,
@@ -213,7 +215,7 @@ const DashboardResident: React.FC = () => {
               });
             }
             if (payload.eventType === 'DELETE' && oldRec && oldRec.role && oldRec.role.toLowerCase() === 'recycler') {
-              setRecyclers((prev) => prev.filter((r) => r.id !== oldRec.id));
+              setRecyclers((prev) => prev.filter((r) => r.id !== String(oldRec.id)));
             }
           }
         )

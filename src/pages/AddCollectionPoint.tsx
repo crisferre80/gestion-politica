@@ -199,6 +199,22 @@ const AddCollectionPoint: React.FC = () => {
         type: 'collection_point_created',
         related_id: newPoint?.id
       });
+      // Notificación para todos los recicladores activos
+      const { data: recyclers } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('role', 'recycler');
+      if (recyclers && Array.isArray(recyclers)) {
+        for (const recycler of recyclers) {
+          await createNotification({
+            user_id: recycler.user_id,
+            title: 'Nuevo punto disponible',
+            content: `Se ha creado un nuevo punto de recolección en ${address}.`,
+            type: 'new_collection_point',
+            related_id: newPoint?.id
+          });
+        }
+      }
       // NUEVO: Navega al dashboard con flag de refresco
       navigate('/dashboard', { state: { refresh: true } });
     } catch (err) {

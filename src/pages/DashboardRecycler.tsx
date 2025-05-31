@@ -364,6 +364,30 @@ const DashboardRecycler: React.FC = () => {
     };
   }, [user]);
 
+  // Suscripción en tiempo real a collection_points para actualización instantánea de puntos
+  useEffect(() => {
+    if (!user?.id) return;
+    // Solo recicladores activos
+    const channel = supabase.channel('recycler-collection-points')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'collection_points',
+      }, (payload) => {
+        // Si el punto es nuevo o cambia de estado, refresca los datos
+        // Solo refresca si el punto está disponible o fue actualizado a disponible
+        if (
+          payload.eventType === 'INSERT' ||
+          (payload.eventType === 'UPDATE' && (payload.new.status === 'available' || payload.old.status === 'available'))
+        ) {
+          fetchData();
+        }
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchData]);
 
   if (!user) {
     return (

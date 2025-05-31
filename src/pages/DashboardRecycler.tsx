@@ -144,7 +144,19 @@ const DashboardRecycler: React.FC = () => {
       setLoading(true);
       console.log('User object:', user);
       console.log('User ID being sent as recyclerId:', user.id); // Verifica este valor
-      await claimCollectionPoint(pointToClaim!.id, user.id, new Date(pickupDateTimeInput).toISOString());
+      console.log('Point to claim:', pointToClaim);
+      console.log('Pickup time:', pickupDateTimeInput);
+      try {
+        await claimCollectionPoint(
+          pointToClaim!.id,
+          user.id,
+          new Date(pickupDateTimeInput).toISOString(),
+          pointToClaim.user_id // <-- user_id del residente dueño del punto
+        );
+      } catch (err) {
+        console.error('Error en claimCollectionPoint:', err);
+        throw err;
+      }
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);
@@ -553,8 +565,10 @@ const DashboardRecycler: React.FC = () => {
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
-                                  const origin = (user.lat && user.lng && Math.abs(user.lat) > 0.01 && Math.abs(user.lng) > 0.01)
-                                    ? `${user.lat},${user.lng}`
+                                  const latNum = Number(user.lat);
+                                  const lngNum = Number(user.lng);
+                                  const origin = (!isNaN(latNum) && !isNaN(lngNum) && Math.abs(latNum) > 0.01 && Math.abs(lngNum) > 0.01)
+                                    ? `${latNum},${lngNum}`
                                     : 'current+location';
                                   const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
                                   window.open(url, '_blank', 'noopener,noreferrer');
@@ -644,8 +658,10 @@ const DashboardRecycler: React.FC = () => {
                             <div className="flex items-center gap-2 mt-4 md:mt-0">
                               <button
                                 onClick={() => {
-                                  const origin = (user.lat && user.lng && Math.abs(user.lat) > 0.01 && Math.abs(user.lng) > 0.01)
-                                    ? `${user.lat},${user.lng}`
+                                  const latNum = Number(user.lat);
+                                  const lngNum = Number(user.lng);
+                                  const origin = (!isNaN(latNum) && !isNaN(lngNum) && Math.abs(latNum) > 0.01 && Math.abs(lngNum) > 0.01)
+                                    ? `${latNum},${lngNum}`
                                     : 'current+location';
                                   const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
                                   window.open(url, '_blank', 'noopener,noreferrer');

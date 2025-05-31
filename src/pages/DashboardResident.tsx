@@ -49,11 +49,11 @@ export type User = {
   phone?: string;
   avatar_url?: string;
   address?: string;
-  materials?: string[]; // <-- agrega esto si falta
+  materials?: string[];
   schedule?: string;
   type?: string;
-  bio?: string;         // <-- agrega esto si falta
-  role?: string;        // <-- asegúrate de que este campo exista para evitar el error
+  bio?: string;
+  role?: string; // Asegura que 'role' está presente para evitar error TS
   // otros campos...
 };
 
@@ -119,30 +119,29 @@ const DashboardResident: React.FC = () => {
     setLoadingRecyclers(true);
     const { data, error } = await supabase
       .from('profiles')
-      .select('*');
+      .select('id, avatar_url, name, email, phone, materials, bio, lat, lng, online, role, user_id, rating_average, total_ratings')
+      .eq('role', 'recycler');
     if (error) {
       setRecyclers([]);
     } else {
       setRecyclers(
-        (data || [])
-          .filter(rec => (rec.role && typeof rec.role === 'string' && rec.role.toLowerCase() === 'recycler'))
-          .map((rec) => ({
-            id: rec.id, // id numérico de la tabla profiles
-            user_id: rec.user_id, // <-- Agregar el user_id (UUID)
-            profiles: {
-              avatar_url: rec.avatar_url,
-              name: rec.name,
-              email: rec.email,
-              phone: rec.phone,
-            },
-            rating_average: rec.rating_average || 0,
-            total_ratings: rec.total_ratings || 0,
-            materials: Array.isArray(rec.materials) ? rec.materials : [],
-            bio: typeof rec.bio === 'string' ? rec.bio : '',
-            lat: rec.lat,
-            lng: rec.lng,
-            online: !!rec.online,
-          }))
+        (data || []).map((rec) => ({
+          id: rec.id,
+          user_id: rec.user_id || rec.id,
+          profiles: {
+            avatar_url: rec.avatar_url,
+            name: rec.name,
+            email: rec.email,
+            phone: rec.phone,
+          },
+          rating_average: rec.rating_average || 0,
+          total_ratings: rec.total_ratings || 0,
+          materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
+          bio: typeof rec.bio === 'string' ? rec.bio : '',
+          lat: rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined,
+          lng: rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined,
+          online: rec.online === true || rec.online === 'true' || rec.online === 1,
+        }))
       );
     }
     setLoadingRecyclers(false);
@@ -247,11 +246,11 @@ const DashboardResident: React.FC = () => {
               },
               rating_average: rec.rating_average || 0,
               total_ratings: rec.total_ratings || 0,
-              materials: rec.materials || [],
-              bio: rec.bio || '',
-              lat: rec.lat,
-              lng: rec.lng,
-              online: rec.online,
+              materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
+              bio: typeof rec.bio === 'string' ? rec.bio : '',
+              lat: rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined,
+              lng: rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined,
+              online: rec.online === true || rec.online === 'true' || rec.online === 1,
             }))
         );
       }
@@ -291,7 +290,7 @@ const DashboardResident: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      await deleteCollectionPoint(pointId.toString(), user.id);
+      await deleteCollectionPoint(pointId.toString());
       setSuccess('Punto de recolección eliminado con éxito');
       await refreshCollectionPoints(); // Refresca lista tras eliminar
     } catch {
@@ -448,14 +447,14 @@ const DashboardResident: React.FC = () => {
   const now = new Date();
   const puntosTodos = detailedPoints.filter(p =>
     (!p.status || p.status === 'available') && // Solo los que están disponibles
-    (!p.claim || p.claim.status !== 'pending') // Y que no tengan un reclamo pendiente
+    (!p.claim || p.claim.status !== 'claimed') // Y que no tengan un reclamo pendiente
   );
   const puntosReclamados = detailedPoints.filter(p =>
-    (p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'pending'
+    (p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'claimed'
   );
   const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || (p.claim && p.claim.status === 'completed'));
   const puntosDemorados = detailedPoints.filter(p => {
-    if ((p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'pending' && p.claim.pickup_time) {
+    if ((p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'claimed' && p.claim.pickup_time) {
       const pickup = new Date(p.claim.pickup_time);
       return pickup < now;
     }
@@ -729,20 +728,21 @@ const handleSubmitRating = async () => {
 
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars
                     function handleMakeAvailableAgain(_point: CollectionPoint & {
-                      status?: string; claim_id?: string | null; // <-- Añadido para acceso seguro
-                      // <-- Añadido para acceso seguro
-                      claim?: {
-                        id?: string; // <-- Añadido para fallback
-                        status?: string;
-                        pickup_time?: string;
-                        recycler?: {
-                          name?: string;
-                          avatar_url?: string;
-                          email?: string;
-                          phone?: string;
+                        status?: string; claim_id?: string | null; // <-- Añadido para acceso seguro
+                        // <-- Añadido para acceso seguro
+                        claim?: {
+                          id?: string; // <-- Añadido para fallback
+                          status?: string;
+                          pickup_time?: string;
+                          recycler?: {
+                            user_id?: string;
+                            name?: string;
+                            avatar_url?: string;
+                            email?: string;
+                            phone?: string;
+                          };
                         };
-                      };
-                    }): void {
+                      }): void {
                       throw new Error('Function not implemented.');
                     }
 
@@ -760,7 +760,7 @@ const handleSubmitRating = async () => {
                             {activePointsTab === 'todos' && (!point.status || point.status === 'available') && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">{getStatusLabel('available')}</span>
                             )}
-                            {(point.status === 'claimed' || point.status === 'reclamado') && point.claim && point.claim.status === 'pending' && (
+                            {(point.status === 'claimed' || point.status === 'reclamado') && point.claim && point.claim.status === 'claimed' && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">{getStatusLabel('claimed')}</span>
                             )}
                             {point.status === 'completed' && (
@@ -899,6 +899,17 @@ const handleSubmitRating = async () => {
                 }))}
               showUserLocation={true}
             />
+            {/* DEBUG: Mostrar recicladores que deberían aparecer en el mapa */}
+          <div className="mt-4 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-900">
+            <b>Recicladores en línea con coordenadas:</b>
+            <ul>
+              {recyclers.filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true).map(r => (
+                <li key={r.id}>
+                  {r.profiles?.name || 'Reciclador'} | lat: {r.lat}, lng: {r.lng} | online: {String(r.online)}
+                </li>
+              ))}
+            </ul>
+          </div>
           </div>
         </div>
       )}
@@ -1190,6 +1201,8 @@ const handleSubmitRating = async () => {
     </div>
   );
 };
+
+// --- FUNCION PARA VOLVER PUNTO A DISPONIBLE ---
 
 export default DashboardResident;
 <style>{`

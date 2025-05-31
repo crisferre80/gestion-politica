@@ -4,9 +4,6 @@ import { useUser } from '../context/UserContext';
 import DashboardRecycler from './DashboardRecycler';
 import DashboardResident from './DashboardResident';
 import AdminPanel from './AdminPanel';
-// import AdminPanel from './AdminPanel';
-// Make sure AdminPanel.tsx exists in the same folder, or update the path below if it's elsewhere:
-// import AdminPanel from '../components/AdminPanel'; // Update this path if needed
 
 const Dashboard: React.FC = () => {
   const { user } = useUser();

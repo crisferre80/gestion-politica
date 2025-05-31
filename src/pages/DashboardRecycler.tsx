@@ -595,10 +595,10 @@ const DashboardRecycler: React.FC = () => {
               <>
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Reclamados</h2>
                 <div className="grid gap-6 md:grid-cols-2">
-                  {claimedPoints.filter(p => p.status === 'pending').length === 0 && (
+                  {claimedPoints.filter(p => p.status === 'claimed').length === 0 && (
                     <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
                   )}
-                  {claimedPoints.filter(p => p.status === 'pending').map(point => (
+                  {claimedPoints.filter(p => p.status === 'claimed').map(point => (
                     <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                       <div className="p-6">
                         {/* Info principal */}
@@ -632,7 +632,7 @@ const DashboardRecycler: React.FC = () => {
                         {point.pickup_time && (
                           <div className="mt-2 text-xs text-gray-500">Retiro programado: {new Date(point.pickup_time).toLocaleString()}</div>
                         )}
-                        {point.status === 'pending' && point.pickup_time && (
+                        {point.status === 'claimed' && point.pickup_time && (
                           <CountdownTimer targetDate={new Date(point.pickup_time)} onComplete={() => fetchData()} />
                         )}
                         {/* Info residente */}
@@ -1017,7 +1017,7 @@ const DashboardRecycler: React.FC = () => {
                 <h2 className="text-2xl font-bold mb-4 text-green-700">Historial</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <div className="bg-green-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-green-700">{claimedPoints.filter(p => p.status === 'pending').length}</div>
+                    <div className="text-3xl font-bold text-green-700">{claimedPoints.filter(p => p.status === 'claimed').length}</div>
                     <div className="text-gray-600 mt-1">Reclamados</div>
                   </div>
                   <div className="bg-red-50 rounded-lg p-4 text-center">

@@ -1,21 +1,19 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export type User = {
-  lng: number;
-  lat: number;
   id: string;
   name: string;
   email: string;
+  experience_years?: number;
+  lng?: number | string;
+  lat?: number | string;
   phone?: string;
   address?: string;
   bio?: string;
   avatar_url?: string;
   materials?: string[];
-  lat?: number | string;
-  lng?: number | string;
   online?: boolean;
   type?: string;
-  experience_years?: number;
   // ...otros campos
 };
 

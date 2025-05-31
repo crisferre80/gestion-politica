@@ -53,7 +53,7 @@ export type User = {
   schedule?: string;
   type?: string;
   bio?: string;
-  role?: string; // Asegura que 'role' está presente para evitar error TS
+  role?: string; // 'role' ahora es opcional para compatibilidad
   // otros campos...
 };
 

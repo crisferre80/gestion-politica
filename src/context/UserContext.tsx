@@ -14,6 +14,7 @@ export type User = {
   materials?: string[];
   online?: boolean;
   type?: string;
+  role?: string;
   // ...otros campos
 };
 

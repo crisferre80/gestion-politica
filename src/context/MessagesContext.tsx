@@ -74,9 +74,8 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
                 receiverId: idToUserId[msg.receiver_id] || msg.receiver_id,
                 content: msg.content,
                 timestamp: new Date(msg.sent_at),
-                createdAt: msg.sent_at,
-                read: msg.read,
-                readAt: msg.read_at,
+                createdAt: msg.sent_at
+                // No incluir read ni readAt en el objeto Message
             }))
         );
     };

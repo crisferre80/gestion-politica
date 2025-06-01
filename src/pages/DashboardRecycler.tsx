@@ -318,11 +318,11 @@ const DashboardRecycler: React.FC = () => {
         schema: 'public',
         table: 'collection_points',
       }, (payload) => {
-        // Si el punto es nuevo o cambia de estado, refresca los datos
-        // Solo refresca si el punto está disponible o fue actualizado a disponible
+        // Si el punto es nuevo, cambia de estado, o es eliminado, refresca los datos
         if (
           payload.eventType === 'INSERT' ||
-          (payload.eventType === 'UPDATE' && (payload.new.status === 'available' || payload.old.status === 'available'))
+          (payload.eventType === 'UPDATE' && (payload.new.status === 'available' || payload.old.status === 'available')) ||
+          payload.eventType === 'DELETE'
         ) {
           fetchData();
         }

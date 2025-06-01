@@ -448,12 +448,11 @@ const DashboardResident: React.FC = () => {
   const now = new Date();
   // Un punto está disponible si su status es 'available' y no tiene un claim activo
   const puntosTodos = detailedPoints.filter(p =>
-    (!p.status || p.status === 'available') && // Solo los que están disponibles
-    (!p.claim || p.claim.status !== 'claimed') // Y que no tengan un reclamo pendiente
+    (p.status === 'available' || !p.status) && (!p.claim || p.claim.status !== 'claimed')
   );
-  // Un punto está reclamado si su status es 'claimed' o el claim está en 'claimed'
+  // Un punto está reclamado si su status es 'claimed', 'reclamado', o el claim está en 'claimed'
   const puntosReclamados = detailedPoints.filter(p =>
-    (p.status === 'claimed' || p.status === 'reclamado' || (p.claim && p.claim.status === 'claimed'))
+    p.status === 'claimed' || p.status === 'reclamado' || (p.claim && p.claim.status === 'claimed')
   );
   const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || (p.claim && p.claim.status === 'completed'));
   const puntosDemorados = detailedPoints.filter(p => {

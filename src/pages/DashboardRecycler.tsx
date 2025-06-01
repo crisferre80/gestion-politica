@@ -52,7 +52,7 @@ const DashboardRecycler: React.FC = () => {
           *,
           collection_point:collection_points!collection_claims_collection_point_id_fkey (
             *,
-            profiles!collection_points_user_id_fkey (
+            profiles:profiles!collection_points_user_id_fkey (
               name,
               email,
               phone,
@@ -63,7 +63,7 @@ const DashboardRecycler: React.FC = () => {
         .eq('recycler_id', user.id)
         .order('claimed_at', { ascending: false });
       if (claimsError) throw claimsError;
-      const claimed = claimsData.map(claim => ({
+      const claimed = (claimsData || []).map(claim => ({
         ...claim.collection_point,
         claim_id: claim.id,
         status: claim.status,
@@ -74,28 +74,60 @@ const DashboardRecycler: React.FC = () => {
         pickup_time: claim.pickup_time
       }));
 
-      // Puntos disponibles
+      // Puntos disponibles (step 1: fetch points)
       const { data: availableData, error: availableError } = await supabase
         .from('collection_points')
-        .select(`*, profiles!collection_points_user_id_fkey (name, email, phone, avatar_url)`)
+        .select('*')
         .eq('status', 'available')
         .order('created_at', { ascending: false });
       if (availableError) throw availableError;
-      const available = availableData.map(point => ({
-        ...point,
-        creator_name: point.profiles?.name,
-        creator_email: point.profiles?.email,
-        creator_phone: point.profiles?.phone,
-        creator_avatar: point.profiles?.avatar_url,
-      }));
+      const availablePointsRaw = availableData || [];
+      console.log('Puntos disponibles crudos:', availablePointsRaw);
+      // Step 2: get all unique user_ids
+      const userIds = [...new Set(availablePointsRaw.map(p => p.user_id))];
+      console.log('userIds únicos:', userIds);
+      let profilesById: Record<string, Pick<import('../lib/supabase').User, 'name' | 'email' | 'phone' | 'avatar_url'>> = {};
+      if (userIds.length > 0) {
+        // Step 3: fetch all profiles for these user_ids
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, name, email, phone, avatar_url')
+          .in('user_id', userIds);
+        if (profilesError) throw profilesError;
+        console.log('Perfiles obtenidos:', profilesData);
+        profilesById = (profilesData || []).reduce((acc, profile) => {
+          acc[profile.user_id] = profile;
+          return acc;
+        }, {} as Record<string, Pick<import('../lib/supabase').User, 'name' | 'email' | 'phone' | 'avatar_url'>>);
+      }
+      // Step 4: merge profile info into points
+      const available = availablePointsRaw.map(point => {
+        const profile = profilesById[point.user_id];
+        if (!profile) {
+          console.warn('No se encontró perfil para user_id', point.user_id);
+        }
+        return {
+          ...point,
+          creator_name: profile?.name || 'Usuario Anónimo',
+          creator_email: profile?.email,
+          creator_phone: profile?.phone,
+          creator_avatar: profile?.avatar_url,
+          profiles: profile, // for phone in UI
+        };
+      });
+      console.log('Puntos disponibles con perfil:', available);
 
       setClaimedPoints(claimed);
       setAvailablePoints(available);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
-      setError('Error al cargar los datos');
+      // Mostrar el error real de Supabase si existe
+      if (err && typeof err === 'object' && 'message' in err) {
+        setError((err as { message: string }).message + '\n' + JSON.stringify(err));
+      } else {
+        setError('Error al cargar los datos: ' + JSON.stringify(err));
+      }
     } finally {
-    setLoading(false);
+      setLoading(false);
     }
   }, [user]);
 
@@ -480,7 +512,10 @@ const DashboardRecycler: React.FC = () => {
                   <h2 className="text-xl font-semibold text-green-700 mb-4">Puntos Disponibles para Reclamar</h2>
                   <div className="grid gap-6 md:grid-cols-2">
                     {trulyAvailablePoints.length === 0 ? (
-                      <div className="col-span-2 text-center text-gray-500">No hay puntos disponibles para reclamar en este momento.</div>
+                      <div className="col-span-2 text-center text-gray-500">
+                        No hay puntos disponibles para reclamar en este momento.<br />
+                        <span className="text-xs text-red-500">Debug: {JSON.stringify(availablePoints)}</span>
+                      </div>
                     ) : (
                       trulyAvailablePoints.map(point => (
                         <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">

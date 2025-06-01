@@ -11,6 +11,7 @@ import NotificationBell from '../components/NotificationBell';
 import { createNotification } from '../lib/notifications';
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import AdminNotifications from '../components/AdminNotifications';
+import PhotoCapture from '../components/PhotoCapture';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -308,8 +309,6 @@ const DashboardResident: React.FC = () => {
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  const [editLat] = useState(user?.lat || '');
-  const [editLng] = useState(user?.lng || '');
   
   // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
 
@@ -557,6 +556,9 @@ const handleSubmitRating = async () => {
     }
   }, [location.state, refreshCollectionPoints]);
 
+  const getAvatarUrl = (url: string | undefined) =>
+  url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -579,7 +581,7 @@ const handleSubmitRating = async () => {
       <div className="flex items-center gap-4 mb-8 bg-white shadow rounded-lg px-6 py-4 w-full max-w-2xl">
         <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
           <img
-            src={avatarUrl}
+            src={getAvatarUrl(user?.avatar_url || avatarUrl)}
             alt="Foto de perfil"
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -1024,24 +1026,24 @@ const handleSubmitRating = async () => {
               }
             }}
           >
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
-                <img src={user?.avatar_url || avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
-              </div>
-              <label className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer">
-                Actualizar Foto
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      handlePhotoUpload(e.target.files[0]);
-                    }
-                  }}
-                />
-              </label>
+            <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
+              <img src={user?.avatar_url || avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
             </div>
+            <PhotoCapture
+              onCapture={file => {
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('La imagen no debe superar los 10MB.');
+      return;
+    }
+                handlePhotoUpload(file);
+              }}
+              onCancel={() => {}}
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
               <div className="text-left">
                 <label className="text-gray-600 text-sm">Nombre completo</label>
@@ -1058,14 +1060,6 @@ const handleSubmitRating = async () => {
               <div className="text-left">
                 <label className="text-gray-600 text-sm">Domicilio</label>
                 <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
-              </div>
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Latitud</label>
-                <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLat} readOnly />
-              </div>
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Longitud</label>
-                <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLng} readOnly />
               </div>
               <div className="text-left md:col-span-2">
                 <label className="text-gray-600 text-sm">Biografía / Nota</label>

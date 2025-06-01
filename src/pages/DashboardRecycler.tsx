@@ -7,6 +7,7 @@ import { useUser } from '../context/UserContext';
 import HeaderRecycler from '../components/HeaderRecycler';
 import { Link } from 'react-router-dom';
 import NotificationBell from '../components/NotificationBell';
+import PhotoCapture from '../components/PhotoCapture';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -31,8 +32,6 @@ const DashboardRecycler: React.FC = () => {
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
   const [editExperienceYears, setEditExperienceYears] = useState(user?.experience_years || 0);
-  const [editLat, setEditLat] = useState(user?.lat || '');
-  const [editLng, setEditLng] = useState(user?.lng || '');
   const [success, setSuccess] = useState<string | null>(null);
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
@@ -265,8 +264,6 @@ const DashboardRecycler: React.FC = () => {
       setEditBio(user.bio || '');
       setEditMaterials(Array.isArray(user.materials) ? user.materials.join(', ') : (user.materials || ''));
       setEditExperienceYears(user.experience_years || 0);
-      setEditLat(user.lat || '');
-      setEditLng(user.lng || '');
       setEditAvatarPreview(null);
       setEditAvatarFile(null);
     }
@@ -389,6 +386,9 @@ const DashboardRecycler: React.FC = () => {
     };
   }, [user, fetchData]);
 
+  const getAvatarUrl = (url: string | undefined) =>
+    url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -413,7 +413,6 @@ const DashboardRecycler: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold text-green-800">Panel del Reciclador</h1>
           <div className="flex items-center gap-4">
-            <NotificationBell />
             <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
           </div>
         </div>
@@ -423,14 +422,14 @@ const DashboardRecycler: React.FC = () => {
             <div className="flex-shrink-0">
               <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-green-400 bg-white shadow">
                 {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
+                  <img src={getAvatarUrl(user.avatar_url)} alt="Foto de perfil" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-16 h-16 text-gray-300 mx-auto my-6" />
                 )}
               </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div className="flex-1 min-w-0 w-full">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl md:text-3xl font-bold text-green-800 mb-1">{user?.name || 'Reciclador'}</h1>
                   {user?.online ? (
@@ -443,10 +442,8 @@ const DashboardRecycler: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-4">
-                  {/* Dejar solo el nuevo NotificationBell en el header, eliminar cualquier otro anterior */}
+                <div className="flex items-center gap-4 ml-auto">
                   <NotificationBell />
-                  <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-8 gap-y-2 text-gray-700 text-sm">
@@ -934,6 +931,15 @@ const DashboardRecycler: React.FC = () => {
                     setError(null);
                     let avatarUrl = user?.avatar_url || null;
                     if (editAvatarFile) {
+                      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
+                      if (!allowedTypes.includes(editAvatarFile.type)) {
+                        setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
+                        return;
+                      }
+                      if (editAvatarFile.size > 10 * 1024 * 1024) {
+                        setError('La imagen no debe superar los 10MB.');
+                        return;
+                      }
                       const fileExt = editAvatarFile.name.split('.').pop();
                       const fileName = `${user.id}_${Date.now()}.${fileExt}`;
                       const { error: uploadError } = await supabase.storage
@@ -943,7 +949,7 @@ const DashboardRecycler: React.FC = () => {
                         setError('Error al subir la imagen de perfil');
                         return;
                       }
-                      avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl;
+                      avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl.replace('/object/avatars/', '/object/public/avatars/');
                     }
                     const formMaterials = editMaterials.split(',').map((m) => m.trim()).filter(Boolean);
                     const { error: updateError } = await supabase.from('profiles').update({
@@ -988,8 +994,6 @@ const DashboardRecycler: React.FC = () => {
                         setEditBio(safeBio);
                         setEditMaterials(safeMaterials.join(', '));
                         setEditExperienceYears(updatedProfile.experience_years || 0);
-                        setEditLat(updatedProfile.lat || '');
-                        setEditLng(updatedProfile.lng || '');
                         setEditAvatarPreview(null);
                         setEditAvatarFile(null);
                       }
@@ -1003,25 +1007,21 @@ const DashboardRecycler: React.FC = () => {
                     {editAvatarPreview ? (
                       <img src={editAvatarPreview || undefined} alt="Preview" className="w-full h-full object-cover" />
                     ) : user?.avatar_url ? (
-                      <img src={user.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
+                      <img src={getAvatarUrl(user.avatar_url)} alt="Foto de perfil" className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-12 h-12 text-gray-400" />
                     )}
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="mb-2"
-                    onChange={e => {
-                      const file = e.target.files?.[0] || null;
+                  <PhotoCapture
+                    onCapture={file => {
                       setEditAvatarFile(file);
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => setEditAvatarPreview(ev.target?.result as string);
-                        reader.readAsDataURL(file);
-                      } else {
-                        setEditAvatarPreview(null);
-                      }
+                      const reader = new FileReader();
+                      reader.onload = (ev) => setEditAvatarPreview(ev.target?.result as string);
+                      reader.readAsDataURL(file);
+                    }}
+                    onCancel={() => {
+                      setEditAvatarFile(null);
+                      setEditAvatarPreview(null);
                     }}
                   />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
@@ -1044,14 +1044,6 @@ const DashboardRecycler: React.FC = () => {
                     <div>
                       <label className="text-gray-600 text-sm">Años de experiencia</label>
                       <input type="number" min="0" className="font-semibold w-full border rounded px-2 py-1" value={editExperienceYears} onChange={e => setEditExperienceYears(Number(e.target.value))} />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Latitud</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLat} readOnly />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Longitud</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLng} readOnly />
                     </div>
                     <div className="md:col-span-2">
                       <label className="text-gray-600 text-sm">Biografía / Nota</label>

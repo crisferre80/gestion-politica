@@ -22,7 +22,7 @@ const DashboardRecycler: React.FC = () => {
   const [pointToClaim, setPointToClaim] = useState<CollectionPoint | null>(null);
   const [pickupDateTimeInput, setPickupDateTimeInput] = useState('');
   // Estado para el cambio de vista
-  const [view, setView] = useState('disponibles');
+  const [view, setViewState] = useState('disponibles');
 
   const [claimedPoints, setClaimedPoints] = useState<CollectionPoint[]>([]);
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
@@ -363,11 +363,17 @@ const DashboardRecycler: React.FC = () => {
   // Helper: get resident user_id from a point (typed)
   const getResidentUserIdFromPoint = (point: CollectionPoint) => point.user_id;
 
+  // Handler para cambio de vista que limpia el residente enfocado
+  const handleSetView = (newView: string) => {
+    setViewState(newView);
+    setFocusedResidentUserId(undefined);
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <HeaderRecycler
         activeTab={view}
-        setActiveTab={setView}
+        setActiveTab={handleSetView}
         residentUserId={focusedResidentUserId}
       />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -458,7 +464,7 @@ const DashboardRecycler: React.FC = () => {
               <select
                 className="border border-green-300 rounded px-3 py-2 text-green-800 bg-white shadow focus:outline-none focus:ring-2 focus:ring-green-400"
                 value={view}
-                onChange={e => setView(e.target.value)}
+                onChange={e => handleSetView(e.target.value)}
               >
                 <option value="disponibles">Puntos Disponibles</option>
                 <option value="reclamados">Puntos Reclamados</option>

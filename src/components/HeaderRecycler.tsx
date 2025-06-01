@@ -86,19 +86,19 @@ const HeaderRecycler: React.FC<HeaderRecyclerProps> = ({ activeTab, setActiveTab
         ))}
         {/* Botón de chat para comunicarse con el residente */}
         <button
-          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-md bg-blue-500 text-white font-medium hover:bg-blue-600 transition-colors shadow"
+          className={`ml-auto flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors shadow ${residentUserId ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
           onClick={() => {
             if (typeof window !== 'undefined' && residentUserId) {
               window.location.href = `/chat/${residentUserId}`;
-            } else if (typeof window !== 'undefined') {
-              window.location.href = '/chat';
             }
           }}
+          disabled={!residentUserId}
+          title={residentUserId ? 'Chatea con el residente asociado al punto reclamado' : 'Selecciona un punto reclamado para habilitar el chat'}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4 1 1-4A8.96 8.96 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          Chat con residente
+          {residentUserId ? 'Chat con residente' : 'Chat no disponible'}
         </button>
         {/* Eliminar campana duplicada del header de tabs */}
         {/* <div className="ml-auto flex items-center">

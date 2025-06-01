@@ -8,38 +8,33 @@ import { createNotification } from '../lib/notifications';
 // Función utilitaria para validar IDs y enviar mensaje
 async function enviarMensajeSeguro(senderId: string, receiverId: string, content: string) {
   console.log('[enviarMensajeSeguro] senderId:', senderId, 'receiverId:', receiverId, 'content:', content);
-  // Validar sender
-  const { data: sender, error: senderError } = await supabase
+  // Buscar el id real de profiles para sender
+  const { data: senderProfile, error: senderProfileError } = await supabase
     .from('profiles')
-    .select('user_id')
+    .select('id')
     .eq('user_id', senderId)
     .single();
-  console.log('[enviarMensajeSeguro] sender:', sender, 'senderError:', senderError);
-  if (senderError || !sender) {
-    throw new Error('El remitente no existe en la tabla de perfiles.');
+  if (senderProfileError || !senderProfile) {
+    throw new Error('El remitente no tiene perfil válido.');
   }
-  // Validar receiver
-  const { data: receiver, error: receiverError } = await supabase
+  // Buscar el id real de profiles para receiver
+  const { data: receiverProfile, error: receiverProfileError } = await supabase
     .from('profiles')
-    .select('user_id')
+    .select('id')
     .eq('user_id', receiverId)
     .single();
-  console.log('[enviarMensajeSeguro] receiver:', receiver, 'receiverError:', receiverError);
-  if (receiverError || !receiver) {
-    throw new Error('El destinatario no existe en la tabla de perfiles.');
+  if (receiverProfileError || !receiverProfile) {
+    throw new Error('El destinatario no tiene perfil válido.');
   }
-  // Insertar mensaje
-  const { error } = await supabase
-    .from('messages')
-    .insert([
-      {
-        sender_id: senderId,
-        receiver_id: receiverId,
-        content: content,
-        read: false, // <-- corregido
-        // No agregues 'timestamp', la tabla solo tiene 'created_at'
-      },
-    ]);
+  // Insertar mensaje usando los id reales y sent_at explícito
+  const insertObj = {
+    sender_id: senderProfile.id,
+    receiver_id: receiverProfile.id,
+    content: content,
+    sent_at: new Date().toISOString()
+  };
+  console.log('[enviarMensajeSeguro] Insertando mensaje:', insertObj);
+  const { error } = await supabase.from('messages').insert([insertObj]);
   if (error) {
     console.error('[enviarMensajeSeguro] Error al insertar mensaje:', error);
     throw error;

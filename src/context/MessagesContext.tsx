@@ -21,75 +21,86 @@ const MessagesContext = createContext<MessagesContextType | undefined>(undefined
 export const MessagesProvider = ({ children }: { children: ReactNode }) => {
     const [messages, setMessages] = useState<Message[]>([]);
 
-    // Cargar mensajes entre dos usuarios
+    // Cargar mensajes entre dos usuarios (usando user_id de Auth)
     const fetchConversation = async (userId1: string, userId2: string) => {
+        // Buscar los id reales de profiles
+        const { data: profile1 } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', userId1)
+            .single();
+        const { data: profile2 } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', userId2)
+            .single();
+        if (!profile1 || !profile2) {
+            setMessages([]);
+            return;
+        }
+        const id1 = profile1.id;
+        const id2 = profile2.id;
         const { data, error } = await supabase
             .from('messages')
             .select('*')
             .or(
-                `and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`
+                `and(sender_id.eq.${id1},receiver_id.eq.${id2}),and(sender_id.eq.${id2},receiver_id.eq.${id1})`
             )
-            .order('created_at', { ascending: true });
-
+            .order('sent_at', { ascending: true });
         if (error) {
             console.error('Error fetching messages:', error);
             setMessages([]);
             return;
         }
-
         // Adaptar los datos a tu tipo Message
         type SupabaseMessage = {
             id: string | number;
-            sender_id: string; // UUID de Supabase Auth
-            receiver_id: string; // UUID de Supabase Auth
+            sender_id: string;
+            receiver_id: string;
             content: string;
-            created_at: string;
+            sent_at: string;
+            read?: boolean;
+            read_at?: string;
         };
-
         setMessages(
             (data ?? []).map((msg: SupabaseMessage) => ({
                 id: msg.id.toString(),
-                senderId: msg.sender_id, // UUID
-                receiverId: msg.receiver_id, // UUID
+                senderId: msg.sender_id,
+                receiverId: msg.receiver_id,
                 content: msg.content,
-                timestamp: new Date(msg.created_at),
-                createdAt: msg.created_at,
+                timestamp: new Date(msg.sent_at),
+                createdAt: msg.sent_at,
+                read: msg.read,
+                readAt: msg.read_at,
             }))
         );
     };
 
     // Enviar mensaje y recargar la conversación
-    const sendMessage = async (senderId: string, receiverId: string, content: string) => {
-        // Validar que los IDs sean UUIDs válidos
-        const uuidRegex = /^[0-9a-fA-F-]{36}$/;
-        if (!uuidRegex.test(senderId) || !uuidRegex.test(receiverId)) {
-            console.error('[sendMessage] IDs no son UUID válidos', { senderId, receiverId });
-            return;
-        }
-        // Validar sender
-        const { data: sender, error: senderError } = await supabase
+    const sendMessage = async (senderUserId: string, receiverUserId: string, content: string) => {
+        // Buscar el id real de profiles a partir de user_id
+        const { data: senderProfile, error: senderProfileError } = await supabase
             .from('profiles')
-            .select('user_id')
-            .eq('user_id', senderId)
+            .select('id')
+            .eq('user_id', senderUserId)
             .single();
-        if (senderError || !sender) {
-            console.error('[sendMessage] El remitente no existe en la tabla de perfiles.', senderError);
-            return;
-        }
-        // Validar receiver
-        const { data: receiver, error: receiverError } = await supabase
+        const { data: receiverProfile, error: receiverProfileError } = await supabase
             .from('profiles')
-            .select('user_id')
-            .eq('user_id', receiverId)
+            .select('id')
+            .eq('user_id', receiverUserId)
             .single();
-        if (receiverError || !receiver) {
-            console.error('[sendMessage] El destinatario no existe en la tabla de perfiles.', receiverError);
+        if (senderProfileError || !senderProfile) {
+            console.error('[sendMessage] El remitente no tiene perfil válido.', senderProfileError);
             return;
         }
-        // Insertar mensaje SOLO con los campos correctos
+        if (receiverProfileError || !receiverProfile) {
+            console.error('[sendMessage] El destinatario no tiene perfil válido.', receiverProfileError);
+            return;
+        }
+        // Insertar mensaje usando los id reales
         const insertObj = {
-            sender_id: senderId,
-            receiver_id: receiverId,
+            sender_id: senderProfile.id,
+            receiver_id: receiverProfile.id,
             content: content
         };
         console.log('[sendMessage] Insertando mensaje:', insertObj);
@@ -99,7 +110,7 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
         // Opcional: recargar mensajes después de enviar
-        await fetchConversation(senderId, receiverId);
+        await fetchConversation(senderUserId, receiverUserId);
     };
 
     return (

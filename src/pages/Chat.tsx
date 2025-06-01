@@ -7,12 +7,14 @@ import { createNotification } from '../lib/notifications';
 
 // Función utilitaria para validar IDs y enviar mensaje
 async function enviarMensajeSeguro(senderId: string, receiverId: string, content: string) {
+  console.log('[enviarMensajeSeguro] senderId:', senderId, 'receiverId:', receiverId, 'content:', content);
   // Validar sender
   const { data: sender, error: senderError } = await supabase
     .from('profiles')
     .select('user_id')
     .eq('user_id', senderId)
     .single();
+  console.log('[enviarMensajeSeguro] sender:', sender, 'senderError:', senderError);
   if (senderError || !sender) {
     throw new Error('El remitente no existe en la tabla de perfiles.');
   }
@@ -22,6 +24,7 @@ async function enviarMensajeSeguro(senderId: string, receiverId: string, content
     .select('user_id')
     .eq('user_id', receiverId)
     .single();
+  console.log('[enviarMensajeSeguro] receiver:', receiver, 'receiverError:', receiverError);
   if (receiverError || !receiver) {
     throw new Error('El destinatario no existe en la tabla de perfiles.');
   }
@@ -37,7 +40,10 @@ async function enviarMensajeSeguro(senderId: string, receiverId: string, content
         // No agregues 'timestamp', la tabla solo tiene 'created_at'
       },
     ]);
-  if (error) throw error;
+  if (error) {
+    console.error('[enviarMensajeSeguro] Error al insertar mensaje:', error);
+    throw error;
+  }
 }
 
 const Chat = () => {
@@ -87,9 +93,12 @@ const Chat = () => {
   }, [myUserId, otherUserId]);
 
   const handleSend = async () => {
+    console.log('[Chat] handleSend', { myUserId, otherUserId, input });
     if (myUserId && otherUserId && input.trim()) {
       try {
+        console.log('[Chat] Enviando mensaje de', myUserId, 'a', otherUserId, 'contenido:', input);
         await enviarMensajeSeguro(myUserId, otherUserId, input);
+        console.log('[Chat] Mensaje enviado correctamente');
         setInput('');
         await fetchConversation(myUserId, otherUserId);
         // Notificación para el receptor
@@ -101,12 +110,17 @@ const Chat = () => {
           related_id: myUserId
         });
       } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError('No se pudo enviar el mensaje');
-        }
+        console.error('[Chat] Error al enviar mensaje', err);
+        setError(
+          (err instanceof Error ? err.message : 'No se pudo enviar el mensaje') +
+          `\n[Debug] myUserId: ${myUserId} | otherUserId: ${otherUserId}`
+        );
       }
+    } else {
+      console.warn('[Chat] handleSend: IDs o input inválidos', { myUserId, otherUserId, input });
+      setError(
+        `IDs o input inválidos.\n[Debug] myUserId: ${myUserId} | otherUserId: ${otherUserId}`
+      );
     }
   };
 

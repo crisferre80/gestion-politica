@@ -60,6 +60,12 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
 
     // Enviar mensaje y recargar la conversación
     const sendMessage = async (senderId: string, receiverId: string, content: string) => {
+        // Validar que los IDs sean UUIDs válidos
+        const uuidRegex = /^[0-9a-fA-F-]{36}$/;
+        if (!uuidRegex.test(senderId) || !uuidRegex.test(receiverId)) {
+            console.error('[sendMessage] IDs no son UUID válidos', { senderId, receiverId });
+            return;
+        }
         // Validar sender
         const { data: sender, error: senderError } = await supabase
             .from('profiles')
@@ -67,7 +73,7 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
             .eq('user_id', senderId)
             .single();
         if (senderError || !sender) {
-            console.error('El remitente no existe en la tabla de perfiles.');
+            console.error('[sendMessage] El remitente no existe en la tabla de perfiles.', senderError);
             return;
         }
         // Validar receiver
@@ -77,21 +83,19 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
             .eq('user_id', receiverId)
             .single();
         if (receiverError || !receiver) {
-            console.error('El destinatario no existe en la tabla de perfiles.');
+            console.error('[sendMessage] El destinatario no existe en la tabla de perfiles.', receiverError);
             return;
         }
-        // Insertar mensaje
-        const { error } = await supabase.from('messages').insert([
-            {
-                sender_id: senderId, // UUID
-                receiver_id: receiverId, // UUID
-                content,
-                read: false, // <-- corregido
-                // timestamp: new Date().toISOString(), // Si tu tabla lo requiere
-            },
-        ]);
+        // Insertar mensaje SOLO con los campos correctos
+        const insertObj = {
+            sender_id: senderId,
+            receiver_id: receiverId,
+            content: content
+        };
+        console.log('[sendMessage] Insertando mensaje:', insertObj);
+        const { error } = await supabase.from('messages').insert([insertObj]);
         if (error) {
-            console.error('Error sending message:', error);
+            console.error('[sendMessage] Error al insertar mensaje:', error);
             return;
         }
         // Opcional: recargar mensajes después de enviar

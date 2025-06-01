@@ -970,18 +970,23 @@ const handleSubmitRating = async () => {
                     ))}
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
-                  <Link
-                    to={rec.user_id ? `/chat/${rec.user_id}` : '#'}
-                    className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
-                    onClick={e => {
-                      if (!rec.user_id) {
-                        e.preventDefault();
-                        toast.error('Este reciclador no tiene chat disponible.');
-                      }
-                    }}
-                  >
-                    Enviar mensaje
-                  </Link>
+                  {/* Validación de UUID para el chat */}
+                  {rec.user_id && /^[0-9a-fA-F-]{36}$/.test(rec.user_id) ? (
+                    <Link
+                      to={`/chat/${rec.user_id}`}
+                      className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
+                    >
+                      Enviar mensaje
+                    </Link>
+                  ) : (
+                    <button
+                      className="mt-3 px-4 py-2 bg-gray-300 text-gray-500 rounded cursor-not-allowed opacity-60"
+                      disabled
+                      title="Este reciclador no tiene chat disponible."
+                    >
+                      Chat no disponible
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

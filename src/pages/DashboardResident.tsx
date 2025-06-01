@@ -974,7 +974,7 @@ const handleSubmitRating = async () => {
                     to={rec.profiles?.email && rec.user_id ? `/chat/${rec.user_id}` : '#'}
                     className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
                     onClick={e => {
-                      if (!rec.profiles?.email) {
+                      if (!rec.profiles?.email || !rec.user_id) {
                         e.preventDefault();
                         toast.error('Este reciclador no tiene chat disponible.');
                       }

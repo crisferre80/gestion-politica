@@ -971,10 +971,10 @@ const handleSubmitRating = async () => {
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
                   <Link
-                    to={rec.profiles?.email && rec.user_id ? `/chat/${rec.user_id}` : '#'}
+                    to={rec.user_id ? `/chat/${rec.user_id}` : '#'}
                     className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
                     onClick={e => {
-                      if (!rec.profiles?.email || !rec.user_id) {
+                      if (!rec.user_id) {
                         e.preventDefault();
                         toast.error('Este reciclador no tiene chat disponible.');
                       }

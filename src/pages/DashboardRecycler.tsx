@@ -164,7 +164,7 @@ const DashboardRecycler: React.FC = () => {
     if (!selectedClaim || !user) return;
     try {
       setError(null);
-      await cancelClaim(selectedClaim.id, selectedClaim.pointId, user.id, cancellationReason);
+      await cancelClaim(selectedClaim.id, selectedClaim.pointId, cancellationReason);
       setShowCancelClaimModal(false);
       setSelectedClaim(null);
       setCancellationReason('');

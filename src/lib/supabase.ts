@@ -235,7 +235,7 @@ export async function claimCollectionPoint(
         pickup_time: pickupTime,
         recycler_id: recyclerId
       })
-      .eq('user_id', pointId);
+      .eq('id', pointId); // <-- CORRECTO: debe ser .eq('id', pointId)
 
     if (updateError) throw updateError;
 
@@ -246,11 +246,7 @@ export async function claimCollectionPoint(
 }
 
 export async function cancelClaim(
-  claimId: string,
-  pointId: string,
-  userId: string,
-  reason: string
-): Promise<void> {
+  claimId: string, pointId: string, reason: string): Promise<void> {
   try {
     // Update claim status
     const { error: claimError } = await supabase

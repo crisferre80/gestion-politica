@@ -258,7 +258,6 @@ export async function cancelClaim(
       .update({
         status: 'cancelled',
         cancelled_at: new Date().toISOString(),
-        cancelled_by: userId,
         cancellation_reason: reason
       })
       .eq('id', claimId);

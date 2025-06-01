@@ -88,7 +88,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const drawRoute = async (start: [number, number], end: [number, number]) => {
     try {
       if (mapRef.current) {
-        // Remove existing route layer and source
+        // Remove existing route layer and source if they exist
         if (mapRef.current.getLayer('route')) {
           mapRef.current.removeLayer('route');
         }

@@ -76,7 +76,7 @@ export interface CollectionClaim {
   id: string;
   collection_point_id: string;
   recycler_id: string;
-  status: 'pending' | 'completed' | 'cancelled' | 'failed';
+  status: 'claimed' | 'completed' | 'cancelled' | 'failed';
   claimed_at: string;
   completed_at?: string;
   cancelled_at?: string;
@@ -209,7 +209,7 @@ export async function claimCollectionPoint(
   userId: string // <-- nuevo parámetro obligatorio
 ): Promise<void> {
   try {
-    // Crear el claim con status 'pending'
+    // Crear el claim con status 'claimed'
     const { data: claim, error: claimError } = await supabase
       .from('collection_claims')
       .insert([
@@ -217,7 +217,7 @@ export async function claimCollectionPoint(
           collection_point_id: pointId,
           recycler_id: recyclerId,
           user_id: userId, // <-- importante para cumplir el constraint
-          status: 'pending',
+          status: 'claimed',
           pickup_time: pickupTime
         }
       ])
@@ -235,7 +235,7 @@ export async function claimCollectionPoint(
         pickup_time: pickupTime,
         recycler_id: recyclerId
       })
-      .eq('id', pointId);
+      .eq('user_id', pointId);
 
     if (updateError) throw updateError;
 

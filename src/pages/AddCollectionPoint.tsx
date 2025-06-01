@@ -9,6 +9,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { createNotification } from '../lib/notifications';
+import { toast } from 'react-toastify';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -215,11 +216,19 @@ const AddCollectionPoint: React.FC = () => {
           });
         }
       }
-      // NUEVO: Navega al dashboard con flag de refresco
-      navigate('/dashboard', { state: { refresh: true } });
+      // Si todo sale bien, navega al panel de residente
+      navigate('/dashboard-resident', { state: { refresh: true } });
     } catch (err) {
+      const errorObj = err as { message?: string };
       console.error('Error:', err);
-      setError('Error al guardar el punto de recolección. Por favor, intenta nuevamente.');
+      // Si el punto se creó pero la notificación falló, navega igual y muestra un warning
+      if (typeof errorObj?.message === 'string' && errorObj.message.includes('notific')) {
+        toast.error('El punto se creó, pero no se pudo enviar la notificación.');
+        navigate('/dashboard-resident', { state: { refresh: true } });
+      } else {
+        // Si el error es grave, muestra el error y no navega
+        setError('Ocurrió un error al crear el punto.');
+      }
     } finally {
       setLoading(false);
     }

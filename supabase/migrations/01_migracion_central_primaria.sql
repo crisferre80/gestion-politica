@@ -87,7 +87,7 @@ CREATE TABLE collection_claims (
   collection_point_id uuid REFERENCES collection_points(id) ON DELETE CASCADE,
   recycler_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
-  status text DEFAULT 'pending',
+  status text DEFAULT 'claimed',
   pickup_time timestamptz,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()

@@ -3,37 +3,46 @@ import { Link } from 'react-router-dom';
 import { Users, MapPin, Calendar, ArrowRight, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-type Advertisement = {
+// Estructura para la celda de la grilla
+interface GridAdCell {
   id: string;
-  title: string;
-  image_url: string;
-  link?: string;
-  active: boolean;
-  created_at: string;
-};
+  ad_id: string | null;
+  size: string;
+  row: number;
+  col: number;
+  custom_label?: string;
+  bg_color?: string;
+  advertisement?: {
+    id: string;
+    title: string;
+    image_url: string;
+    link?: string;
+    active: boolean;
+    created_at: string;
+  } | null;
+}
+
 
 const Home: React.FC = () => {
-  const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+  const [gridAds, setGridAds] = useState<GridAdCell[]>([]);
 
   useEffect(() => {
-    fetchAdvertisements();
+    fetchGridAds();
   }, []);
 
-  const fetchAdvertisements = async () => {
+  const fetchGridAds = async () => {
     try {
-      const { data: ads, error } = await supabase
-        .from('advertisements')
-        .select('*')
-        .eq('active', true)
-        .order('created_at', { ascending: false });
-
+      const { data, error } = await supabase
+        .from('ads_grid')
+        .select(`*, advertisement:ad_id (id, title, image_url, link, active, created_at)`)
+        .order('row', { ascending: true })
+        .order('col', { ascending: true });
       if (error) throw error;
-      setAdvertisements(ads);
+      setGridAds(data);
     } catch (err) {
-      console.error('Error fetching advertisements:', err);
+      console.error('Error fetching grid ads:', err);
     }
   };
-
 
   return (
     <div>
@@ -168,32 +177,48 @@ const Home: React.FC = () => {
       </section>
 
       {/* Sponsors Section */}
-      {advertisements.length > 0 && (
+      {gridAds.length > 0 && (
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Nuestros Auspiciantes</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {advertisements.map((ad) => (
-                <div key={ad.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-                  <img
-                    src={ad.image_url}
-                    alt={ad.title}
-                    className="w-full h-38 object-cover"
-                  />
-                  <div className="p-4">
-                    <h3 className="font-medium text-lg text-gray-900">{ad.title}</h3>
-                    {ad.link && (
-                      <a
-                        href={ad.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-block text-green-600 hover:text-green-700"
-                      >
-                        Más información
-                      </a>
-                    )}
+              {gridAds.map((cell) => (
+                cell.advertisement && cell.advertisement.active ? (
+                  <div
+                    key={cell.id}
+                    className="bg-white rounded-lg shadow-sm overflow-hidden flex flex-col justify-between"
+                    style={{ backgroundColor: cell.bg_color || undefined }}
+                  >
+                    <img
+                      src={cell.advertisement.image_url}
+                      alt={cell.advertisement.title}
+                      style={{
+                        width: '100%',
+                        height: cell.size === '2x2' ? '320px' : cell.size === '2x1' ? '220px' : cell.size === '1x2' ? '180px' : '140px',
+                        objectFit: 'contain',
+                        maxHeight: '340px',
+                        margin: '0 auto',
+                        background: '#f3f4f6',
+                        borderRadius: '0.5rem',
+                      }}
+                    />
+                    <div className="p-4">
+                      <h3 className="font-medium text-lg text-gray-900">
+                        {cell.custom_label || cell.advertisement.title}
+                      </h3>
+                      {cell.advertisement.link && (
+                        <a
+                          href={cell.advertisement.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-block text-green-600 hover:text-green-700"
+                        >
+                          Más información
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : null
               ))}
             </div>
           </div>

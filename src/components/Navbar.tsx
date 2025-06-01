@@ -78,6 +78,11 @@ const Navbar: React.FC = () => {
                         <p className="text-sm font-medium">{user?.name}</p>
                         <p className="text-xs text-gray-500">{user?.email}</p>
                       </div>
+                      {user?.id && (
+                        <Link to={`/recycler-profile/${user.id}`} className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center">
+                          <User className="h-4 w-4 mr-2" />Mi Perfil
+                        </Link>
+                      )}
                       <Link to="/profile" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Settings className="h-4 w-4 mr-2" />Configuración</Link>
                       <Link to="/change-password" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Key className="h-4 w-4 mr-2" />Cambiar contraseña</Link>
                       <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><LogOut className="h-4 w-4 mr-2" />Cerrar sesión</button>
@@ -142,6 +147,11 @@ const Navbar: React.FC = () => {
                       <p className="text-sm font-medium">{user?.name}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>
+                    {user?.id && (
+                      <Link to={`/recycler-profile/${user.id}`} className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center">
+                        <User className="h-4 w-4 mr-2" />Mi Perfil
+                      </Link>
+                    )}
                     <Link to="/profile" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Settings className="h-4 w-4 mr-2" />Configuración</Link>
                     <Link to="/change-password" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Key className="h-4 w-4 mr-2" />Cambiar contraseña</Link>
                   </div>

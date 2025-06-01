@@ -5,6 +5,7 @@ import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
 import NotificationBell from '../components/NotificationBell';
+import HeaderRecycler from '../components/HeaderRecycler';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -27,6 +28,7 @@ const DashboardRecycler: React.FC = () => {
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
+  const [focusedResidentUserId, setFocusedResidentUserId] = useState<string>();
 
   // NOTIFICACIONES DE MENSAJES NUEVOS
 
@@ -358,8 +360,16 @@ const DashboardRecycler: React.FC = () => {
   const claimedIds = new Set(claimedPoints.map(p => p.id));
   const trulyAvailablePoints = availablePoints.filter(p => !claimedIds.has(p.id));
 
+  // Helper: get resident user_id from a point (typed)
+  const getResidentUserIdFromPoint = (point: CollectionPoint) => point.user_id;
+
   return (
     <div className="bg-gray-50 min-h-screen py-8">
+      <HeaderRecycler
+        activeTab={view}
+        setActiveTab={setView}
+        residentUserId={focusedResidentUserId}
+      />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold text-green-800">Panel del Reciclador</h1>
@@ -653,16 +663,27 @@ const DashboardRecycler: React.FC = () => {
                                 )}
                               </div>
                             </div>
-                            {/* Botón cancelar reclamo */}
+                            {/* Botones de acción */}
                             <div className="mt-4 flex gap-2">
                               <button
                                 onClick={() => {
                                   setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
                                   setShowCancelClaimModal(true);
+                                  setFocusedResidentUserId(getResidentUserIdFromPoint(point));
                                 }}
                                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
                               >
                                 Cancelar reclamo
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPointToComplete(point);
+                                  setShowCompleteModal(true);
+                                  setFocusedResidentUserId(getResidentUserIdFromPoint(point));
+                                }}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
+                              >
+                                Marcar como retirado
                               </button>
                             </div>
                           </div>

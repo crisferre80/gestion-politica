@@ -2,6 +2,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
 export type Message = {
+    createdAt: string;
     id: string;
     senderId: string; // UUID de Supabase Auth (user_id)
     receiverId: string; // UUID de Supabase Auth (user_id)
@@ -52,6 +53,7 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
                 receiverId: msg.receiver_id, // UUID
                 content: msg.content,
                 timestamp: new Date(msg.created_at),
+                createdAt: msg.created_at,
             }))
         );
     };
@@ -84,7 +86,7 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
                 sender_id: senderId, // UUID
                 receiver_id: receiverId, // UUID
                 content,
-                is_read: false,
+                read: false, // <-- corregido
                 // timestamp: new Date().toISOString(), // Si tu tabla lo requiere
             },
         ]);

@@ -33,7 +33,7 @@ async function enviarMensajeSeguro(senderId: string, receiverId: string, content
         sender_id: senderId,
         receiver_id: receiverId,
         content: content,
-        is_read: false,
+        read: false, // <-- corregido
         // No agregues 'timestamp', la tabla solo tiene 'created_at'
       },
     ]);
@@ -154,7 +154,11 @@ const Chat = () => {
                     <div className={`flex flex-col items-${isMe ? 'end' : 'start'} max-w-[70%]`}>
                       <div className={`flex items-center gap-2 mb-0.5 ${isMe ? 'flex-row-reverse' : ''}`}> 
                         <span className="text-xs text-gray-500 font-semibold">{profile.name || (isMe ? 'Tú' : 'Usuario')}</span>
-                        <span className="text-[10px] text-gray-400">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+<span className="text-[10px] text-gray-400">{
+  msg.createdAt
+    ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : ''
+}</span>
                       </div>
                       <span
                         className={`px-4 py-2 rounded-2xl block break-words shadow text-sm ${

@@ -217,26 +217,14 @@ const AddCollectionPoint: React.FC = () => {
         }
       }
       // Navegación según el tipo de usuario
-      if (user.type === 'resident' || user.role === 'resident') {
-        navigate('/dashboard-resident', { state: { refresh: true } });
-      } else if (user.type === 'recycler' || user.role === 'recycler') {
-        navigate('/dashboard-recycler', { state: { refresh: true } });
-      } else {
-        navigate('/dashboard', { state: { refresh: true } });
-      }
+      navigate('/dashboard', { state: { refresh: true } });
     } catch (err) {
       const errorObj = err as { message?: string };
       console.error('Error:', err);
       // Si el punto se creó pero la notificación falló, navega igual y muestra un warning
       if (typeof errorObj?.message === 'string' && errorObj.message.includes('notific')) {
         toast.error('El punto se creó, pero no se pudo enviar la notificación.');
-        if (user.type === 'resident' || user.role === 'resident') {
-          navigate('/dashboard-resident', { state: { refresh: true } });
-        } else if (user.type === 'recycler' || user.role === 'recycler') {
-          navigate('/dashboard-recycler', { state: { refresh: true } });
-        } else {
-          navigate('/dashboard', { state: { refresh: true } });
-        }
+        navigate('/dashboard', { state: { refresh: true } });
       } else {
         // Si el error es grave, muestra el error y no navega
         setError('Ocurrió un error al crear el punto.');

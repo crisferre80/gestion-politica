@@ -102,11 +102,12 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
             console.error('[sendMessage] El destinatario no tiene perfil válido.', receiverProfileError);
             return;
         }
-        // Insertar mensaje usando los id reales
+        // Insertar mensaje usando los id reales y sent_at explícito
         const insertObj = {
             sender_id: senderProfile.id,
             receiver_id: receiverProfile.id,
-            content: content
+            content: content,
+            sent_at: new Date().toISOString()
         };
         console.log('[sendMessage] Insertando mensaje:', insertObj);
         const { error } = await supabase.from('messages').insert([insertObj]);

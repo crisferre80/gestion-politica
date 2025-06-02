@@ -207,15 +207,19 @@ const AddCollectionPoint: React.FC = () => {
 
       if (supabaseError) throw supabaseError;
       // Notificación para el residente (creador)
-      await createNotification({
-        user_id: user.id,
-        title: 'Punto de recolección creado',
-        content: `Has creado un nuevo punto de recolección en ${address}.`,
-        type: 'collection_point_created',
-        related_id: newPoint?.id,
-        user_name: user?.name,
-        user_email: user?.email
-      });
+      try {
+        await createNotification({
+          user_id: user.id,
+          title: 'Punto de recolección creado',
+          content: `Has creado un nuevo punto de recolección en ${address}.`,
+          type: 'collection_point_created',
+          related_id: newPoint?.id,
+          user_name: user?.name,
+          user_email: user?.email
+        });
+      } catch (notifErr) {
+        toast.error('El punto se creó, pero no se pudo enviar la notificación al creador.');
+      }
       // Notificación para todos los recicladores activos
       const { data: recyclers } = await supabase
         .from('profiles')
@@ -223,29 +227,25 @@ const AddCollectionPoint: React.FC = () => {
         .eq('role', 'recycler');
       if (recyclers && Array.isArray(recyclers)) {
         for (const recycler of recyclers) {
-          await createNotification({
-            user_id: recycler.user_id,
-            title: 'Nuevo punto disponible',
-            content: `Se ha creado un nuevo punto de recolección en ${address}.`,
-            type: 'new_collection_point',
-            related_id: newPoint?.id
-            // No email/name for recyclers here
-          });
+          try {
+            await createNotification({
+              user_id: recycler.user_id,
+              title: 'Nuevo punto disponible',
+              content: `Se ha creado un nuevo punto de recolección en ${address}.`,
+              type: 'new_collection_point',
+              related_id: newPoint?.id
+              // No email/name for recycladores here
+            });
+          } catch (notifErr) {
+            toast.error(`No se pudo notificar al reciclador (${recycler.user_id}).`);
+          }
         }
       }
       // Navegación según el tipo de usuario
       navigate('/dashboard', { state: { refresh: true } });
     } catch (err) {
-      const errorObj = err as { message?: string };
       console.error('Error:', err);
-      // Si el punto se creó pero la notificación falló, navega igual y muestra un warning
-      if (typeof errorObj?.message === 'string' && errorObj.message.includes('notific')) {
-        toast.error('El punto se creó, pero no se pudo enviar la notificación.');
-        navigate('/dashboard', { state: { refresh: true } });
-      } else {
-        // Si el error es grave, muestra el error y no navega
-        setError('Ocurrió un error al crear el punto.');
-      }
+      setError('Ocurrió un error al crear el punto.');
     } finally {
       setLoading(false);
     }

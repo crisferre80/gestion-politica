@@ -97,15 +97,19 @@ const Chat = () => {
         setInput('');
         await fetchConversation(myUserId, otherUserId);
         // Notificación para el receptor
-        await createNotification({
-          user_id: otherUserId,
-          title: 'Nuevo mensaje',
-          content: `Has recibido un nuevo mensaje de ${user?.name || 'un residente'}.`,
-          type: 'new_message',
-          related_id: myUserId,
-          user_name: user?.name,
-          user_email: user?.email
-        });
+        try {
+          await createNotification({
+            user_id: otherUserId,
+            title: 'Nuevo mensaje',
+            content: `Has recibido un nuevo mensaje de ${user?.name || 'un residente'}.`,
+            type: 'new_message',
+            related_id: myUserId,
+            user_name: user?.name,
+            user_email: user?.email
+          });
+        } catch (notifErr) {
+          setError('El mensaje fue enviado, pero no se pudo notificar al usuario destinatario.');
+        }
       } catch (err: unknown) {
         console.error('[Chat] Error al enviar mensaje', err);
         setError(

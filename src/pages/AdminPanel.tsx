@@ -118,7 +118,7 @@ const AdminPanel: React.FC = () => {
           });
           setNotifStatus('Notificación enviada al usuario');
         } catch (err) {
-          setNotifStatus('Error al enviar la notificación');
+          setNotifStatus('El usuario fue notificado, pero no se pudo registrar la notificación en la base de datos.');
           console.error('[NOTIF][ERROR] Falló envío individual a', validUser.user_id, err);
         }
       }

@@ -72,14 +72,18 @@ const Register: React.FC = () => {
       }
       // Notificación para el nuevo usuario
       if (data?.user) {
-        await createNotification({
-          user_id: data.user.id,
-          title: '¡Bienvenido a EcoConecta!',
-          content: 'Tu registro fue exitoso. Ya puedes comenzar a usar la plataforma.',
-          type: 'user_registered',
-          user_name: name,
-          user_email: email
-        });
+        try {
+          await createNotification({
+            user_id: data.user.id,
+            title: '¡Bienvenido a EcoConecta!',
+            content: 'Tu registro fue exitoso. Ya puedes comenzar a usar la plataforma.',
+            type: 'user_registered',
+            user_name: name,
+            user_email: email
+          });
+        } catch (notifErr) {
+          setError('El usuario fue registrado, pero no se pudo enviar la notificación de bienvenida.');
+        }
         // Fetch perfil actualizado para obtener avatar_url real
         let updatedProfile = null;
         try {

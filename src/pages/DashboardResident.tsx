@@ -529,13 +529,17 @@ const handleSubmitRating = async () => {
     });
     if (error) throw error;
     // Notificación para el reciclador
-    await createNotification({
-      user_id: ratingTarget.recyclerId,
-      title: 'Nueva calificación',
-      content: `Has recibido una nueva calificación de un residente.`,
-      type: 'recycler_rated',
-      user_name: ratingTarget.recyclerName
-    });
+    try {
+      await createNotification({
+        user_id: ratingTarget.recyclerId,
+        title: 'Nueva calificación',
+        content: `Has recibido una nueva calificación de un residente.`,
+        type: 'recycler_rated',
+        user_name: ratingTarget.recyclerName
+      });
+    } catch (notifErr) {
+      setRatingError('La calificación fue enviada, pero no se pudo notificar al reciclador.');
+    }
     setRatingSuccess('¡Calificación enviada correctamente!');
     setRatingValue(0);
     setRatingComment('');

@@ -43,7 +43,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
   routeDestination,
   onDeletePoint
 }) => {
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number; latitude: number; longitude: number 
+} | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   // Removed local routeDestination state to avoid duplicate identifier error
@@ -54,6 +57,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
         navigator.geolocation.getCurrentPosition(
           (position) => {
             setUserLocation({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
               lat: position.coords.latitude,
               lng: position.coords.longitude
             });
@@ -154,6 +159,15 @@ const MapComponent: React.FC<MapComponentProps> = ({
       onMapClick({ lng: event.lngLat.lng, lat: event.lngLat.lat });
     }
   };
+
+  // Filtrar puntos con coordenadas válidas
+  const validPoints = points.filter(
+    (point) =>
+      typeof point.lat === 'number' &&
+      typeof point.lng === 'number' &&
+      !isNaN(point.lat) &&
+      !isNaN(point.lng)
+  );
 
   return (
     <div className="relative">

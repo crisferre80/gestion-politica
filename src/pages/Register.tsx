@@ -41,8 +41,14 @@ const Register: React.FC = () => {
         experience_years: userType === 'recycler' ? experienceYears : undefined,
       });
       if (error) {
-        // Mostrar el mensaje real del error
-        if (error.message === 'User already registered') {
+        // Manejo robusto de errores de usuario ya registrado
+        const msg = error.message?.toLowerCase() || '';
+        if (
+          (typeof error === 'object' && error !== null && 'status' in error && (error as { status?: number }).status === 422) ||
+          msg.includes('already registered') ||
+          msg.includes('already exists') ||
+          msg.includes('user exists')
+        ) {
           setError('Este correo electrónico ya está registrado. Por favor, inicia sesión o utiliza otro correo.');
         } else if (error.message) {
           setError(error.message);

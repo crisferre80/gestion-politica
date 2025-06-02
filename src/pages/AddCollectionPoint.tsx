@@ -172,20 +172,34 @@ const AddCollectionPoint: React.FC = () => {
     setError('');
 
     const formattedSchedule = `${format(collectionDate, 'EEEE')}s, ${format(collectionTimeStart, 'HH:mm')} - ${format(collectionTimeEnd, 'HH:mm')}`;
+
+    // LOG DETALLADO PARA DEPURACIÓN
+    console.log('DEBUG AddCollectionPoint: user:', user);
+    console.log('DEBUG AddCollectionPoint: user.id (irá como user_id):', user?.id);
+    console.log('DEBUG AddCollectionPoint: datos a insertar:', {
+      user_id: user?.id,
+      address,
+      district,
+      materials,
+      schedule: formattedSchedule,
+      additional_info: additionalInfo,
+      lat: selectedLocation.lat,
+      lng: selectedLocation.lng
+    });
     
     try {
       const { error: supabaseError, data: newPoint } = await supabase
         .from('collection_points')
         .insert([
           {
-            user_id: user.id,
+            user_id: user.id, // IMPORTANTE: user.id debe ser igual a profiles.id
             address,
             district,
             materials,
             schedule: formattedSchedule,
             additional_info: additionalInfo,
-            latitude: selectedLocation.lat,
-            longitude: selectedLocation.lng
+            lat: selectedLocation.lat,
+            lng: selectedLocation.lng
           }
         ])
         .select()

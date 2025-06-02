@@ -43,7 +43,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   routeDestination,
   onDeletePoint
 }) => {
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   // Removed local routeDestination state to avoid duplicate identifier error
@@ -54,8 +54,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
         navigator.geolocation.getCurrentPosition(
           (position) => {
             setUserLocation({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
             });
 
             if (showRoute && routeDestination && position.coords) {
@@ -79,7 +79,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   useEffect(() => {
     if (userLocation && routeDestination) {
       drawRoute(
-        [userLocation.longitude, userLocation.latitude],
+        [userLocation.lng, userLocation.lat],
         [routeDestination.lng, routeDestination.lat]
       );
     }
@@ -173,10 +173,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
         <NavigationControl position="top-right" />
         
         {/* Solo mostrar la ubicación del usuario si no es un reciclador */}
-        {userLocation && !points.some(p => p.isRecycler && p.lat === userLocation.latitude && p.lng === userLocation.longitude) && (
+        {userLocation && !points.some(p => p.isRecycler && p.lat === userLocation.lat && p.lng === userLocation.lng) && (
           <Marker
-            longitude={userLocation.longitude}
-            latitude={userLocation.latitude}
+            longitude={userLocation.lng}
+            latitude={userLocation.lat}
           >
             <div className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center animate-pulse">
               <div className="w-3 h-3 bg-white rounded-full"></div>

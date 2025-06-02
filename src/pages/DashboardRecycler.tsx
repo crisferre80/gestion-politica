@@ -607,7 +607,7 @@ const DashboardRecycler: React.FC = () => {
                                   Ver en Mapa
                                 </button>
                                 {/* Botón Google Maps justo al lado */}
-                                {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' ? (
+                                {typeof point.lng === 'number' && typeof point.lat === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' ? (
                                   <button
                                     onClick={e => {
                                       e.stopPropagation();
@@ -616,7 +616,7 @@ const DashboardRecycler: React.FC = () => {
                                       const origin = (!isNaN(latNum) && !isNaN(lngNum) && Math.abs(latNum) > 0.01 && Math.abs(lngNum) > 0.01)
                                         ? `${latNum},${lngNum}`
                                         : 'current+location';
-                                      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
+                                      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.lat},${point.lng}&travelmode=driving`;
                                       window.open(url, '_blank', 'noopener,noreferrer');
                                     }}
                                     title="Ver ruta en Google Maps"
@@ -908,14 +908,14 @@ const DashboardRecycler: React.FC = () => {
                     <Map
                       points={[{
                         id: selectedPoint.id,
-                        lat: Number(selectedPoint.latitude),
-                        lng: Number(selectedPoint.longitude),
+                        lat: Number(selectedPoint.lat),
+                        lng: Number(selectedPoint.lng),
                         title: selectedPoint.address,
                         avatar_url: selectedPoint.creator_avatar
                       }]}
                       showUserLocation={true}
                       showRoute={true}
-                      routeDestination={{ lat: Number(selectedPoint.latitude), lng: Number(selectedPoint.longitude) }}
+                      routeDestination={{ lat: Number(selectedPoint.lat), lng: Number(selectedPoint.lng) }}
                     />
                   </div>
                 </div>

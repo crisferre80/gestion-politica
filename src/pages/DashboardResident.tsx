@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone, Star } from 'lucide-react';
-import { supabase, deleteCollectionPoint } from '../lib/supabase';
+import { supabase, deleteCollectionPoint, ensureUserProfile } from '../lib/supabase';
 // Importa uploadProfilePhoto desde el módulo correcto si existe, por ejemplo:
 // import { uploadProfilePhoto } from '../lib/uploadProfilePhoto';
 import Map from '../components/Map';
@@ -407,6 +407,8 @@ const DashboardResident: React.FC = () => {
   // Cargar puntos con detalles de reclamo y reciclador
   useEffect(() => {
     if (!user?.id) return;
+    // Asegura que el perfil existe antes de cargar puntos
+    ensureUserProfile({ id: user.id, email: user.email, name: user.name });
     const fetchDetailedPoints = async () => {
       const { data, error } = await supabase
         .from('collection_points')
@@ -415,7 +417,10 @@ const DashboardResident: React.FC = () => {
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      if (!error && data) setDetailedPoints(data);
+      if (!error && data) {
+        console.log('[DEBUG] Resident Dashboard - fetched collection_points:', data); // DEBUG
+        setDetailedPoints(data);
+      }
       else setDetailedPoints([]);
     };
     fetchDetailedPoints();

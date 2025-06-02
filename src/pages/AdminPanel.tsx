@@ -167,15 +167,18 @@ const AdminPanel: React.FC = () => {
                   <tr><td colSpan={5} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
                 ) : (
                   users.filter(u => !roleFilter || u.role === roleFilter).map(u => (
-                    <tr key={u.id} className="border-b hover:bg-green-50 transition-colors">
-                      <td className="p-2 whitespace-nowrap">{u.name}</td>
-                      <td className="p-2 whitespace-nowrap">{u.email}</td>
-                      <td className="p-2 capitalize whitespace-nowrap">{u.role}</td>
-                      <td className="p-2 text-xs font-mono break-all max-w-[120px] whitespace-pre-line">{u.user_id}</td>
+                    <tr key={u.id} className={`border-b hover:bg-green-50 transition-colors ${!u.user_id || !u.role ? 'bg-yellow-100' : ''}`}>
+                      <td className="p-2 whitespace-nowrap">{u.name || <span className="text-red-600">Sin nombre</span>}</td>
+                      <td className="p-2 whitespace-nowrap">{u.email || <span className="text-red-600">Sin email</span>}</td>
+                      <td className="p-2 capitalize whitespace-nowrap">{u.role || <span className="text-red-600">Sin rol</span>}</td>
+                      <td className="p-2 text-xs font-mono break-all max-w-[120px] whitespace-pre-line">{u.user_id || <span className="text-red-600">Sin user_id</span>}</td>
                       <td className="p-2 flex flex-col md:flex-row gap-2 items-start md:items-center">
                         <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => handleDeleteUser(u.id)}>Eliminar</button>
                         {u.user_id && (
                           <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => { setNotifTarget('individual'); setSelectedUser(u); }}>Notificar</button>
+                        )}
+                        {(!u.user_id || !u.role) && (
+                          <span className="text-xs text-yellow-800 bg-yellow-200 rounded px-2 py-1 mt-1">Perfil incompleto</span>
                         )}
                       </td>
                     </tr>

@@ -116,8 +116,8 @@ function PuntosRecoleccion() {
   // Para el mapa, todos los puntos filtrados
   const mapPoints = filteredPoints.map(point => ({
     id: point.id,
-    lat: Number(point.latitude),
-    lng: Number(point.longitude),
+    lat: Number(point.lat),
+    lng: Number(point.lng),
     title: point.address,
     isRecycler: false
   }));

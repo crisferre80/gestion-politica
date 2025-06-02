@@ -98,6 +98,7 @@ const Register: React.FC = () => {
         }
         login({
           id: data.user.id,
+          profileId: updatedProfile?.id || '',
           name,
           email: data.user.email!,
           type: userType,

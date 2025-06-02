@@ -25,6 +25,7 @@ const Login: React.FC = () => {
         );
         login({
             id: data.user.id,
+            profileId: profile.id, // <-- ID interno de profiles
             email: data.user.email!,
             name: profile.name || '',
             type: profile.type,

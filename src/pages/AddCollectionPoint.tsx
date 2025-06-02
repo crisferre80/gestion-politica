@@ -153,7 +153,7 @@ const AddCollectionPoint: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user?.id) {
+    if (!user?.profileId) {
       setError('Debes iniciar sesión para agregar un punto de recolección');
       return;
     }
@@ -192,7 +192,7 @@ const AddCollectionPoint: React.FC = () => {
         .from('collection_points')
         .insert([
           {
-            user_id: user.id, // IMPORTANTE: user.id debe ser igual a profiles.id
+            user_id: user.profileId, // Usar el ID interno de profiles
             address,
             district,
             materials,
@@ -209,7 +209,7 @@ const AddCollectionPoint: React.FC = () => {
       // Notificación para el residente (creador)
       try {
         await createNotification({
-          user_id: user.id,
+          user_id: user.profileId, // Notificar al perfil correcto
           title: 'Punto de recolección creado',
           content: `Has creado un nuevo punto de recolección en ${address}.`,
           type: 'collection_point_created',

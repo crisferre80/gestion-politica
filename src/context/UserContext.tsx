@@ -1,7 +1,8 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export type User = {
-  id: string;
+  id: string; // UUID de Auth
+  profileId: string; // ID interno de profiles (PK)
   name: string;
   email: string;
   experience_years?: number;

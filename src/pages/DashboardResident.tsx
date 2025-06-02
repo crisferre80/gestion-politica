@@ -15,7 +15,7 @@ import PhotoCapture from '../components/PhotoCapture';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
-  id: number;
+  id: string; // <-- Cambiado a string (uuid)
   avatar_url?: string;
   name?: string;
   email?: string;
@@ -31,9 +31,9 @@ export type ProfileRealtimePayload = {
 };
 
 type CollectionPoint = {
-  additional_info: boolean;
+  additional_info: boolean | string; // Puede ser string según tu tabla
   notas: string;
-  id: number;
+  id: string; // <-- Cambiado a string (uuid)
   address: string;
   district: string;
   schedule: string;
@@ -272,19 +272,24 @@ const DashboardResident: React.FC = () => {
       .from('collection_points')
       .select('*')
       .eq('user_id', user.id);
-    if (!error && data) setDetailedPoints(data); // Corrige: solo actualiza el estado, no elimina puntos
+    if (!error && data) setDetailedPoints(data);
     // Actualiza detailedPoints
     const { data: detailed, error: errorDetailed } = await supabase
       .from('collection_points')
       .select(`*,
-        claim:collection_claims!claim_id (*, recycler:profiles!collection_claims_recycler_id_fkey (user_id, name, avatar_url, email, phone))
+        claim:collection_claims!collection_point_id (
+          *,
+          recycler:profiles!collection_claims_recycler_id_fkey (
+            id, user_id, name, avatar_url, email, phone
+          )
+        )
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (!errorDetailed && detailed) setDetailedPoints(detailed);
   }, [user?.id]);
 
-  const handleDelete = async (pointId: number) => {
+  const handleDelete = async (pointId: string) => { // <-- Cambiado a string
     if (!user?.id) {
       setError('Usuario no autenticado');
       return;
@@ -293,9 +298,9 @@ const DashboardResident: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      await deleteCollectionPoint(pointId.toString());
+      await deleteCollectionPoint(pointId);
       setSuccess('Punto de recolección eliminado con éxito');
-      await refreshCollectionPoints(); // Refresca lista tras eliminar
+      await refreshCollectionPoints();
     } catch {
       setError('Error al eliminar el punto de recolección');
     }
@@ -394,6 +399,7 @@ const DashboardResident: React.FC = () => {
       status?: string;
       pickup_time?: string;
       recycler?: {
+        id?: string;
         user_id?: string;
         name?: string;
         avatar_url?: string;
@@ -413,19 +419,23 @@ const DashboardResident: React.FC = () => {
       const { data, error } = await supabase
         .from('collection_points')
         .select(`*,
-          claim:collection_claims!claim_id (*, recycler:profiles!collection_claims_recycler_id_fkey (user_id, name, avatar_url, email, phone))
+          claim:collection_claims!collection_point_id (
+            *,
+            recycler:profiles!collection_claims_recycler_id_fkey (
+              id, user_id, name, avatar_url, email, phone
+            )
+          )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      if (!error && data) {
-        console.log('[DEBUG] Resident Dashboard - fetched collection_points:', data); // DEBUG
-        setDetailedPoints(data);
-      }
-      else setDetailedPoints([]);
-    };
+    if (!error && data) {
+      console.log('[DEBUG] Resident Dashboard - fetched collection_points:', data);
+      setDetailedPoints(data);
+    }
+    else setDetailedPoints([]);
+  };
     fetchDetailedPoints();
 
-    // --- SUSCRIPCIÓN EN TIEMPO REAL PARA ACTUALIZAR PUNTOS ---
     const channelPoints = supabase.channel('resident-collection-points')
       .on('postgres_changes', {
         event: '*',
@@ -440,7 +450,6 @@ const DashboardResident: React.FC = () => {
         schema: 'public',
         table: 'collection_claims',
       }, () => {
-        // Si el claim afecta a uno de los puntos de este usuario, refresca
         fetchDetailedPoints();
       })
       .subscribe();
@@ -455,7 +464,7 @@ const DashboardResident: React.FC = () => {
   const puntosTodos = detailedPoints.filter(p =>
     (p.status === 'available' || !p.status) && (!p.claim || p.claim.status !== 'claimed')
   );
-  // Un punto está reclamado si su status es 'claimed', 'reclamado', o el claim está en 'claimed'
+  // Un punto está reclamado si su status es 'claimed', 'reclamado' o el claim está en 'claimed'
   const puntosReclamados = detailedPoints.filter(p =>
     p.status === 'claimed' || p.status === 'reclamado' || (p.claim && p.claim.status === 'claimed')
   );
@@ -559,7 +568,7 @@ const handleSubmitRating = async () => {
   const [ratingsModalTarget, setRatingsModalTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 
   useEffect(() => {
-    // Refresca puntos si se navega con el flag refresh (tras crear un punto)
+    // Refresca puntos si se navega with el flag refresh (tras crear un punto)
     if (location.state && location.state.refresh) {
       refreshCollectionPoints();
       // Limpia el state para evitar refrescos innecesarios al navegar de nuevo
@@ -831,7 +840,7 @@ const handleSubmitRating = async () => {
                               ripple.style.top = `${e.clientY - rect.top}px`;
                               btn.appendChild(ripple);
                               setTimeout(() => ripple.remove(), 600);
-                              handleDelete(point.id);
+                              handleDelete(point.id); // <-- Ahora es string
                             }}
                             className={`bg-red-500 text-white rounded-lg px-4 py-2 flex items-center overflow-hidden relative ripple-btn ${isInactive ? 'opacity-50 pointer-events-none' : ''}`}
                             disabled={isDeleting || isInactive}

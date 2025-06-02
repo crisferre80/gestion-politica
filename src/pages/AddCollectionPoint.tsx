@@ -212,7 +212,9 @@ const AddCollectionPoint: React.FC = () => {
         title: 'Punto de recolección creado',
         content: `Has creado un nuevo punto de recolección en ${address}.`,
         type: 'collection_point_created',
-        related_id: newPoint?.id
+        related_id: newPoint?.id,
+        user_name: user?.name,
+        user_email: user?.email
       });
       // Notificación para todos los recicladores activos
       const { data: recyclers } = await supabase
@@ -227,6 +229,7 @@ const AddCollectionPoint: React.FC = () => {
             content: `Se ha creado un nuevo punto de recolección en ${address}.`,
             type: 'new_collection_point',
             related_id: newPoint?.id
+            // No email/name for recyclers here
           });
         }
       }

@@ -102,7 +102,9 @@ const Chat = () => {
           title: 'Nuevo mensaje',
           content: `Has recibido un nuevo mensaje de ${user?.name || 'un residente'}.`,
           type: 'new_message',
-          related_id: myUserId
+          related_id: myUserId,
+          user_name: user?.name,
+          user_email: user?.email
         });
       } catch (err: unknown) {
         console.error('[Chat] Error al enviar mensaje', err);

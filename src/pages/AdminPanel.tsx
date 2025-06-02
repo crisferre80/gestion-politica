@@ -90,6 +90,8 @@ const AdminPanel: React.FC = () => {
               title: notifTitle,
               content: notifMsg,
               type: 'admin',
+              user_name: u.name,
+              user_email: u.email
             });
           } catch (err) {
             console.error('[NOTIF][ERROR] Falló envío a', u.user_id, err);
@@ -111,6 +113,8 @@ const AdminPanel: React.FC = () => {
             title: notifTitle,
             content: notifMsg,
             type: 'admin',
+            user_name: validUser.name,
+            user_email: validUser.email
           });
           setNotifStatus('Notificación enviada al usuario');
         } catch (err) {

@@ -534,6 +534,7 @@ const handleSubmitRating = async () => {
       title: 'Nueva calificación',
       content: `Has recibido una nueva calificación de un residente.`,
       type: 'recycler_rated',
+      user_name: ratingTarget.recyclerName
     });
     setRatingSuccess('¡Calificación enviada correctamente!');
     setRatingValue(0);

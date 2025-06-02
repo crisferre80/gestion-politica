@@ -27,7 +27,8 @@ export async function createNotification({
       type,
       related_id: related_id || null,
       read: false,
-      created_at: new Date().toISOString(),
+      closed: false
+      // No enviamos id ni created_at, la base los autogenera
     },
   ]);
   if (error) {

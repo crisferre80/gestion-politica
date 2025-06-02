@@ -28,7 +28,6 @@ const DashboardRecycler: React.FC = () => {
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
-  const [focusedResidentUserId, setFocusedResidentUserId] = useState<string>();
 
   // NOTIFICACIONES DE MENSAJES NUEVOS
 
@@ -157,25 +156,25 @@ const DashboardRecycler: React.FC = () => {
       setError('Por favor, selecciona una fecha y hora para la recolección.');
       return;
     }
-
     try {
       setError(null);
       setLoading(true);
-      console.log('User object:', user);
-      console.log('User ID being sent as recyclerId:', user.id); // Verifica este valor
-      console.log('Point to claim:', pointToClaim);
-      console.log('Pickup time:', pickupDateTimeInput);
-      try {
-        await claimCollectionPoint(
-          pointToClaim!.id,
-          user.id,
-          new Date(pickupDateTimeInput).toISOString(),
-          pointToClaim.user_id // <-- user_id del residente dueño del punto
-        );
-      } catch (err) {
-        console.error('Error en claimCollectionPoint:', err);
-        throw err;
+      // --- NUEVO: obtener profiles.id del reciclador actual ---
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (profileError || !profile) {
+        throw new Error('No se pudo obtener el perfil del reciclador.');
       }
+      const recyclerProfileId = profile.id;
+      await claimCollectionPoint(
+        pointToClaim.id,
+        recyclerProfileId, // <-- usar profiles.id
+        new Date(pickupDateTimeInput).toISOString(),
+        pointToClaim.user_id // user_id del residente dueño del punto
+      );
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);
@@ -392,22 +391,14 @@ const DashboardRecycler: React.FC = () => {
   const claimedIds = new Set(claimedPoints.map(p => p.id));
   const trulyAvailablePoints = availablePoints.filter(p => !claimedIds.has(p.id));
 
-  // Helper: get resident user_id from a point (typed)
-  const getResidentUserIdFromPoint = (point: CollectionPoint) => point.user_id;
-
   // Handler para cambio de vista que limpia el residente enfocado
   const handleSetView = (newView: string) => {
     setViewState(newView);
-    setFocusedResidentUserId(undefined);
   };
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
-      <HeaderRecycler
-        activeTab={view}
-        setActiveTab={handleSetView}
-        residentUserId={focusedResidentUserId}
-      />
+      <HeaderRecycler />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold text-green-800">Panel del Reciclador</h1>
@@ -710,7 +701,6 @@ const DashboardRecycler: React.FC = () => {
                                 onClick={() => {
                                   setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
                                   setShowCancelClaimModal(true);
-                                  setFocusedResidentUserId(getResidentUserIdFromPoint(point));
                                 }}
                                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
                               >
@@ -720,7 +710,6 @@ const DashboardRecycler: React.FC = () => {
                                 onClick={() => {
                                   setPointToComplete(point);
                                   setShowCompleteModal(true);
-                                  setFocusedResidentUserId(getResidentUserIdFromPoint(point));
                                 }}
                                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
                               >

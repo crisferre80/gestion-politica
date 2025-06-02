@@ -14,7 +14,9 @@ export async function uploadAvatar(userId: string, file: File): Promise<string |
 
   // Obtener URL pública
   const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-  return data?.publicUrl || null;
+  // Fix: asegurar que la URL tenga /public/ en la ruta
+  const publicUrl = data.publicUrl.replace('/object/avatars/', '/object/public/avatars/');
+  return publicUrl || null;
 }
 
 export async function updateProfileAvatar(userId: string, avatarUrl: string) {

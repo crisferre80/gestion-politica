@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
 import { Image as ImageIcon, Link as LinkIcon, Trash2 } from 'lucide-react';
+import AdminAdsGrid from '../components/AdminAdsGrid';
+// import AdminAdsGrid from '../components/AdminAdsGrid';
+// If the file exists at a different path, update the import accordingly, for example:
+// import AdminAdsGrid from '../components/ads/AdminAdsGrid';
 
-interface Advertisement {
-  id: string;
-  title: string;
-  image_url: string;
-  link: string | null;
-  active: boolean;
-  created_at: string;
-}
+import { Advertisement } from '../types/Advertisement.ts';
 
 const AdminAds: React.FC = () => {
   const { user } = useUser();
@@ -245,6 +242,11 @@ const AdminAds: React.FC = () => {
             ) : (
               <p className="text-center text-gray-500">No hay publicidades activas</p>
             )}
+          </div>
+
+          <div className="border-t border-gray-200 pt-6 mt-8">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Configurar grilla de auspiciantes</h2>
+            <AdminAdsGrid ads={ads} onUpdate={fetchAds} />
           </div>
         </div>
       </div>

@@ -1,7 +1,9 @@
--- =========================
--- TABLAS PRINCIPALES
--- =========================
+-- FULL SCHEMA + RLS para EcoNecta (2025-06-01)
+-- Incluye tablas, columnas, triggers y todas las RLS necesarias
 
+-- =========================
+-- DROP ALL (para entorno de desarrollo, quitar en producción)
+-- =========================
 DROP TABLE IF EXISTS user_statistics CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS recycler_ratings CASCADE;
@@ -11,7 +13,9 @@ DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS advertisements CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
 
--- Tabla de perfiles de usuario
+-- =========================
+-- TABLAS PRINCIPALES
+-- =========================
 CREATE TABLE profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid UNIQUE,
@@ -33,7 +37,6 @@ CREATE TABLE profiles (
   total_ratings integer DEFAULT 0
 );
 
--- Tabla de ratings de recicladores
 CREATE TABLE recycler_ratings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recycler_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
@@ -43,7 +46,6 @@ CREATE TABLE recycler_ratings (
   created_at timestamptz DEFAULT now()
 );
 
--- Tabla de notificaciones
 CREATE TABLE notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
@@ -55,10 +57,8 @@ CREATE TABLE notifications (
   closed boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications(user_id);
 
--- Tabla de estadísticas de usuario
 CREATE TABLE user_statistics (
   user_id uuid PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
   collections_completed integer DEFAULT 0,
@@ -68,7 +68,6 @@ CREATE TABLE user_statistics (
   updated_at timestamptz DEFAULT now()
 );
 
--- Tabla de puntos de recolección
 CREATE TABLE collection_points (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
@@ -81,7 +80,6 @@ CREATE TABLE collection_points (
   updated_at timestamptz DEFAULT now()
 );
 
--- Tabla de reclamos de puntos de recolección
 CREATE TABLE collection_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   collection_point_id uuid REFERENCES collection_points(id) ON DELETE CASCADE,
@@ -93,7 +91,6 @@ CREATE TABLE collection_claims (
   updated_at timestamptz DEFAULT now()
 );
 
--- Tabla de mensajes (chat)
 CREATE TABLE messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   sender_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
@@ -103,7 +100,6 @@ CREATE TABLE messages (
   sent_at timestamptz DEFAULT now()
 );
 
--- Tabla de anuncios/publicidad
 CREATE TABLE advertisements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -118,8 +114,6 @@ CREATE TABLE advertisements (
 -- =========================
 -- TRIGGERS Y FUNCIONES
 -- =========================
-
--- Trigger para actualizar rating_average y total_ratings en profiles
 CREATE OR REPLACE FUNCTION update_recycler_rating_stats() RETURNS TRIGGER AS $$
 BEGIN
   UPDATE profiles
@@ -139,7 +133,6 @@ CREATE TRIGGER trg_update_recycler_rating_stats_insert
 AFTER INSERT OR UPDATE OR DELETE ON recycler_ratings
 FOR EACH ROW EXECUTE FUNCTION update_recycler_rating_stats();
 
--- Trigger para updated_at en user_statistics
 CREATE OR REPLACE FUNCTION update_user_statistics_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
@@ -152,7 +145,6 @@ CREATE TRIGGER trg_update_user_statistics_updated_at
 BEFORE UPDATE ON user_statistics
 FOR EACH ROW EXECUTE FUNCTION update_user_statistics_updated_at();
 
--- Trigger para updated_at en collection_points
 CREATE OR REPLACE FUNCTION update_collection_points_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
@@ -165,7 +157,6 @@ CREATE TRIGGER trg_update_collection_points_updated_at
 BEFORE UPDATE ON collection_points
 FOR EACH ROW EXECUTE FUNCTION update_collection_points_updated_at();
 
--- Trigger para updated_at en collection_claims
 CREATE OR REPLACE FUNCTION update_collection_claims_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
@@ -178,7 +169,6 @@ CREATE TRIGGER trg_update_collection_claims_updated_at
 BEFORE UPDATE ON collection_claims
 FOR EACH ROW EXECUTE FUNCTION update_collection_claims_updated_at();
 
--- Trigger para updated_at en advertisements
 CREATE OR REPLACE FUNCTION update_advertisements_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
@@ -194,8 +184,6 @@ FOR EACH ROW EXECUTE FUNCTION update_advertisements_updated_at();
 -- =========================
 -- RLS (Row Level Security)
 -- =========================
-
--- Habilitar RLS en todas las tablas principales
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recycler_ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
@@ -205,17 +193,10 @@ ALTER TABLE collection_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE advertisements ENABLE ROW LEVEL SECURITY;
 
--- Cambia este UID por el de tu admin real
--- Ejemplo: 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM profiles WHERE email = 'admin@econecta.com') THEN
-    INSERT INTO profiles (id, email, name, role) VALUES ('f61d8fea-5758-47e9-852f-f5b92717b5ae', 'admin@econecta.com', 'Admin', 'admin');
-  END IF;
-END;
-$$;
+-- Cambia este UID por el de tu admin real si es necesario
+-- UID de ejemplo: 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
 
--- RLS para profiles
+-- 1. Admin puede ver todos los perfiles
 DROP POLICY IF EXISTS "Usuarios ven su perfil o admin" ON profiles;
 CREATE POLICY "Usuarios ven su perfil o admin"
   ON profiles
@@ -224,15 +205,74 @@ CREATE POLICY "Usuarios ven su perfil o admin"
     id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
-DROP POLICY IF EXISTS "Usuarios actualizan su perfil o admin" ON profiles;
-CREATE POLICY "Usuarios actualizan su perfil o admin"
+-- 2. Cualquier usuario puede ver perfiles de residentes de puntos disponibles
+DROP POLICY IF EXISTS "Cualquier usuario ve perfiles de puntos disponibles" ON profiles;
+CREATE POLICY "Cualquier usuario ve perfiles de puntos disponibles"
   ON profiles
-  FOR UPDATE
+  FOR SELECT
   USING (
-    id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
+    id = auth.uid()
+    OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
+    OR id IN (SELECT user_id FROM collection_points WHERE status = 'available')
   );
 
--- RLS para recycler_ratings
+-- 3. Cualquier usuario puede ver puntos de recolección disponibles
+DROP POLICY IF EXISTS "Cualquier usuario ve puntos disponibles" ON collection_points;
+CREATE POLICY "Cualquier usuario ve puntos disponibles"
+  ON collection_points
+  FOR SELECT
+  USING (
+    status = 'available'
+    OR user_id = auth.uid()
+    OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
+  );
+
+-- 4. Usuarios pueden crear puntos propios
+DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON collection_points;
+CREATE POLICY "Usuarios crean puntos propios"
+  ON collection_points
+  FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+-- 5. Recicladores pueden reclamar puntos
+DROP POLICY IF EXISTS "Recicladores pueden reclamar puntos" ON collection_claims;
+CREATE POLICY "Recicladores pueden reclamar puntos"
+  ON collection_claims
+  FOR INSERT
+  WITH CHECK (recycler_id = auth.uid());
+
+-- 6. Recicladores y residentes pueden ver sus claims y el admin todos
+DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON collection_claims;
+CREATE POLICY "Usuarios ven claims propios o admin"
+  ON collection_claims
+  FOR SELECT
+  USING (
+    recycler_id = auth.uid() OR user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
+  );
+
+-- 7. Todos pueden ver anuncios
+DROP POLICY IF EXISTS "Todos pueden ver anuncios" ON advertisements;
+CREATE POLICY "Todos pueden ver anuncios"
+  ON advertisements
+  FOR SELECT
+  USING (true);
+
+-- 8. Mensajes: usuarios ven/enviar los suyos y admin todos
+DROP POLICY IF EXISTS "Usuarios ven sus mensajes" ON messages;
+CREATE POLICY "Usuarios ven sus mensajes"
+  ON messages
+  FOR SELECT
+  USING (
+    sender_id = auth.uid() OR receiver_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
+  );
+
+DROP POLICY IF EXISTS "Usuarios pueden enviar mensajes" ON messages;
+CREATE POLICY "Usuarios pueden enviar mensajes"
+  ON messages
+  FOR INSERT
+  WITH CHECK (sender_id = auth.uid());
+
+-- 9. Ratings: todos pueden ver, solo residentes pueden calificar
 DROP POLICY IF EXISTS "Usuarios pueden ver ratings de recicladores" ON recycler_ratings;
 CREATE POLICY "Usuarios pueden ver ratings de recicladores"
   ON recycler_ratings
@@ -245,7 +285,7 @@ CREATE POLICY "Usuarios pueden calificar recicladores"
   FOR INSERT
   WITH CHECK (rater_id = auth.uid());
 
--- RLS para notifications
+-- 10. Notificaciones: usuario y admin
 DROP POLICY IF EXISTS "Usuarios ven sus notificaciones o admin" ON notifications;
 CREATE POLICY "Usuarios ven sus notificaciones o admin"
   ON notifications
@@ -262,7 +302,7 @@ CREATE POLICY "Admin puede insertar notificaciones para cualquier usuario"
     user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
--- RLS para user_statistics
+-- 11. Estadísticas: usuario y admin
 DROP POLICY IF EXISTS "Usuarios ven sus estadísticas o admin" ON user_statistics;
 CREATE POLICY "Usuarios ven sus estadísticas o admin"
   ON user_statistics
@@ -271,56 +311,4 @@ CREATE POLICY "Usuarios ven sus estadísticas o admin"
     user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
--- RLS para collection_points
-DROP POLICY IF EXISTS "Usuarios ven puntos propios o admin" ON collection_points;
-CREATE POLICY "Usuarios ven puntos propios o admin"
-  ON collection_points
-  FOR SELECT
-  USING (
-    user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
-  );
-
-DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON collection_points;
-CREATE POLICY "Usuarios crean puntos propios"
-  ON collection_points
-  FOR INSERT
-  WITH CHECK (user_id = auth.uid());
-
--- RLS para collection_claims
-DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON collection_claims;
-CREATE POLICY "Usuarios ven claims propios o admin"
-  ON collection_claims
-  FOR SELECT
-  USING (
-    recycler_id = auth.uid() OR user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
-  );
-
-DROP POLICY IF EXISTS "Recicladores pueden reclamar puntos" ON collection_claims;
-CREATE POLICY "Recicladores pueden reclamar puntos"
-  ON collection_claims
-  FOR INSERT
-  WITH CHECK (recycler_id = auth.uid());
-
--- RLS para messages
-DROP POLICY IF EXISTS "Usuarios ven sus mensajes" ON messages;
-CREATE POLICY "Usuarios ven sus mensajes"
-  ON messages
-  FOR SELECT
-  USING (
-    sender_id = auth.uid() OR receiver_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
-  );
-
-DROP POLICY IF EXISTS "Usuarios pueden enviar mensajes" ON messages;
-CREATE POLICY "Usuarios pueden enviar mensajes"
-  ON messages
-  FOR INSERT
-  WITH CHECK (sender_id = auth.uid());
-
--- RLS para advertisements (todos pueden ver)
-DROP POLICY IF EXISTS "Todos pueden ver anuncios" ON advertisements;
-CREATE POLICY "Todos pueden ver anuncios"
-  ON advertisements
-  FOR SELECT
-  USING (true);
-
--- ¡Listo! Esta migración deja tu base lista para EcoNecta3, con triggers y RLS.
+-- Fin de migración full para EcoNecta

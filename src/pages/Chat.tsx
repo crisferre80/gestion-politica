@@ -7,37 +7,38 @@ import { createNotification } from '../lib/notifications';
 
 // Función utilitaria para validar IDs y enviar mensaje
 async function enviarMensajeSeguro(senderId: string, receiverId: string, content: string) {
-  // Validar sender
-  const { data: sender, error: senderError } = await supabase
+  console.log('[enviarMensajeSeguro] senderId:', senderId, 'receiverId:', receiverId, 'content:', content);
+  // Buscar el id real de profiles para sender
+  const { data: senderProfile, error: senderProfileError } = await supabase
     .from('profiles')
-    .select('user_id')
+    .select('id')
     .eq('user_id', senderId)
     .single();
-  if (senderError || !sender) {
-    throw new Error('El remitente no existe en la tabla de perfiles.');
+  if (senderProfileError || !senderProfile) {
+    throw new Error('El remitente no tiene perfil válido.');
   }
-  // Validar receiver
-  const { data: receiver, error: receiverError } = await supabase
+  // Buscar el id real de profiles para receiver
+  const { data: receiverProfile, error: receiverProfileError } = await supabase
     .from('profiles')
-    .select('user_id')
+    .select('id')
     .eq('user_id', receiverId)
     .single();
-  if (receiverError || !receiver) {
-    throw new Error('El destinatario no existe en la tabla de perfiles.');
+  if (receiverProfileError || !receiverProfile) {
+    throw new Error('El destinatario no tiene perfil válido.');
   }
-  // Insertar mensaje
-  const { error } = await supabase
-    .from('messages')
-    .insert([
-      {
-        sender_id: senderId,
-        receiver_id: receiverId,
-        content: content,
-        is_read: false,
-        // No agregues 'timestamp', la tabla solo tiene 'created_at'
-      },
-    ]);
-  if (error) throw error;
+  // Insertar mensaje usando los id reales y sent_at explícito
+  const insertObj = {
+    sender_id: senderProfile.id,
+    receiver_id: receiverProfile.id,
+    content: content,
+    sent_at: new Date().toISOString()
+  };
+  console.log('[enviarMensajeSeguro] Insertando mensaje:', insertObj);
+  const { error } = await supabase.from('messages').insert([insertObj]);
+  if (error) {
+    console.error('[enviarMensajeSeguro] Error al insertar mensaje:', error);
+    throw error;
+  }
 }
 
 const Chat = () => {
@@ -87,9 +88,12 @@ const Chat = () => {
   }, [myUserId, otherUserId]);
 
   const handleSend = async () => {
+    console.log('[Chat] handleSend', { myUserId, otherUserId, input });
     if (myUserId && otherUserId && input.trim()) {
       try {
+        console.log('[Chat] Enviando mensaje de', myUserId, 'a', otherUserId, 'contenido:', input);
         await enviarMensajeSeguro(myUserId, otherUserId, input);
+        console.log('[Chat] Mensaje enviado correctamente');
         setInput('');
         await fetchConversation(myUserId, otherUserId);
         // Notificación para el receptor
@@ -98,15 +102,22 @@ const Chat = () => {
           title: 'Nuevo mensaje',
           content: `Has recibido un nuevo mensaje de ${user?.name || 'un residente'}.`,
           type: 'new_message',
-          related_id: myUserId
+          related_id: myUserId,
+          user_name: user?.name,
+          user_email: user?.email
         });
       } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError('No se pudo enviar el mensaje');
-        }
+        console.error('[Chat] Error al enviar mensaje', err);
+        setError(
+          (err instanceof Error ? err.message : 'No se pudo enviar el mensaje') +
+          `\n[Debug] myUserId: ${myUserId} | otherUserId: ${otherUserId}`
+        );
       }
+    } else {
+      console.warn('[Chat] handleSend: IDs o input inválidos', { myUserId, otherUserId, input });
+      setError(
+        `IDs o input inválidos.\n[Debug] myUserId: ${myUserId} | otherUserId: ${otherUserId}`
+      );
     }
   };
 
@@ -154,7 +165,11 @@ const Chat = () => {
                     <div className={`flex flex-col items-${isMe ? 'end' : 'start'} max-w-[70%]`}>
                       <div className={`flex items-center gap-2 mb-0.5 ${isMe ? 'flex-row-reverse' : ''}`}> 
                         <span className="text-xs text-gray-500 font-semibold">{profile.name || (isMe ? 'Tú' : 'Usuario')}</span>
-                        <span className="text-[10px] text-gray-400">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+<span className="text-[10px] text-gray-400">{
+  msg.createdAt
+    ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : ''
+}</span>
                       </div>
                       <span
                         className={`px-4 py-2 rounded-2xl block break-words shadow text-sm ${

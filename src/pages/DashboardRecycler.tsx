@@ -4,9 +4,8 @@ import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint, comp
 import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
-import HeaderRecycler from '../components/HeaderRecycler';
-import { Link } from 'react-router-dom';
 import NotificationBell from '../components/NotificationBell';
+import HeaderRecycler from '../components/HeaderRecycler';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -18,24 +17,12 @@ const DashboardRecycler: React.FC = () => {
   const [showCancelClaimModal, setShowCancelClaimModal] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<{ id: string; pointId: string } | null>(null);
   const [cancellationReason, setCancellationReason] = useState('');
-  const [activeTab, setActiveTab] = useState('mis-puntos-disponibles');
   // Estado para el modal de programar recolección
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [pointToClaim, setPointToClaim] = useState<CollectionPoint | null>(null);
   const [pickupDateTimeInput, setPickupDateTimeInput] = useState('');
-  // Estado para edición de perfil
-  const [editName, setEditName] = useState(user?.name || '');
-  const [editEmail, setEditEmail] = useState(user?.email || '');
-  const [editPhone, setEditPhone] = useState(user?.phone || '');
-  const [editAddress, setEditAddress] = useState(user?.address || '');
-  const [editBio, setEditBio] = useState(user?.bio || '');
-  const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  const [editExperienceYears, setEditExperienceYears] = useState(user?.experience_years || 0);
-  const [editLat, setEditLat] = useState(user?.lat || '');
-  const [editLng, setEditLng] = useState(user?.lng || '');
-  const [success, setSuccess] = useState<string | null>(null);
-  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
-  const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
+  // Estado para el cambio de vista
+  const [view, setViewState] = useState('disponibles');
 
   const [claimedPoints, setClaimedPoints] = useState<CollectionPoint[]>([]);
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
@@ -43,7 +30,6 @@ const DashboardRecycler: React.FC = () => {
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
 
   // NOTIFICACIONES DE MENSAJES NUEVOS
-  const [unreadChats, setUnreadChats] = useState<{ [userId: string]: number }>({});
 
   // --- Notificaciones de eventos del residente ---
   const [eventNotifications, setEventNotifications] = useState<Array<{id: string, type: string, message: string, created_at: string}>>([]);
@@ -65,7 +51,7 @@ const DashboardRecycler: React.FC = () => {
           *,
           collection_point:collection_points!collection_claims_collection_point_id_fkey (
             *,
-            profiles!collection_points_user_id_fkey (
+            profiles:profiles!collection_points_user_id_fkey (
               name,
               email,
               phone,
@@ -74,9 +60,9 @@ const DashboardRecycler: React.FC = () => {
           )
         `)
         .eq('recycler_id', user.id)
-        .order('claimed_at', { ascending: false });
+        .order('created_at', { ascending: false });
       if (claimsError) throw claimsError;
-      const claimed = claimsData.map(claim => ({
+      const claimed = (claimsData || []).map(claim => ({
         ...claim.collection_point,
         claim_id: claim.id,
         status: claim.status,
@@ -87,28 +73,60 @@ const DashboardRecycler: React.FC = () => {
         pickup_time: claim.pickup_time
       }));
 
-      // Puntos disponibles
+      // Puntos disponibles (step 1: fetch points)
       const { data: availableData, error: availableError } = await supabase
         .from('collection_points')
-        .select(`*, profiles!collection_points_user_id_fkey (name, email, phone, avatar_url)`)
+        .select('*')
         .eq('status', 'available')
         .order('created_at', { ascending: false });
       if (availableError) throw availableError;
-      const available = availableData.map(point => ({
-        ...point,
-        creator_name: point.profiles?.name,
-        creator_email: point.profiles?.email,
-        creator_phone: point.profiles?.phone,
-        creator_avatar: point.profiles?.avatar_url,
-      }));
+      const availablePointsRaw = availableData || [];
+      console.log('Puntos disponibles crudos:', availablePointsRaw);
+      // Step 2: get all unique user_ids
+      const userIds = [...new Set(availablePointsRaw.map(p => p.user_id))];
+      console.log('userIds únicos:', userIds);
+      let profilesById: Record<string, Pick<import('../lib/supabase').User, 'name' | 'email' | 'phone' | 'avatar_url'>> = {};
+      if (userIds.length > 0) {
+        // Step 3: fetch all profiles for these user_ids
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, name, email, phone, avatar_url')
+          .in('user_id', userIds);
+        if (profilesError) throw profilesError;
+        console.log('Perfiles obtenidos:', profilesData);
+        profilesById = (profilesData || []).reduce((acc, profile) => {
+          acc[profile.user_id] = profile;
+          return acc;
+        }, {} as Record<string, Pick<import('../lib/supabase').User, 'name' | 'email' | 'phone' | 'avatar_url'>>);
+      }
+      // Step 4: merge profile info into points
+      const available = availablePointsRaw.map(point => {
+        const profile = profilesById[point.user_id];
+        if (!profile) {
+          console.warn('No se encontró perfil para user_id', point.user_id);
+        }
+        return {
+          ...point,
+          creator_name: profile?.name || 'Usuario Anónimo',
+          creator_email: profile?.email,
+          creator_phone: profile?.phone,
+          creator_avatar: profile?.avatar_url,
+          profiles: profile, // for phone in UI
+        };
+      });
+      console.log('Puntos disponibles con perfil:', available);
 
       setClaimedPoints(claimed);
       setAvailablePoints(available);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
-      setError('Error al cargar los datos');
+      // Mostrar el error real de Supabase si existe
+      if (err && typeof err === 'object' && 'message' in err) {
+        setError((err as { message: string }).message + '\n' + JSON.stringify(err));
+      } else {
+        setError('Error al cargar los datos: ' + JSON.stringify(err));
+      }
     } finally {
-    setLoading(false);
+      setLoading(false);
     }
   }, [user]);
 
@@ -138,25 +156,25 @@ const DashboardRecycler: React.FC = () => {
       setError('Por favor, selecciona una fecha y hora para la recolección.');
       return;
     }
-
     try {
       setError(null);
       setLoading(true);
-      console.log('User object:', user);
-      console.log('User ID being sent as recyclerId:', user.id); // Verifica este valor
-      console.log('Point to claim:', pointToClaim);
-      console.log('Pickup time:', pickupDateTimeInput);
-      try {
-        await claimCollectionPoint(
-          pointToClaim!.id,
-          user.id,
-          new Date(pickupDateTimeInput).toISOString(),
-          pointToClaim.user_id // <-- user_id del residente dueño del punto
-        );
-      } catch (err) {
-        console.error('Error en claimCollectionPoint:', err);
-        throw err;
+      // --- NUEVO: obtener profiles.id del reciclador actual ---
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (profileError || !profile) {
+        throw new Error('No se pudo obtener el perfil del reciclador.');
       }
+      const recyclerProfileId = profile.id;
+      await claimCollectionPoint(
+        pointToClaim.id,
+        recyclerProfileId, // <-- usar profiles.id
+        new Date(pickupDateTimeInput).toISOString(),
+        pointToClaim.user_id // user_id del residente dueño del punto
+      );
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);
@@ -179,7 +197,7 @@ const DashboardRecycler: React.FC = () => {
     if (!selectedClaim || !user) return;
     try {
       setError(null);
-      await cancelClaim(selectedClaim.id, selectedClaim.pointId, user.id, cancellationReason);
+      await cancelClaim(selectedClaim.id, selectedClaim.pointId, cancellationReason);
       setShowCancelClaimModal(false);
       setSelectedClaim(null);
       setCancellationReason('');
@@ -255,50 +273,9 @@ const DashboardRecycler: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [user]);
 
-  // Sincronizar campos de edición de perfil con el usuario actual
-  useEffect(() => {
-    if (user) {
-      setEditName(user.name || '');
-      setEditEmail(user.email || '');
-      setEditPhone(user.phone || '');
-      setEditAddress(user.address || '');
-      setEditBio(user.bio || '');
-      setEditMaterials(Array.isArray(user.materials) ? user.materials.join(', ') : (user.materials || ''));
-      setEditExperienceYears(user.experience_years || 0);
-      setEditLat(user.lat || '');
-      setEditLng(user.lng || '');
-      setEditAvatarPreview(null);
-      setEditAvatarFile(null);
-    }
-  }, [user]);
-
   // Escucha en tiempo real los mensajes recibidos
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase.channel('dashboard-messages-unread')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `receiver_id=eq.${user.id}`,
-      }, (payload) => {
-        const msg = payload.new;
-        if (msg && msg.sender_id) {
-          setUnreadChats(prev => ({
-            ...prev,
-            [msg.sender_id]: (prev[msg.sender_id] || 0) + 1
-          }));
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
-
-  // Cuando se abre el chat con un usuario, limpiar el contador
-  const handleOpenChat = (userId: string) => {
-    setUnreadChats(prev => ({ ...prev, [userId]: 0 }));
-  };
-
+  // Escucha en tiempo real los mensajes recibidos
+  // (Eliminado el manejo de unreadChats por no ser usado)
   // Actualización automática de ubicación cada 30 segundos
   useEffect(() => {
     if (!user?.id) return;
@@ -364,6 +341,33 @@ const DashboardRecycler: React.FC = () => {
     };
   }, [user]);
 
+  // Suscripción en tiempo real a collection_points para actualización instantánea de puntos
+  useEffect(() => {
+    if (!user?.id) return;
+    // Solo recicladores activos
+    const channel = supabase.channel('recycler-collection-points')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'collection_points',
+      }, (payload) => {
+        // Si el punto es nuevo, cambia de estado, o es eliminado, refresca los datos
+        if (
+          payload.eventType === 'INSERT' ||
+          (payload.eventType === 'UPDATE' && (payload.new.status === 'available' || payload.old.status === 'available')) ||
+          payload.eventType === 'DELETE'
+        ) {
+          fetchData();
+        }
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchData]);
+
+  const getAvatarUrl = (url: string | undefined) =>
+    url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
 
   if (!user) {
     return (
@@ -383,13 +387,22 @@ const DashboardRecycler: React.FC = () => {
     );
   }
 
+  // Exclude points that are already claimed by this recycler (by id)
+  const claimedIds = new Set(claimedPoints.map(p => p.id));
+  const trulyAvailablePoints = availablePoints.filter(p => !claimedIds.has(p.id));
+
+  // Handler para cambio de vista que limpia el residente enfocado
+  const handleSetView = (newView: string) => {
+    setViewState(newView);
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen py-8">
+      <HeaderRecycler />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold text-green-800">Panel del Reciclador</h1>
           <div className="flex items-center gap-4">
-            <NotificationBell />
             <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
           </div>
         </div>
@@ -399,14 +412,14 @@ const DashboardRecycler: React.FC = () => {
             <div className="flex-shrink-0">
               <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-green-400 bg-white shadow">
                 {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
+                  <img src={getAvatarUrl(user.avatar_url)} alt="Foto de perfil" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-16 h-16 text-gray-300 mx-auto my-6" />
                 )}
               </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div className="flex-1 min-w-0 w-full">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl md:text-3xl font-bold text-green-800 mb-1">{user?.name || 'Reciclador'}</h1>
                   {user?.online ? (
@@ -419,10 +432,8 @@ const DashboardRecycler: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-4">
-                  {/* Dejar solo el nuevo NotificationBell en el header, eliminar cualquier otro anterior */}
+                <div className="flex items-center gap-4 ml-auto">
                   <NotificationBell />
-                  <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-8 gap-y-2 text-gray-700 text-sm">
@@ -451,8 +462,6 @@ const DashboardRecycler: React.FC = () => {
               </div>
             </div>
           </div>
-          {/* Header con tabs y submenus */}
-          <HeaderRecycler activeTab={activeTab} setActiveTab={setActiveTab} />
           <div className="p-6">
             {error && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
@@ -473,576 +482,406 @@ const DashboardRecycler: React.FC = () => {
                 </ul>
               </div>
             )}
+            {/* Dropdown for view selection */}
+            <div className="mb-6 flex justify-end">
+              <select
+                className="border border-green-300 rounded px-3 py-2 text-green-800 bg-white shadow focus:outline-none focus:ring-2 focus:ring-green-400"
+                value={view}
+                onChange={e => handleSetView(e.target.value)}
+              >
+                <option value="disponibles">Puntos Disponibles</option>
+                <option value="reclamados">Puntos Reclamados</option>
+                <option value="cancelados">Puntos Cancelados</option>
+                <option value="retirados">Puntos Retirados</option>
+              </select>
+            </div>
+
             {/* Secciones de Mis Puntos */}
-            {activeTab === 'mis-puntos-disponibles' && (
-              <>
-                <h2 className="text-xl font-semibold text-green-700 mb-4">Puntos Disponibles para Reclamar</h2>
-                <div className="grid gap-6 md:grid-cols-2">
-                  {availablePoints.length === 0 && (
-                    <div className="col-span-2 text-center text-gray-500">No hay puntos disponibles para reclamar en este momento.</div>
-                  )}
-                  {availablePoints.map(point => (
-                    <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">
-                      <div className="p-6">
-                        {/* Info principal */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            <MapPin className="h-6 w-6 text-green-500" />
-                            <div>
-                              <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
-                              <p className="mt-1 text-sm text-gray-500">{point.district}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {/* Botón Google Maps navegación usando coordenadas Mapbox */}
-                            {/* Eliminado el botón de la esquina, solo se deja el botón junto a 'Ver en Mapa' */}
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          <span>{point.schedule
-                            ? (() => {
-                                // Si es una fecha válida, formatear en español
-                                const date = new Date(point.schedule);
-                                if (!isNaN(date.getTime())) {
-                                  return date.toLocaleString('es-ES', {
-                                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                  });
-                                }
-                                // Traducción manual para horarios tipo "Thursday, 07:30 - 17:00"
-                                const dias = [
-                                  { en: 'Monday', es: 'Lunes' },
-                                  { en: 'Tuesday', es: 'Martes' },
-                                  { en: 'Wednesday', es: 'Miércoles' },
-                                  { en: 'Thursday', es: 'Jueves' },
-                                  { en: 'Friday', es: 'Viernes' },
-                                  { en: 'Saturday', es: 'Sábado' },
-                                  { en: 'Sunday', es: 'Domingo' },
-                                ];
-                                let texto = point.schedule;
-                                dias.forEach(d => {
-                                  texto = texto.replace(new RegExp(d.en, 'g'), d.es);
-                                });
-                                return texto.replace(/\b(AM|PM)\b/gi, m => m.toLowerCase());
-                              })()
-                            : ''}</span>
-                        </div>
-                        {/* Información adicional del residente */}
-                        {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
-                          <div className="mt-2 text-sm text-gray-600">
-                            <strong>Información adicional:</strong> {point.additional_info}
-                          </div>
-                        )}
-                        {/* Botón reclamar */}
-                        <div className="mt-4 flex gap-2">
-                          <button
-                            onClick={() => handleOpenPickupModal(point)}
-                            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
-                          >
-                            Reclamar
-                          </button>
-                          <div className="flex items-center">
-                            <button
-                              onClick={() => {
-                                setSelectedPoint(point);
-                                setShowMap(true);
-                              }}
-                              className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400 flex items-center"
-                            >
-                              <MapIcon className="h-4 w-4 mr-2" />
-                              Ver en Mapa
-                            </button>
-                            {/* Botón Google Maps justo al lado */}
-                            {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' ? (
-                              <button
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  const latNum = Number(user.lat);
-                                  const lngNum = Number(user.lng);
-                                  const origin = (!isNaN(latNum) && !isNaN(lngNum) && Math.abs(latNum) > 0.01 && Math.abs(lngNum) > 0.01)
-                                    ? `${latNum},${lngNum}`
-                                    : 'current+location';
-                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
-                                  window.open(url, '_blank', 'noopener,noreferrer');
-                                }}
-                                title="Ver ruta en Google Maps"
-                                className="ml-2 p-0 bg-transparent border-none shadow-none focus:outline-none"
-                                style={{ minWidth: 0 }}
-                              >
-                                <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 animate-bounce-map" />
-                              </button>
-                            ) : (
-                              <span className="ml-2 text-xs text-gray-400 italic">Ubicación no disponible</span>
-                            )}
-                          </div>
-                        </div>
+            <div>
+              {view === 'disponibles' && (
+                <div>
+                  <h2 className="text-xl font-semibold text-green-700 mb-4">Puntos Disponibles para Reclamar</h2>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {trulyAvailablePoints.length === 0 ? (
+                      <div className="col-span-2 text-center text-gray-500">
+                        No hay puntos disponibles para reclamar en este momento.<br />
+                        <span className="text-xs text-red-500">Debug: {JSON.stringify(availablePoints)}</span>
                       </div>
-                    </div>
-                  ))}
-                </div>
-                <hr className="my-10 border-green-300" />
-              </>
-            )}
-            {activeTab === 'mis-puntos-reclamados' && (
-              <>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Reclamados</h2>
-                <div className="grid gap-6 md:grid-cols-2">
-                  {claimedPoints.filter(p => p.status === 'claimed').length === 0 && (
-                    <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
-                  )}
-                  {claimedPoints.filter(p => p.status === 'claimed').map(point => (
-                    <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                      <div className="p-6">
-                        {/* Info principal */}
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            <MapPin className="h-8 w-8 text-green-500" />
-                            <div>
-                              <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
-                              <p className="mt-1 text-sm text-gray-500">{point.district}</p>
-                            </div>
-                          </div>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
-                        </div>
-                        {/* Info residente + Google Maps icono */}
-                        <div className="mt-6 pt-6 border-t border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                          
-                          
-                        </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          <span>{point.schedule}</span>
-                        </div>
-                        {point.pickup_time && (
-                          <div className="mt-2 text-xs text-gray-500">Retiro programado: {new Date(point.pickup_time).toLocaleString()}</div>
-                        )}
-                        {point.status === 'claimed' && point.pickup_time && (
-                          <CountdownTimer targetDate={new Date(point.pickup_time)} onComplete={() => fetchData()} />
-                        )}
-                        {/* Info residente */}
-                        <div className="mt-6 pt-6 border-t border-gray-200">
-                          <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <User className="h-4 w-4 mr-2" />
-                              <span>{point.creator_name}</span>
-                            </div>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <Mail className="h-4 w-4 mr-2" />
-                              <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
-                            </div>
-                            {point.profiles?.phone && (
-                              <div className="flex items-center text-sm text-gray-500">
-                                <Phone className="h-4 w-4 mr-1" />
-                                <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
-                              </div>
-                            )}
-                            {/* Botón Google Maps navegación usando coordenadas Mapbox */}
-                          {typeof point.longitude === 'number' && typeof point.latitude === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' && (
-                            <div className="flex items-center gap-2 mt-4 md:mt-0">
-                              <button
-                                onClick={() => {
-                                  const latNum = Number(user.lat);
-                                  const lngNum = Number(user.lng);
-                                  const origin = (!isNaN(latNum) && !isNaN(lngNum) && Math.abs(latNum) > 0.01 && Math.abs(lngNum) > 0.01)
-                                    ? `${latNum},${lngNum}`
-                                    : 'current+location';
-                                  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.latitude},${point.longitude}&travelmode=driving`;
-                                  window.open(url, '_blank', 'noopener,noreferrer');
-                                }}
-                                title="Ver ruta en Google Maps"
-                                className="inline-flex items-center px-3 py-2 rounded bg-white hover:bg-green-50 border border-green-200 shadow transition focus:outline-none focus:ring-2 focus:ring-green-400"
-                                style={{ minWidth: 0 }}
-                              >
-                                <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 mr-1 animate-bounce-map" />
-                              </button>
-                            </div>
-                          )}
-                          </div>
-                          <div className="mt-4 grid grid-cols-3 gap-3">
-                            <button
-                              onClick={() => {
-                                setSelectedPoint(point);
-                                setShowMap(true);
-                              }}
-                              className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-                            >
-                              <MapIcon className="h-4 w-4 mr-2" />
-                              Ver en Mapa
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedClaim({ id: point.claim_id!, pointId: point.id });
-                                setShowCancelClaimModal(true);
-                              }}
-                              className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Cancelar Reclamo
-                            </button>
-                            <button
-                              onClick={() => {
-                                setPointToComplete(point);
-                                setShowCompleteModal(true);
-                              }}
-                              className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                            >
-                              <Clock className="h-4 w-4 mr-2" />
-                              Retirado
-                            </button>
-                            {/* Enlace robusto al chat con residente */}
-                            {point.user_id ? (
-                              <Link
-                                to={`/chat/${point.user_id}`}
-                                onClick={() => handleOpenChat(point.user_id)}
-                                className="flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 col-span-3 md:col-span-1 mt-2 md:mt-0 relative"
-                              >
-                                💬 Chat con residente
-                                {unreadChats[point.user_id] > 0 && (
-                                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-2 py-0.5 font-bold animate-bounce shadow">{unreadChats[point.user_id]}</span>
-                                )}
-                              </Link>
-                            ) : (
-                              <span className="flex items-center justify-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-gray-400 bg-gray-100 col-span-3 md:col-span-1 mt-2 md:mt-0 cursor-not-allowed">
-                                No disponible para chat
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {activeTab === 'mis-puntos-cancelados' && (
-              <>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Cancelados</h2>
-                <div className="grid gap-6 md:grid-cols-2">
-                  {claimedPoints.filter(p => p.status === 'cancelled').length === 0 && (
-                    <div className="col-span-2 text-center text-gray-500">No tienes puntos cancelados.</div>
-                  )}
-                  {claimedPoints.filter(p => p.status === 'cancelled').map(point => (
-                    <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                      <div className="p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            <MapPin className="h-6 w-6 text-green-500" />
-                            <div>
-                              <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
-                              <p className="mt-1 text-sm text-gray-500">{point.district}</p>
-                            </div>
-                          </div>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Cancelado</span>
-                        </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          <span>{point.schedule}</span>
-                        </div>
-                        {point.cancelled_at && (
-                          <div className="mt-2 text-xs text-gray-500">Cancelado el: {new Date(point.cancelled_at).toLocaleString()}</div>
-                        )}
-                        {point.cancellation_reason && (
-                          <div className="mt-2 text-xs text-red-600 font-semibold">Motivo: {point.cancellation_reason}</div>
-                        )}
-                        {/* Info residente */}
-                        <div className="mt-6 pt-6 border-t border-gray-200">
-                          <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <User className="h-4 w-4 mr-2" />
-                              <span>{point.creator_name}</span>
-                            </div>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <Mail className="h-4 w-4 mr-2" />
-                              <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
-                            </div>
-                            {point.profiles?.phone && (
-                              <div className="flex items-center text-sm text-gray-500">
-                                <Phone className="h-4 w-4 mr-1" />
-                                <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {activeTab === 'mis-puntos-retirados' && (
-              <>
-                <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Retirados</h2>
-                <div className="grid gap-6 md:grid-cols-2">
-                  {claimedPoints.filter(p => p.status === 'completed').length === 0 && (
-                    <div className="col-span-2 text-center text-gray-500">No tienes puntos retirados.</div>
-                  )}
-                  {claimedPoints.filter(p => p.status === 'completed').map(point => (
-                    <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                      <div className="p-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            <MapPin className="h-6 w-6 text-green-500" />
-                            <div>
-                              <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
-                              <p className="mt-1 text-sm text-gray-500">{point.district}</p>
-                            </div>
-                          </div>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
-                        </div>
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {point.materials.map((material: string, idx: number) => (
-                              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          <span>{point.schedule}</span>
-                        </div>
-                        {point.completed_at && (
-                          <div className="mt-2 text-xs text-gray-500">Retirado el: {new Date(point.completed_at).toLocaleString()}</div>
-                        )}
-                        {/* Botón favorito (placeholder) */}
-                        <div className="mt-4 flex items-center gap-2">
-                          <button
-                            className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold hover:bg-yellow-200"
-                            // onClick={() => handleToggleFavorite(point.id)}
-                            disabled
-                          >
-                            ★ Marcar como favorito
-                          </button>
-                          {/* Si ya es favorito, mostrar opción para quitar */}
-                          {/* <button ...>Quitar de favoritos</button> */}
-                        </div>
-                        {/* Info residente */}
-                        <div className="mt-6 pt-6 border-t border-gray-200">
-                          <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <User className="h-4 w-4 mr-2" />
-                              <span>{point.creator_name}</span>
-                            </div>
-                            <div className="flex items-center text-sm text-gray-500">
-                              <Mail className="h-4 w-4 mr-2" />
-                              <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
-                            </div>
-                            {point.profiles?.phone && (
-                              <div className="flex items-center text-sm text-gray-500">
-                                <Phone className="h-4 w-4 mr-1" />
-                                <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {activeTab === 'perfil' && (
-              <div className="max-w-xl mx-auto bg-white rounded-lg shadow-md p-6 mt-4">
-                <h2 className="text-2xl font-bold mb-4 text-green-700">Mi Perfil</h2>
-                <form
-                  className="flex flex-col items-center gap-4"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    setError(null);
-                    let avatarUrl = user?.avatar_url || null;
-                    if (editAvatarFile) {
-                      const fileExt = editAvatarFile.name.split('.').pop();
-                      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
-                      const { error: uploadError } = await supabase.storage
-                        .from('avatars')
-                        .upload(fileName, editAvatarFile, { upsert: true });
-                      if (uploadError) {
-                        setError('Error al subir la imagen de perfil');
-                        return;
-                      }
-                      avatarUrl = supabase.storage.from('avatars').getPublicUrl(fileName).data.publicUrl;
-                    }
-                    const formMaterials = editMaterials.split(',').map((m) => m.trim()).filter(Boolean);
-                    const { error: updateError } = await supabase.from('profiles').update({
-                      name: editName,
-                      email: editEmail,
-                      phone: editPhone,
-                      address: editAddress,
-                      bio: editBio,
-                      materials: formMaterials,
-                      avatar_url: avatarUrl,
-                      experience_years: Number(editExperienceYears),
-                    }).eq('user_id', user.id);
-                    if (!updateError) {
-                      // Obtener el perfil actualizado
-                      const { data: updatedProfile, error: fetchError } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .single();
-                      if (!fetchError && updatedProfile) {
-                        // Normalización defensiva para evitar errores de renderizado
-                        const safeMaterials = Array.isArray(updatedProfile.materials)
-                          ? updatedProfile.materials
-                          : (typeof updatedProfile.materials === 'string' && updatedProfile.materials.length > 0
-                              ? [updatedProfile.materials]
-                              : []);
-                        const safeBio = typeof updatedProfile.bio === 'string' ? updatedProfile.bio : '';
-                        login({
-                          ...user,
-                          ...updatedProfile,
-                          type: updatedProfile.role || user.type,
-                          materials: safeMaterials,
-                          bio: safeBio,
-                          experience_years: updatedProfile.experience_years,
-                          lat: updatedProfile.lat,
-                          lng: updatedProfile.lng,
-                        });
-                        setEditName(updatedProfile.name || '');
-                        setEditEmail(updatedProfile.email || '');
-                        setEditPhone(updatedProfile.phone || '');
-                        setEditAddress(updatedProfile.address || '');
-                        setEditBio(safeBio);
-                        setEditMaterials(safeMaterials.join(', '));
-                        setEditExperienceYears(updatedProfile.experience_years || 0);
-                        setEditLat(updatedProfile.lat || '');
-                        setEditLng(updatedProfile.lng || '');
-                        setEditAvatarPreview(null);
-                        setEditAvatarFile(null);
-                      }
-                      setSuccess('Perfil actualizado correctamente');
-                    } else {
-                      setError('Error al actualizar el perfil');
-                    }
-                  }}
-                >
-                  <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 border-2 border-green-600 flex items-center justify-center mb-2">
-                    {editAvatarPreview ? (
-                      <img src={editAvatarPreview || undefined} alt="Preview" className="w-full h-full object-cover" />
-                    ) : user?.avatar_url ? (
-                      <img src={user.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
                     ) : (
-                      <User className="w-12 h-12 text-gray-400" />
+                      trulyAvailablePoints.map(point => (
+                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">
+                          <div className="p-6">
+                            {/* Info principal */}
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3">
+                                <MapPin className="h-6 w-6 text-green-500" />
+                                <div>
+                                  <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
+                                  <p className="mt-1 text-sm text-gray-500">{point.district}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* Botón Google Maps navegación usando coordenadas Mapbox */}
+                                {/* Eliminado el botón de la esquina, solo se deja el botón junto a 'Ver en Mapa' */}
+                              </div>
+                            </div>
+                            <div className="flex flex-row items-start mt-4">
+                              <div className="mr-6 flex-shrink-0">
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                                  alt="Reciclaje"
+                                  className="w-36 h-36 object-contain animate-bounce-slow"
+                                  style={{ filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {point.materials.map((material: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex items-center text-sm text-gray-500">
+                              <Calendar className="h-4 w-4 mr-2" />
+                              <span>{point.schedule
+                                ? (() => {
+                                    // Si es una fecha válida, formatear en español
+                                    const date = new Date(point.schedule);
+                                    if (!isNaN(date.getTime())) {
+                                      return date.toLocaleString('es-ES', {
+                                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                      });
+                                    }
+                                    // Traducción manual para horarios tipo "Thursday, 07:30 - 17:00"
+                                    const dias = [
+                                      { en: 'Monday', es: 'Lunes' },
+                                      { en: 'Tuesday', es: 'Martes' },
+                                      { en: 'Wednesday', es: 'Miércoles' },
+                                      { en: 'Thursday', es: 'Jueves' },
+                                      { en: 'Friday', es: 'Viernes' },
+                                      { en: 'Saturday', es: 'Sábado' },
+                                      { en: 'Sunday', es: 'Domingo' },
+                                    ];
+                                    let texto = point.schedule;
+                                    dias.forEach(d => {
+                                      texto = texto.replace(new RegExp(d.en, 'g'), d.es);
+                                    });
+                                    return texto.replace(/\b(AM|PM)\b/gi, m => m.toLowerCase());
+                                  })()
+                                : ''}</span>
+                            </div>
+                            {/* Información adicional del residente */}
+                            {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
+                              <div className="mt-2 text-sm text-gray-600">
+                                <strong>Información adicional:</strong> {point.additional_info}
+                              </div>
+                            )}
+                            {/* Botón reclamar */}
+                            <div className="mt-4 flex gap-2">
+                              <button
+                                onClick={() => handleOpenPickupModal(point)}
+                                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
+                              >
+                                Reclamar
+                              </button>
+                              <div className="flex items-center">
+                                <button
+                                  onClick={() => {
+                                    setSelectedPoint(point);
+                                    setShowMap(true);
+                                  }}
+                                  className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400 flex items-center"
+                                >
+                                  <MapIcon className="h-4 w-4 mr-2" />
+                                  Ver en Mapa
+                                </button>
+                                {/* Botón Google Maps justo al lado */}
+                                {typeof point.lng === 'number' && typeof point.lat === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' ? (
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      const latNum = Number(user.lat);
+                                      const lngNum = Number(user.lng);
+                                      const origin = (!isNaN(latNum) && !isNaN(lngNum) && Math.abs(latNum) > 0.01 && Math.abs(lngNum) > 0.01)
+                                        ? `${latNum},${lngNum}`
+                                        : 'current+location';
+                                      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.lat},${point.lng}&travelmode=driving`;
+                                      window.open(url, '_blank', 'noopener,noreferrer');
+                                    }}
+                                    title="Ver ruta en Google Maps"
+                                    className="ml-2 p-0 bg-transparent border-none shadow-none focus:outline-none"
+                                    style={{ minWidth: 0 }}
+                                  >
+                                    <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 animate-bounce-map" />
+                                  </button>
+                                ) : (
+                                  <span className="ml-2 text-xs text-gray-400 italic">Ubicación no disponible</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="mb-2"
-                    onChange={e => {
-                      const file = e.target.files?.[0] || null;
-                      setEditAvatarFile(file);
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => setEditAvatarPreview(ev.target?.result as string);
-                        reader.readAsDataURL(file);
-                      } else {
-                        setEditAvatarPreview(null);
-                      }
-                    }}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                    <div>
-                      <label className="text-gray-600 text-sm">Nombre completo</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1" value={editName} onChange={e => setEditName(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Email</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Teléfono</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Domicilio</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Años de experiencia</label>
-                      <input type="number" min="0" className="font-semibold w-full border rounded px-2 py-1" value={editExperienceYears} onChange={e => setEditExperienceYears(Number(e.target.value))} />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Latitud</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLat} readOnly />
-                    </div>
-                    <div>
-                      <label className="text-gray-600 text-sm">Longitud</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLng} readOnly />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-gray-600 text-sm">Biografía / Nota</label>
-                      <textarea className="font-semibold w-full border rounded px-2 py-1" value={editBio} onChange={e => setEditBio(e.target.value)} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-gray-600 text-sm">Materiales (separados por coma)</label>
-                      <input className="font-semibold w-full border rounded px-2 py-1" value={editMaterials} onChange={e => setEditMaterials(e.target.value)} />
-                    </div>
-                  </div>
-                  <button type="submit" className="mt-4 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">Actualizar Perfil</button>
-                  {success && <div className="text-green-600 mt-2">{success}</div>}
-                  {error && <div className="text-red-600 mt-2">{error}</div>}
-                </form>
-              </div>
-            )}
-            {activeTab === 'historial' && (
-              <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 mt-4">
-                <h2 className="text-2xl font-bold mb-4 text-green-700">Historial</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-green-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-green-700">{claimedPoints.filter(p => p.status === 'claimed').length}</div>
-                    <div className="text-gray-600 mt-1">Reclamados</div>
-                  </div>
-                  <div className="bg-red-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-red-700">{claimedPoints.filter(p => p.status === 'cancelled').length}</div>
-                    <div className="text-gray-600 mt-1">Cancelados</div>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg p-4 text-center">
-                    <div className="text-3xl font-bold text-blue-700">{claimedPoints.filter(p => p.status === 'completed').length}</div>
-                    <div className="text-gray-600 mt-1">Retirados</div>
+                  <hr className="my-10 border-green-300" />
+                </div>
+              )}
+              {view === 'reclamados' && (
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Reclamados</h2>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {claimedPoints.filter(p => p.status === 'claimed').length === 0 ? (
+                      <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
+                    ) : (
+                      claimedPoints.filter(p => p.status === 'claimed').map(point => (
+                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                          <div className="p-6">
+                            {/* Info principal */}
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3">
+                                <MapPin className="h-8 w-8 text-green-500" />
+                                <div>
+                                  <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
+                                  <p className="mt-1 text-sm text-gray-500">{point.district}</p>
+                                </div>
+                              </div>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
+                            </div>
+                            <div className="flex flex-row justify-between items-start mt-4">
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="ml-4 flex-shrink-0">
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                                  alt="Reciclaje"
+                                  className="w-28 h-28 object-contain bg-white shadow-none"
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-4">
+                              {point.pickup_time && (
+                                <div className="text-xs text-gray-500">Retiro programado: {new Date(point.pickup_time).toLocaleString()}</div>
+                              )}
+                              {point.status === 'claimed' && point.pickup_time && (
+                                <CountdownTimer targetDate={new Date(point.pickup_time)} onComplete={() => fetchData()} />
+                              )}
+                            </div>
+                            {/* Info residente */}
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                              <div className="space-y-2">
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <User className="h-4 w-4 mr-2" />
+                                  <span>{point.creator_name}</span>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
+                                </div>
+                                {point.profiles?.phone && (
+                                  <div className="flex items-center text-sm text-gray-500">
+                                    <Phone className="h-4 w-4 mr-1" />
+                                    <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {/* Botones de acción */}
+                            <div className="mt-4 flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
+                                  setShowCancelClaimModal(true);
+                                }}
+                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
+                              >
+                                Cancelar reclamo
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPointToComplete(point);
+                                  setShowCompleteModal(true);
+                                }}
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
+                              >
+                                Marcar como retirado
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
-                {/* Estadísticas adicionales (ejemplo: kilos recolectados por mes) */}
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-2">Estadísticas</h3>
-                  <div className="text-gray-700 text-sm">(Próximamente: kilos recolectados por mes, gráfica, etc.)</div>
+              )}
+              {view === 'cancelados' && (
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Cancelados</h2>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {claimedPoints.filter(p => p.status === 'cancelled').length === 0 ? (
+                      <div className="col-span-2 text-center text-gray-500">No tienes puntos cancelados.</div>
+                    ) : (
+                      claimedPoints.filter(p => p.status === 'cancelled').map(point => (
+                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                          <div className="p-6">
+                            {/* Info principal */}
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3">
+                                <MapPin className="h-6 w-6 text-green-500" />
+                                <div>
+                                  <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
+                                  <p className="mt-1 text-sm text-gray-500">{point.district}</p>
+                                </div>
+                              </div>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Cancelado</span>
+                            </div>
+                            <div className="flex flex-row justify-between items-start mt-4">
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {point.materials.map((material: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="ml-4 flex-shrink-0">
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                                  alt="Reciclaje"
+                                  className="w-28 h-28 object-contain bg-white shadow-none"
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-4 flex items-center text-sm text-gray-500">
+                              <Calendar className="h-4 w-4 mr-2" />
+                              <span>{point.schedule}</span>
+                            </div>
+                            {point.cancelled_at && (
+                              <div className="mt-2 text-xs text-gray-500">Cancelado el: {new Date(point.cancelled_at).toLocaleString()}</div>
+                            )}
+                            {point.cancellation_reason && (
+                              <div className="mt-2 text-xs text-red-600 font-semibold">Motivo: {point.cancellation_reason}</div>
+                            )}
+                            {/* Info residente */}
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                              <div className="space-y-2">
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <User className="h-4 w-4 mr-2" />
+                                  <span>{point.creator_name}</span>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
+                                </div>
+                                {point.profiles?.phone && (
+                                  <div className="flex items-center text-sm text-gray-500">
+                                    <Phone className="h-4 w-4 mr-1" />
+                                    <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-            {activeTab === 'favoritos' && (
-              <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 mt-4">
-                <h2 className="text-2xl font-bold mb-4 text-yellow-600">Mis Puntos Favoritos</h2>
-                <div className="text-gray-500 mb-4">Próximamente: aquí verás los puntos retirados que marcaste como favoritos.</div>
-                {/* Aquí se mostrarán las tarjetas de puntos favoritos cuando se implemente la lógica */}
-              </div>
-            )}
+              )}
+              {view === 'retirados' && (
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Retirados</h2>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {claimedPoints.filter(p => p.status === 'completed').length === 0 && (
+                      <div className="col-span-2 text-center text-gray-500">No tienes puntos retirados.</div>
+                    )}
+                    {claimedPoints.filter(p => p.status === 'completed').map(point => (
+                      <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div className="p-6">
+                          {/* Info principal */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-3">
+                              <MapPin className="h-6 w-6 text-green-500" />
+                              <div>
+                                <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
+                                <p className="mt-1 text-sm text-gray-500">{point.district}</p>
+                              </div>
+                            </div>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
+                          </div>
+                          <div className="flex flex-row justify-between items-start mt-4">
+                            <div className="flex-1">
+                              <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {point.materials.map((material: string, idx: number) => (
+                                  <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="ml-4 flex-shrink-0">
+                              <img
+                                src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                                alt="Reciclaje"
+                                className="w-28 h-28 object-contain bg-white shadow-none"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-4 flex items-center text-sm text-gray-500">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            <span>{point.schedule}</span>
+                          </div>
+                          {point.completed_at && (
+                            <div className="mt-2 text-xs text-gray-500">Retirado el: {new Date(point.completed_at).toLocaleString()}</div>
+                          )}
+                          {/* Botón favorito (placeholder) */}
+                          <div className="mt-4 flex items-center gap-2">
+                            <button
+                              className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold hover:bg-yellow-200"
+                              // onClick={() => handleToggleFavorite(point.id)}
+                              disabled
+                            >
+                              ★ Marcar como favorito
+                            </button>
+                            {/* Si ya es favorito, mostrar opción para quitar */}
+                            {/* <button ...>Quitar de favoritos</button> */}
+                          </div>
+                          {/* Info residente */}
+                          <div className="mt-6 pt-6 border-t border-gray-200">
+                            <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                            <div className="space-y-2">
+                              <div className="flex items-center text-sm text-gray-500">
+                                <User className="h-4 w-4 mr-2" />
+                                <span>{point.creator_name}</span>
+                              </div>
+                              <div className="flex items-center text-sm text-gray-500">
+                                <Mail className="h-4 w-4 mr-2" />
+                                <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
+                              </div>
+                              {point.profiles?.phone && (
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <Phone className="h-4 w-4 mr-1" />
+                                  <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Modal de mapa */}
             {showMap && selectedPoint && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1058,14 +897,14 @@ const DashboardRecycler: React.FC = () => {
                     <Map
                       points={[{
                         id: selectedPoint.id,
-                        lat: Number(selectedPoint.latitude),
-                        lng: Number(selectedPoint.longitude),
+                        lat: Number(selectedPoint.lat),
+                        lng: Number(selectedPoint.lng),
                         title: selectedPoint.address,
                         avatar_url: selectedPoint.creator_avatar
                       }]}
                       showUserLocation={true}
                       showRoute={true}
-                      routeDestination={{ lat: Number(selectedPoint.latitude), lng: Number(selectedPoint.longitude) }}
+                      routeDestination={{ lat: Number(selectedPoint.lat), lng: Number(selectedPoint.lng) }}
                     />
                   </div>
                 </div>

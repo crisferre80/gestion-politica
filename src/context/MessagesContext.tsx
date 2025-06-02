@@ -2,6 +2,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
 export type Message = {
+    createdAt: string;
     id: string;
     senderId: string; // UUID de Supabase Auth (user_id)
     receiverId: string; // UUID de Supabase Auth (user_id)
@@ -20,80 +21,101 @@ const MessagesContext = createContext<MessagesContextType | undefined>(undefined
 export const MessagesProvider = ({ children }: { children: ReactNode }) => {
     const [messages, setMessages] = useState<Message[]>([]);
 
-    // Cargar mensajes entre dos usuarios
+    // Cargar mensajes entre dos usuarios (usando user_id de Auth)
     const fetchConversation = async (userId1: string, userId2: string) => {
+        // Buscar los id reales de profiles
+        const { data: profile1 } = await supabase
+            .from('profiles')
+            .select('id, user_id')
+            .eq('user_id', userId1)
+            .single();
+        const { data: profile2 } = await supabase
+            .from('profiles')
+            .select('id, user_id')
+            .eq('user_id', userId2)
+            .single();
+        if (!profile1 || !profile2) {
+            setMessages([]);
+            return;
+        }
+        const id1 = profile1.id;
+        const id2 = profile2.id;
+        // Map de id interno a user_id
+        const idToUserId: Record<string, string> = {
+            [id1]: profile1.user_id,
+            [id2]: profile2.user_id
+        };
         const { data, error } = await supabase
             .from('messages')
             .select('*')
             .or(
-                `and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`
+                `and(sender_id.eq.${id1},receiver_id.eq.${id2}),and(sender_id.eq.${id2},receiver_id.eq.${id1})`
             )
-            .order('created_at', { ascending: true });
-
+            .order('sent_at', { ascending: true });
         if (error) {
             console.error('Error fetching messages:', error);
             setMessages([]);
             return;
         }
-
-        // Adaptar los datos a tu tipo Message
+        // Adaptar los datos a tu tipo Message, usando user_id para el frontend
         type SupabaseMessage = {
             id: string | number;
-            sender_id: string; // UUID de Supabase Auth
-            receiver_id: string; // UUID de Supabase Auth
+            sender_id: string;
+            receiver_id: string;
             content: string;
-            created_at: string;
+            sent_at: string;
+            read?: boolean;
+            read_at?: string;
         };
-
         setMessages(
             (data ?? []).map((msg: SupabaseMessage) => ({
                 id: msg.id.toString(),
-                senderId: msg.sender_id, // UUID
-                receiverId: msg.receiver_id, // UUID
+                senderId: idToUserId[msg.sender_id] || msg.sender_id,
+                receiverId: idToUserId[msg.receiver_id] || msg.receiver_id,
                 content: msg.content,
-                timestamp: new Date(msg.created_at),
+                timestamp: new Date(msg.sent_at),
+                createdAt: msg.sent_at
+                // No incluir read ni readAt en el objeto Message
             }))
         );
     };
 
     // Enviar mensaje y recargar la conversación
-    const sendMessage = async (senderId: string, receiverId: string, content: string) => {
-        // Validar sender
-        const { data: sender, error: senderError } = await supabase
+    const sendMessage = async (senderUserId: string, receiverUserId: string, content: string) => {
+        // Buscar el id real de profiles a partir de user_id
+        const { data: senderProfile, error: senderProfileError } = await supabase
             .from('profiles')
-            .select('user_id')
-            .eq('user_id', senderId)
+            .select('id')
+            .eq('user_id', senderUserId)
             .single();
-        if (senderError || !sender) {
-            console.error('El remitente no existe en la tabla de perfiles.');
+        const { data: receiverProfile, error: receiverProfileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', receiverUserId)
+            .single();
+        if (senderProfileError || !senderProfile) {
+            console.error('[sendMessage] El remitente no tiene perfil válido.', senderProfileError);
             return;
         }
-        // Validar receiver
-        const { data: receiver, error: receiverError } = await supabase
-            .from('profiles')
-            .select('user_id')
-            .eq('user_id', receiverId)
-            .single();
-        if (receiverError || !receiver) {
-            console.error('El destinatario no existe en la tabla de perfiles.');
+        if (receiverProfileError || !receiverProfile) {
+            console.error('[sendMessage] El destinatario no tiene perfil válido.', receiverProfileError);
             return;
         }
-        // Insertar mensaje
-        const { error } = await supabase.from('messages').insert([
-            {
-                sender_id: senderId, // UUID
-                receiver_id: receiverId, // UUID
-                content,
-                is_read: false,
-                // timestamp: new Date().toISOString(), // Si tu tabla lo requiere
-            },
-        ]);
+        // Insertar mensaje usando los id reales y sent_at explícito
+        const insertObj = {
+            sender_id: senderProfile.id,
+            receiver_id: receiverProfile.id,
+            content: content,
+            sent_at: new Date().toISOString()
+        };
+        console.log('[sendMessage] Insertando mensaje:', insertObj);
+        const { error } = await supabase.from('messages').insert([insertObj]);
         if (error) {
-            console.error('Error sending message:', error);
+            console.error('[sendMessage] Error al insertar mensaje:', error);
             return;
         }
         // Opcional: recargar mensajes después de enviar
-        await fetchConversation(senderId, receiverId);
+        await fetchConversation(senderUserId, receiverUserId);
     };
 
     return (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone, Star } from 'lucide-react';
-import { supabase, deleteCollectionPoint } from '../lib/supabase';
+import { supabase, deleteCollectionPoint, ensureUserProfile } from '../lib/supabase';
 // Importa uploadProfilePhoto desde el módulo correcto si existe, por ejemplo:
 // import { uploadProfilePhoto } from '../lib/uploadProfilePhoto';
 import Map from '../components/Map';
@@ -11,6 +11,7 @@ import NotificationBell from '../components/NotificationBell';
 import { createNotification } from '../lib/notifications';
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import AdminNotifications from '../components/AdminNotifications';
+import PhotoCapture from '../components/PhotoCapture';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -74,8 +75,8 @@ const DashboardResident: React.FC = () => {
   // const [] = useState(false);
   // const [] = useState(false);
   type Recycler = {
-    id: number;
-    user_id?: string; // <-- Añadir user_id (UUID) aquí
+    id: string; // <-- Cambiado a string
+    user_id?: string;
     profiles?: {
       avatar_url?: string;
       name?: string;
@@ -121,12 +122,13 @@ const DashboardResident: React.FC = () => {
       .from('profiles')
       .select('id, avatar_url, name, email, phone, materials, bio, lat, lng, online, role, user_id, rating_average, total_ratings')
       .eq('role', 'recycler');
+    console.log('Recyclers fetched from Supabase:', data, error); // DEBUG
     if (error) {
       setRecyclers([]);
     } else {
       setRecyclers(
         (data || []).map((rec) => ({
-          id: rec.id,
+          id: String(rec.id), // <-- Forzamos a string
           user_id: rec.user_id || rec.id,
           profiles: {
             avatar_url: rec.avatar_url,
@@ -165,13 +167,14 @@ const DashboardResident: React.FC = () => {
             const oldRec = payload.old as ProfileRealtimePayload;
             if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
               setRecyclers((prev) => {
-                const exists = prev.find((r) => r.id === newRec.id);
+                const exists = prev.find((r) => r.id === String(newRec.id));
                 if (exists) {
                   // Actualiza el reciclador existente
                   return prev.map((r) =>
-                    r.id === newRec.id
+                    r.id === String(newRec.id)
                       ? {
                           ...r,
+                          id: String(newRec.id),
                           profiles: {
                             avatar_url: newRec.avatar_url,
                             name: newRec.name,
@@ -193,7 +196,7 @@ const DashboardResident: React.FC = () => {
                   return [
                     ...prev,
                     {
-                      id: newRec.id,
+                      id: String(newRec.id),
                       profiles: {
                         avatar_url: newRec.avatar_url,
                         name: newRec.name,
@@ -213,7 +216,7 @@ const DashboardResident: React.FC = () => {
               });
             }
             if (payload.eventType === 'DELETE' && oldRec && oldRec.role && oldRec.role.toLowerCase() === 'recycler') {
-              setRecyclers((prev) => prev.filter((r) => r.id !== oldRec.id));
+              setRecyclers((prev) => prev.filter((r) => r.id !== String(oldRec.id)));
             }
           }
         )
@@ -306,8 +309,6 @@ const DashboardResident: React.FC = () => {
   const [editAddress, setEditAddress] = useState(user?.address || '');
   const [editBio, setEditBio] = useState(user?.bio || '');
   const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  const [editLat] = useState(user?.lat || '');
-  const [editLng] = useState(user?.lng || '');
   
   // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
 
@@ -406,6 +407,8 @@ const DashboardResident: React.FC = () => {
   // Cargar puntos con detalles de reclamo y reciclador
   useEffect(() => {
     if (!user?.id) return;
+    // Asegura que el perfil existe antes de cargar puntos
+    ensureUserProfile({ id: user.id, email: user.email, name: user.name });
     const fetchDetailedPoints = async () => {
       const { data, error } = await supabase
         .from('collection_points')
@@ -414,7 +417,10 @@ const DashboardResident: React.FC = () => {
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      if (!error && data) setDetailedPoints(data);
+      if (!error && data) {
+        console.log('[DEBUG] Resident Dashboard - fetched collection_points:', data); // DEBUG
+        setDetailedPoints(data);
+      }
       else setDetailedPoints([]);
     };
     fetchDetailedPoints();
@@ -445,12 +451,13 @@ const DashboardResident: React.FC = () => {
 
   // Filtrado por sub-tab
   const now = new Date();
+  // Un punto está disponible si su status es 'available' y no tiene un claim activo
   const puntosTodos = detailedPoints.filter(p =>
-    (!p.status || p.status === 'available') && // Solo los que están disponibles
-    (!p.claim || p.claim.status !== 'claimed') // Y que no tengan un reclamo pendiente
+    (p.status === 'available' || !p.status) && (!p.claim || p.claim.status !== 'claimed')
   );
+  // Un punto está reclamado si su status es 'claimed', 'reclamado', o el claim está en 'claimed'
   const puntosReclamados = detailedPoints.filter(p =>
-    (p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'claimed'
+    p.status === 'claimed' || p.status === 'reclamado' || (p.claim && p.claim.status === 'claimed')
   );
   const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || (p.claim && p.claim.status === 'completed'));
   const puntosDemorados = detailedPoints.filter(p => {
@@ -527,6 +534,7 @@ const handleSubmitRating = async () => {
       title: 'Nueva calificación',
       content: `Has recibido una nueva calificación de un residente.`,
       type: 'recycler_rated',
+      user_name: ratingTarget.recyclerName
     });
     setRatingSuccess('¡Calificación enviada correctamente!');
     setRatingValue(0);
@@ -555,6 +563,9 @@ const handleSubmitRating = async () => {
     }
   }, [location.state, refreshCollectionPoints]);
 
+  const getAvatarUrl = (url: string | undefined) =>
+  url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -577,7 +588,7 @@ const handleSubmitRating = async () => {
       <div className="flex items-center gap-4 mb-8 bg-white shadow rounded-lg px-6 py-4 w-full max-w-2xl">
         <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
           <img
-            src={avatarUrl}
+            src={getAvatarUrl(user?.avatar_url || avatarUrl)}
             alt="Foto de perfil"
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -965,18 +976,23 @@ const handleSubmitRating = async () => {
                     ))}
                   </div>
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
-                  <Link
-                    to={rec.profiles?.email && rec.user_id ? `/chat/${rec.user_id}` : '#'}
-                    className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
-                    onClick={e => {
-                      if (!rec.profiles?.email) {
-                        e.preventDefault();
-                        toast.error('Este reciclador no tiene chat disponible.');
-                      }
-                    }}
-                  >
-                    Enviar mensaje
-                  </Link>
+                  {/* Validación de UUID para el chat */}
+                  {rec.user_id && /^[0-9a-fA-F-]{36}$/.test(rec.user_id) ? (
+                    <Link
+                      to={`/chat/${rec.user_id}`}
+                      className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
+                    >
+                      Enviar mensaje
+                    </Link>
+                  ) : (
+                    <button
+                      className="mt-3 px-4 py-2 bg-gray-300 text-gray-500 rounded cursor-not-allowed opacity-60"
+                      disabled
+                      title="Este reciclador no tiene chat disponible."
+                    >
+                      Chat no disponible
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -1022,24 +1038,24 @@ const handleSubmitRating = async () => {
               }
             }}
           >
-            <div className="flex flex-col items-center mb-6">
-              <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
-                <img src={user?.avatar_url || avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
-              </div>
-              <label className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer">
-                Actualizar Foto
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      handlePhotoUpload(e.target.files[0]);
-                    }
-                  }}
-                />
-              </label>
+            <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
+              <img src={user?.avatar_url || avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
             </div>
+            <PhotoCapture
+              onCapture={file => {
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('La imagen no debe superar los 10MB.');
+      return;
+    }
+                handlePhotoUpload(file);
+              }}
+              onCancel={() => {}}
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
               <div className="text-left">
                 <label className="text-gray-600 text-sm">Nombre completo</label>
@@ -1056,14 +1072,6 @@ const handleSubmitRating = async () => {
               <div className="text-left">
                 <label className="text-gray-600 text-sm">Domicilio</label>
                 <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
-              </div>
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Latitud</label>
-                <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLat} readOnly />
-              </div>
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Longitud</label>
-                <input className="font-semibold w-full border rounded px-2 py-1 bg-gray-100" value={editLng} readOnly />
               </div>
               <div className="text-left md:col-span-2">
                 <label className="text-gray-600 text-sm">Biografía / Nota</label>

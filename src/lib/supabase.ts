@@ -30,7 +30,7 @@ export type CollectionPoint = {
   user_id: string;
   recycler_id: string;
   lng: number;
-  lat: unknown;
+  lat: number;
   estimated_weight: number;
   cancellation_reason: string | null;
   cancelled_at: string | null; // ISO date string or null if not cancelled
@@ -40,8 +40,6 @@ export type CollectionPoint = {
   creator_name: ReactNode;
   creator_avatar: string | undefined;
   claimed_by: string;
-  longitude: number;
-  latitude: unknown;
   id: string;
   address: string;
   district: string;
@@ -76,7 +74,7 @@ export interface CollectionClaim {
   id: string;
   collection_point_id: string;
   recycler_id: string;
-  status: 'pending' | 'completed' | 'cancelled' | 'failed';
+  status: 'claimed' | 'completed' | 'cancelled' | 'failed';
   claimed_at: string;
   completed_at?: string;
   cancelled_at?: string;
@@ -87,16 +85,6 @@ export interface CollectionClaim {
 
 export async function signUpUser(email: string, password: string, userData: Partial<User>) {
   try {
-    // Elimina esta validación previa:
-    // const { data: existingProfile } = await supabase
-    //   .from('profiles')
-    //   .select('id')
-    //   .eq('email', email)
-    //   .maybeSingle();
-    // if (existingProfile) {
-    //   return { data: null, error: new Error('User already registered') };
-    // }
-
     // Intenta crear el usuario en Auth
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -112,23 +100,50 @@ export async function signUpUser(email: string, password: string, userData: Part
     if (signUpError) throw signUpError;
     if (!authData.user) throw new Error('Failed to create user');
 
-    // Crea el perfil solo si el usuario fue creado en Auth
-    const { error: profileError } = await supabase
+    // Verifica si ya existe un perfil por user_id
+    const { data: profileById } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', authData.user.id)
+      .maybeSingle();
+    if (profileById) {
+      return { data: { ...authData, profile: profileById }, error: null };
+    }
+
+    // Verifica si ya existe un perfil por email
+    const { data: profileByEmail } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+    if (profileByEmail) {
+      // Si existe, actualiza el user_id si es necesario
+      if (!profileByEmail.user_id) {
+        await supabase.from('profiles').update({ user_id: authData.user.id }).eq('email', email);
+      }
+      return { data: { ...authData, profile: { ...profileByEmail, user_id: authData.user.id } }, error: null };
+    }
+
+    // Si no existe, crea el perfil
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .insert([{
         user_id: authData.user.id,
         email: email,
         name: userData.name,
         role: userData.type,
-      }]);
+      }])
+      .select()
+      .single();
 
-    if (profileError) {
+    if (profileError || !profile) {
       // Si falla la creación del perfil, elimina el usuario Auth
       await supabase.auth.admin.deleteUser(authData.user.id);
-      throw profileError;
+      throw profileError || new Error('Failed to create profile');
     }
 
-    return { data: authData, error: null };
+    // Solo devuelve éxito si el perfil se creó correctamente
+    return { data: { ...authData, profile }, error: null };
   } catch (error: unknown) {
     console.error('SignUp error:', error);
     return { data: null, error: error instanceof Error ? error : new Error(String(error)) };
@@ -152,7 +167,7 @@ export async function signInUser(email: string, password: string) {
 
     if (!authData.user) throw new Error('Failed to sign in');
 
-    // Get profile
+    // Get profile by user_id
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -160,41 +175,74 @@ export async function signInUser(email: string, password: string) {
       .maybeSingle();
 
     if (profileError) throw profileError;
-    if (!profile) {
-      // Create profile if it doesn't exist
-      const { error: createProfileError } = await supabase
-        .from('profiles')
-        .insert([{
+    if (profile) {
+      // Map role to type for consistency with the User interface
+      return {
+        data: authData,
+        profile: { ...profile, type: profile.role }
+      };
+    }
+
+    // Si no existe perfil por user_id, busca por email
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', authData.user.email)
+      .maybeSingle();
+    if (existingProfileError) throw existingProfileError;
+    if (existingProfile) {
+      // Si existe, actualiza el user_id si es necesario
+      if (!existingProfile.user_id) {
+        await supabase.from('profiles').update({ user_id: authData.user.id }).eq('email', authData.user.email);
+      }
+      return {
+        data: authData,
+        profile: { ...existingProfile, user_id: authData.user.id, type: existingProfile.role }
+      };
+    }
+
+    // Si no existe ni por user_id ni por email, crea el perfil
+    const { error: createProfileError } = await supabase
+      .from('profiles')
+      .insert([
+        {
           user_id: authData.user.id,
           email: authData.user.email!,
           name: authData.user.user_metadata.name || '',
           role: authData.user.user_metadata.type || 'resident',
-        }]);
+        }
+      ]);
 
-      if (createProfileError) throw new Error('Failed to create profile');
-
-      // Fetch the newly created profile
-      const { data: newProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', authData.user.id)
-        .single();
-
-      if (fetchError || !newProfile) throw new Error('Failed to fetch profile');
-
-   
-      return { 
-        data: authData, 
-        profile: { ...newProfile, type: newProfile.role }
-      };
+    if (createProfileError) {
+      // Si la creación falla por restricción de unicidad, intenta recuperar el perfil existente
+      if (createProfileError.code === '23505' || createProfileError.message?.includes('duplicate')) {
+        const { data: conflictProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', authData.user.email)
+          .maybeSingle();
+        if (conflictProfile) {
+          return {
+            data: authData,
+            profile: { ...conflictProfile, user_id: authData.user.id, type: conflictProfile.role }
+          };
+        }
+      }
+      throw new Error('Failed to create profile');
     }
 
-    
+    // Fetch the newly created profile
+    const { data: newProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', authData.user.id)
+      .single();
 
-    // Map role to type for consistency with the User interface
-    return { 
-      data: authData, 
-      profile: { ...profile, type: profile.role }
+    if (fetchError || !newProfile) throw new Error('Failed to fetch profile');
+
+    return {
+      data: authData,
+      profile: { ...newProfile, type: newProfile.role }
     };
   } catch (error: unknown) {
     console.error('SignIn error:', error);
@@ -209,7 +257,7 @@ export async function claimCollectionPoint(
   userId: string // <-- nuevo parámetro obligatorio
 ): Promise<void> {
   try {
-    // Crear el claim con status 'pending'
+    // Crear el claim con status 'claimed'
     const { data: claim, error: claimError } = await supabase
       .from('collection_claims')
       .insert([
@@ -217,7 +265,7 @@ export async function claimCollectionPoint(
           collection_point_id: pointId,
           recycler_id: recyclerId,
           user_id: userId, // <-- importante para cumplir el constraint
-          status: 'pending',
+          status: 'claimed',
           pickup_time: pickupTime
         }
       ])
@@ -235,7 +283,7 @@ export async function claimCollectionPoint(
         pickup_time: pickupTime,
         recycler_id: recyclerId
       })
-      .eq('id', pointId);
+      .eq('id', pointId); // <-- CORRECTO: debe ser .eq('id', pointId)
 
     if (updateError) throw updateError;
 
@@ -246,11 +294,7 @@ export async function claimCollectionPoint(
 }
 
 export async function cancelClaim(
-  claimId: string,
-  pointId: string,
-  userId: string,
-  reason: string
-): Promise<void> {
+  claimId: string, pointId: string, reason: string): Promise<void> {
   try {
     // Update claim status
     const { error: claimError } = await supabase
@@ -258,7 +302,6 @@ export async function cancelClaim(
       .update({
         status: 'cancelled',
         cancelled_at: new Date().toISOString(),
-        cancelled_by: userId,
         cancellation_reason: reason
       })
       .eq('id', claimId);
@@ -363,5 +406,28 @@ export async function updateOnlineStatus(userId: string, online: boolean): Promi
   } catch (error) {
     console.error('Error updating online status:', error);
     throw error;
+  }
+}
+
+/**
+ * Asegura que el usuario tenga un perfil en la tabla profiles con el user_id correcto.
+ * Si no existe, lo crea automáticamente con los datos mínimos.
+ */
+export async function ensureUserProfile(user: { id: string; email?: string; name?: string }) {
+  if (!user?.id) return;
+  // Verifica si existe el perfil
+  const { data } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (!data) {
+    // Si no existe, crea el perfil mínimo
+    await supabase.from('profiles').insert({
+      user_id: user.id,
+      email: user.email || '',
+      name: user.name || '',
+    });
   }
 }

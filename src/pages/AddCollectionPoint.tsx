@@ -9,6 +9,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { createNotification } from '../lib/notifications';
+import { toast } from 'react-toastify';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -171,20 +172,34 @@ const AddCollectionPoint: React.FC = () => {
     setError('');
 
     const formattedSchedule = `${format(collectionDate, 'EEEE')}s, ${format(collectionTimeStart, 'HH:mm')} - ${format(collectionTimeEnd, 'HH:mm')}`;
+
+    // LOG DETALLADO PARA DEPURACIÓN
+    console.log('DEBUG AddCollectionPoint: user:', user);
+    console.log('DEBUG AddCollectionPoint: user.id (irá como user_id):', user?.id);
+    console.log('DEBUG AddCollectionPoint: datos a insertar:', {
+      user_id: user?.id,
+      address,
+      district,
+      materials,
+      schedule: formattedSchedule,
+      additional_info: additionalInfo,
+      lat: selectedLocation.lat,
+      lng: selectedLocation.lng
+    });
     
     try {
       const { error: supabaseError, data: newPoint } = await supabase
         .from('collection_points')
         .insert([
           {
-            user_id: user.id,
+            user_id: user.id, // IMPORTANTE: user.id debe ser igual a profiles.id
             address,
             district,
             materials,
             schedule: formattedSchedule,
             additional_info: additionalInfo,
-            latitude: selectedLocation.lat,
-            longitude: selectedLocation.lng
+            lat: selectedLocation.lat,
+            lng: selectedLocation.lng
           }
         ])
         .select()
@@ -197,13 +212,40 @@ const AddCollectionPoint: React.FC = () => {
         title: 'Punto de recolección creado',
         content: `Has creado un nuevo punto de recolección en ${address}.`,
         type: 'collection_point_created',
-        related_id: newPoint?.id
+        related_id: newPoint?.id,
+        user_name: user?.name,
+        user_email: user?.email
       });
-      // NUEVO: Navega al dashboard con flag de refresco
+      // Notificación para todos los recicladores activos
+      const { data: recyclers } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('role', 'recycler');
+      if (recyclers && Array.isArray(recyclers)) {
+        for (const recycler of recyclers) {
+          await createNotification({
+            user_id: recycler.user_id,
+            title: 'Nuevo punto disponible',
+            content: `Se ha creado un nuevo punto de recolección en ${address}.`,
+            type: 'new_collection_point',
+            related_id: newPoint?.id
+            // No email/name for recyclers here
+          });
+        }
+      }
+      // Navegación según el tipo de usuario
       navigate('/dashboard', { state: { refresh: true } });
     } catch (err) {
+      const errorObj = err as { message?: string };
       console.error('Error:', err);
-      setError('Error al guardar el punto de recolección. Por favor, intenta nuevamente.');
+      // Si el punto se creó pero la notificación falló, navega igual y muestra un warning
+      if (typeof errorObj?.message === 'string' && errorObj.message.includes('notific')) {
+        toast.error('El punto se creó, pero no se pudo enviar la notificación.');
+        navigate('/dashboard', { state: { refresh: true } });
+      } else {
+        // Si el error es grave, muestra el error y no navega
+        setError('Ocurrió un error al crear el punto.');
+      }
     } finally {
       setLoading(false);
     }

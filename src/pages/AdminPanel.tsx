@@ -22,13 +22,14 @@ const AdminPanel: React.FC = () => {
   const [notifTarget, setNotifTarget] = useState<'global' | 'individual'>('global');
   const [notifStatus, setNotifStatus] = useState('');
   const [stats, setStats] = useState<{[role: string]: number}>({});
+  const [roleFilter, setRoleFilter] = useState<string>('');
 
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
-      // Traer también user_id (UUID)
       const { data, error } = await supabase.from('profiles').select('id, user_id, name, email, role');
       if (!error && data) {
+        console.log('[ADMIN][USERS]', data); // <-- Log temporal para depuración
         setUsers(data);
         // Estadísticas por rol
         const stats: {[role: string]: number} = {};
@@ -37,7 +38,6 @@ const AdminPanel: React.FC = () => {
           stats[role] = (stats[role] || 0) + 1;
         });
         setStats(stats);
-        // Si el usuario seleccionado ya no existe, deseleccionarlo
         if (selectedUser && !data.find(u => u.id === selectedUser.id)) {
           setSelectedUser(null);
         }
@@ -47,7 +47,6 @@ const AdminPanel: React.FC = () => {
       setLoading(false);
     };
     fetchUsers();
-    // Refrescar usuarios cada vez que se envía/elimina uno
   }, [selectedUser]);
 
   // Refrescar usuarios después de enviar notificación global o eliminar usuario
@@ -91,6 +90,8 @@ const AdminPanel: React.FC = () => {
               title: notifTitle,
               content: notifMsg,
               type: 'admin',
+              user_name: u.name,
+              user_email: u.email
             });
           } catch (err) {
             console.error('[NOTIF][ERROR] Falló envío a', u.user_id, err);
@@ -112,6 +113,8 @@ const AdminPanel: React.FC = () => {
             title: notifTitle,
             content: notifMsg,
             type: 'admin',
+            user_name: validUser.name,
+            user_email: validUser.email
           });
           setNotifStatus('Notificación enviada al usuario');
         } catch (err) {
@@ -142,31 +145,53 @@ const AdminPanel: React.FC = () => {
       </div>
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-2">Usuarios registrados</h2>
-        {loading ? <p>Cargando...</p> : error ? <p className="text-red-600">{error}</p> : (
-          <table className="w-full bg-white rounded shadow">
-            <thead>
-              <tr className="bg-green-100">
-                <th className="p-2">Nombre</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">Rol</th>
-                <th className="p-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.id} className="border-b">
-                  <td className="p-2">{u.name}</td>
-                  <td className="p-2">{u.email}</td>
-                  <td className="p-2 capitalize">{u.role}</td>
-                  <td className="p-2 flex gap-2">
-                    <button className="bg-red-500 text-white px-2 py-1 rounded" onClick={() => handleDeleteUser(u.id)}>Eliminar</button>
-                    <button className="bg-blue-500 text-white px-2 py-1 rounded" onClick={() => { setNotifTarget('individual'); setSelectedUser(u); }}>Notificar</button>
-                  </td>
+        <div className="mb-2">
+          <label className="mr-2">Filtrar por rol:</label>
+          <select className="border rounded px-2 py-1" value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="admin">Admin</option>
+            <option value="recycler">Reciclador</option>
+            <option value="resident">Residente</option>
+          </select>
+        </div>
+        <div className="overflow-x-auto w-full rounded-lg shadow-sm bg-white/80 border border-gray-200">
+          {loading ? <p className="p-4">Cargando...</p> : error ? <p className="text-red-600 p-4">{error}</p> : (
+            <table className="min-w-[600px] w-full text-sm md:text-base">
+              <thead className="sticky top-0 bg-green-100 z-10">
+                <tr>
+                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Nombre</th>
+                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
+                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Rol</th>
+                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">User ID</th>
+                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {users.filter(u => !roleFilter || u.role === roleFilter).length === 0 ? (
+                  <tr><td colSpan={5} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
+                ) : (
+                  users.filter(u => !roleFilter || u.role === roleFilter).map(u => (
+                    <tr key={u.id} className={`border-b hover:bg-green-50 transition-colors ${!u.user_id || !u.role ? 'bg-yellow-100' : ''}`}>
+                      <td className="p-2 whitespace-nowrap">{u.name || <span className="text-red-600">Sin nombre</span>}</td>
+                      <td className="p-2 whitespace-nowrap">{u.email || <span className="text-red-600">Sin email</span>}</td>
+                      <td className="p-2 capitalize whitespace-nowrap">{u.role || <span className="text-red-600">Sin rol</span>}</td>
+                      <td className="p-2 text-xs font-mono break-all max-w-[120px] whitespace-pre-line">{u.user_id || <span className="text-red-600">Sin user_id</span>}</td>
+                      <td className="p-2 flex flex-col md:flex-row gap-2 items-start md:items-center">
+                        <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => handleDeleteUser(u.id)}>Eliminar</button>
+                        {u.user_id && (
+                          <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => { setNotifTarget('individual'); setSelectedUser(u); }}>Notificar</button>
+                        )}
+                        {(!u.user_id || !u.role) && (
+                          <span className="text-xs text-yellow-800 bg-yellow-200 rounded px-2 py-1 mt-1">Perfil incompleto</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-2">Enviar notificación</h2>

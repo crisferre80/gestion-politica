@@ -61,7 +61,7 @@ const DashboardRecycler: React.FC = () => {
           )
         `)
         .eq('recycler_id', user.id)
-        .order('claimed_at', { ascending: false });
+        .order('created_at', { ascending: false });
       if (claimsError) throw claimsError;
       const claimed = (claimsData || []).map(claim => ({
         ...claim.collection_point,

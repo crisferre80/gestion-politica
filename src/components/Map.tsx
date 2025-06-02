@@ -43,6 +43,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
   routeDestination,
   onDeletePoint
 }) => {
+  // Filtrar puntos con lat/lng válidos
+  const validPoints = points.filter(
+    p => typeof p.lat === 'number' && !isNaN(p.lat) && typeof p.lng === 'number' && !isNaN(p.lng)
+  );
+
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -171,9 +176,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
         cursor={isAddingPoint ? 'crosshair' : 'default'}
       >
         <NavigationControl position="top-right" />
-        
         {/* Solo mostrar la ubicación del usuario si no es un reciclador */}
-        {userLocation && !points.some(p => p.isRecycler && p.lat === userLocation.latitude && p.lng === userLocation.longitude) && (
+        {userLocation && !validPoints.some(p => p.isRecycler && p.lat === userLocation.latitude && p.lng === userLocation.longitude) && (
           <Marker
             longitude={userLocation.longitude}
             latitude={userLocation.latitude}
@@ -183,15 +187,14 @@ const MapComponent: React.FC<MapComponentProps> = ({
             </div>
           </Marker>
         )}
-        
-        {points.map((point) => (
+        {/* Mostrar solo puntos válidos */}
+        {validPoints.map((point) => (
           <Marker
             key={point.id}
             longitude={point.lng}
             latitude={point.lat}
             onClick={() => {
               if (onMarkerClick) onMarkerClick(point.id);
-              // setRouteDestination({ lat: point.lat, lng: point.lng }); // Use prop to control routeDestination
             }}
           >
             <div className="cursor-pointer transform -translate-x-1/2 -translate-y-1/2 relative flex flex-col items-center">
@@ -257,7 +260,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
           </Marker>
         )}
       </Map>
-
+      {/* Si no hay puntos válidos, mostrar advertencia */}
+      {validPoints.length === 0 && (
+        <div className="absolute top-4 left-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-3 rounded shadow">
+          No hay puntos de recolección con coordenadas válidas para mostrar en el mapa.
+        </div>
+      )}
       {locationError && (
         <div className="absolute bottom-4 left-4 right-4 bg-red-50 border-l-4 border-red-400 p-4 rounded shadow-md">
           <div className="flex">

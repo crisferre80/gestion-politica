@@ -34,66 +34,75 @@ const DashboardRecycler: React.FC = () => {
   // --- Notificaciones de eventos del residente ---
   const [eventNotifications, setEventNotifications] = useState<Array<{id: string, type: string, message: string, created_at: string}>>([]);
 
-  // Cargar puntos reclamados y disponibles
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      if (!user) {
-        setError('Usuario no autenticado');
-        setLoading(false);
-        return;
-      }
-      // Reclamos del reciclador (usando recycler_id correcto)
-      const { data: claimsData, error: claimsError } = await supabase
-        .from('collection_claims')
-        .select('*')
-        .eq('recycler_id', user.id) // Cambiado a recycler_id
-        .order('created_at', { ascending: false });
-      if (claimsError) throw claimsError;
-      // Para cada claim, obtener el punto y el perfil del residente
-      let claimed: any[] = [];
-      if (claimsData && claimsData.length > 0) {
-        // Obtener todos los point_user_id únicos
-        const pointIds = claimsData.map(claim => claim.collection_point_id);
-        const { data: pointsData, error: pointsError } = await supabase
-          .from('collection_points')
-          .select('*')
-          .in('id', pointIds);
-        if (pointsError) throw pointsError;
-        // Obtener todos los user_id de los residentes
-        const residentUserIds = [...new Set(pointsData.map(p => p.user_id))];
-        let profilesById: Record<string, any> = {};
-        if (residentUserIds.length > 0) {
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('user_id, name, email, phone, avatar_url')
-            .in('user_id', residentUserIds);
-          if (profilesError) throw profilesError;
-          profilesById = (profilesData || []).reduce((acc, profile) => {
-            acc[profile.user_id] = profile;
-            return acc;
-          }, {} as Record<string, any>);
+  // Define ResidentProfile type at the top-level so it's accessible everywhere in the component
+  type ResidentProfile = {
+    user_id: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    avatar_url?: string;
+  };
+  
+    // Cargar puntos reclamados y disponibles
+    const fetchData = useCallback(async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        if (!user) {
+          setError('Usuario no autenticado');
+          setLoading(false);
+          return;
         }
-        claimed = claimsData.map(claim => {
-          const point = pointsData.find(p => p.id === claim.collection_point_id) || {};
-          const profile = profilesById[point.user_id] || {};
-          return {
-            ...point,
-            claim_id: claim.id,
-            status: claim.status,
-            creator_name: profile.name || 'Usuario Anónimo',
-            creator_email: profile.email,
-            creator_phone: profile.phone,
-            creator_avatar: profile.avatar_url,
-            pickup_time: claim.pickup_time,
-            profiles: profile,
-            cancelled_at: claim.cancelled_at,
-            cancellation_reason: claim.cancellation_reason,
-            completed_at: claim.completed_at,
-          };
-        });
-      }
+        // Reclamos del reciclador (usando recycler_id correcto)
+        const { data: claimsData, error: claimsError } = await supabase
+          .from('collection_claims')
+          .select('*')
+          .eq('recycler_id', user.id) // Cambiado a recycler_id
+          .order('created_at', { ascending: false });
+        if (claimsError) throw claimsError;
+        // Para cada claim, obtener el punto y el perfil del residente
+        let claimed: CollectionPoint[] = [];
+        if (claimsData && claimsData.length > 0) {
+          // Obtener todos los point_user_id únicos
+          const pointIds = claimsData.map(claim => claim.collection_point_id);
+          const { data: pointsData, error: pointsError } = await supabase
+            .from('collection_points')
+            .select('*')
+            .in('id', pointIds);
+          if (pointsError) throw pointsError;
+          // Obtener todos los user_id de los residentes
+          const residentUserIds = [...new Set(pointsData.map(p => p.user_id))];
+          let profilesById: Record<string, ResidentProfile> = {};
+          if (residentUserIds.length > 0) {
+            const { data: profilesData, error: profilesError } = await supabase
+              .from('profiles')
+              .select('user_id, name, email, phone, avatar_url')
+              .in('user_id', residentUserIds);
+            if (profilesError) throw profilesError;
+            profilesById = (profilesData || []).reduce((acc, profile) => {
+              acc[profile.user_id] = profile;
+              return acc;
+            }, {} as Record<string, ResidentProfile>);
+          }
+          claimed = claimsData.map(claim => {
+            const point = pointsData.find(p => p.id === claim.collection_point_id) || {};
+            const profile = profilesById[point.user_id] || {};
+            return {
+              ...point,
+              claim_id: claim.id,
+              status: claim.status,
+              creator_name: profile.name || 'Usuario Anónimo',
+              creator_email: profile.email,
+              creator_phone: profile.phone,
+              creator_avatar: profile.avatar_url,
+              pickup_time: claim.pickup_time,
+              profiles: profile,
+              cancelled_at: claim.cancelled_at,
+              cancellation_reason: claim.cancellation_reason,
+              completed_at: claim.completed_at,
+            };
+          });
+        }
       // Puntos disponibles (igual que antes)
       const { data: availableData, error: availableError } = await supabase
         .from('collection_points')
@@ -127,7 +136,7 @@ const DashboardRecycler: React.FC = () => {
       // Debug: mostrar cuántos puntos quedan tras el filtro
       console.log('DEBUG: Puntos disponibles tras filtro:', availablePointsRaw.length, availablePointsRaw.map(p => p.id));
       const userIds = [...new Set(availablePointsRaw.map(p => p.user_id))];
-      let profilesById: Record<string, any> = {};
+      let profilesById: Record<string, ResidentProfile> = {};
       if (userIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
@@ -137,7 +146,7 @@ const DashboardRecycler: React.FC = () => {
         profilesById = (profilesData || []).reduce((acc, profile) => {
           acc[profile.user_id] = profile;
           return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, ResidentProfile>);
       }
       const available = availablePointsRaw.map(point => {
         const profile = profilesById[point.user_id];
@@ -226,8 +235,14 @@ const DashboardRecycler: React.FC = () => {
       setSelectedClaim(null);
       setCancellationReason('');
       await fetchData();
-    } catch (err: any) {
-      setError(err?.message || 'Error al cancelar la reclamación');
+    } catch (err: unknown) {
+      let message = 'Error al cancelar la reclamación';
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+        message = (err as { message: string }).message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+      setError(message);
     }
   };
 

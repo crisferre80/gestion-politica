@@ -169,26 +169,16 @@ const DashboardRecycler: React.FC = () => {
     try {
       setError(null);
       setLoading(true);
-      // --- NUEVO: obtener profiles.id del reciclador actual ---
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (profileError || !profile) {
-        throw new Error('No se pudo obtener el perfil del reciclador.');
-      }
-      const recyclerProfileId = profile.id;
+      // Obtener profiles.id del reciclador actual (opcional, pero usamos user.id para user_id)
       await claimCollectionPoint(
-        pointToClaim.id,
-        recyclerProfileId, // <-- usar profiles.id
+        pointToClaim.id, // collection_point_id
+        user.id, // recycler_user_id
         new Date(pickupDateTimeInput).toISOString(),
         pointToClaim.user_id // user_id del residente dueño del punto
       );
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);
-      // Podrías añadir un mensaje de éxito aquí si lo deseas
     } catch (err: unknown) {
       let message = 'Error desconocido al reclamar el punto';
       if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
@@ -207,12 +197,11 @@ const DashboardRecycler: React.FC = () => {
     if (!selectedClaim || !user) return;
     try {
       setError(null);
-      await cancelClaim(selectedClaim.id, selectedClaim.pointId, cancellationReason);
+      await cancelClaim(selectedClaim.id, selectedClaim.pointId, cancellationReason); // Solo 3 argumentos
       setShowCancelClaimModal(false);
       setSelectedClaim(null);
       setCancellationReason('');
       await fetchData();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err?.message || 'Error al cancelar la reclamación');
     }
@@ -224,7 +213,7 @@ const DashboardRecycler: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await completeCollection(pointToComplete.claim_id, pointToComplete.id);
+      await completeCollection(pointToComplete.claim_id, pointToComplete.id); // Solo 2 argumentos
       setShowCompleteModal(false);
       setPointToComplete(null);
       await fetchData();

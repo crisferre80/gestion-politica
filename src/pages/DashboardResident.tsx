@@ -285,8 +285,9 @@ const DashboardResident: React.FC = () => {
         )
       `)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false, referencedTable: 'collection_points' });
     if (!errorDetailed && detailed) setDetailedPoints(detailed);
+    else if (errorDetailed) setError('Error al cargar los puntos de recolección: ' + errorDetailed.message);
   }, [user?.id]);
 
   const handleDelete = async (pointId: string) => { // <-- Cambiado a string
@@ -427,13 +428,16 @@ const DashboardResident: React.FC = () => {
           )
         `)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-    if (!error && data) {
-      console.log('[DEBUG] Resident Dashboard - fetched collection_points:', data);
-      setDetailedPoints(data);
-    }
-    else setDetailedPoints([]);
-  };
+        .order('created_at', { ascending: false, referencedTable: 'collection_points' });
+      if (!error && data) {
+        console.log('[DEBUG] Resident Dashboard - fetched collection_points:', data);
+        setDetailedPoints(data);
+      }
+      else {
+        setDetailedPoints([]);
+        if (error) setError('Error al cargar los puntos de recolección: ' + error.message);
+      }
+    };
     fetchDetailedPoints();
 
     const channelPoints = supabase.channel('resident-collection-points')

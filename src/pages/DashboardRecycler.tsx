@@ -44,11 +44,11 @@ const DashboardRecycler: React.FC = () => {
         setLoading(false);
         return;
       }
-      // Reclamos del reciclador (usando user_id en vez de id)
+      // Reclamos del reciclador (usando recycler_id correcto)
       const { data: claimsData, error: claimsError } = await supabase
         .from('collection_claims')
         .select('*')
-        .eq('recycler_user_id', user.id) // Cambiado a recycler_user_id
+        .eq('recycler_id', user.id) // Cambiado a recycler_id
         .order('created_at', { ascending: false });
       if (claimsError) throw claimsError;
       // Para cada claim, obtener el punto y el perfil del residente
@@ -101,7 +101,31 @@ const DashboardRecycler: React.FC = () => {
         .eq('status', 'available')
         .order('created_at', { ascending: false });
       if (availableError) throw availableError;
-      const availablePointsRaw = availableData || [];
+      let availablePointsRaw = availableData || [];
+      // Debug: mostrar cuántos puntos trae la consulta inicial
+      console.log('DEBUG: Puntos disponibles iniciales:', availablePointsRaw.length, availablePointsRaw.map(p => p.id));
+      // Filtrar puntos que ya tienen un claim activo (status 'claimed' o 'completed')
+      // Obtener todos los ids de puntos disponibles
+      const availableIds = availablePointsRaw.map(p => p.id);
+      // Buscar claims activos para esos puntos
+      let claimedPointIds: string[] = [];
+      if (availableIds.length > 0) {
+        const { data: claims, error: claimsError2 } = await supabase
+          .from('collection_claims')
+          .select('collection_point_id, status')
+          .in('collection_point_id', availableIds);
+        if (!claimsError2 && claims) {
+          claimedPointIds = claims
+            .filter(c => c.status === 'claimed' || c.status === 'completed')
+            .map(c => c.collection_point_id);
+        }
+      }
+      // Debug: mostrar los IDs de puntos excluidos por claims activos
+      console.log('DEBUG: claimedPointIds (excluidos):', claimedPointIds);
+      // Excluir los puntos ya reclamados
+      availablePointsRaw = availablePointsRaw.filter(p => !claimedPointIds.includes(p.id));
+      // Debug: mostrar cuántos puntos quedan tras el filtro
+      console.log('DEBUG: Puntos disponibles tras filtro:', availablePointsRaw.length, availablePointsRaw.map(p => p.id));
       const userIds = [...new Set(availablePointsRaw.map(p => p.user_id))];
       let profilesById: Record<string, any> = {};
       if (userIds.length > 0) {

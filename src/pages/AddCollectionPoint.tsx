@@ -153,7 +153,7 @@ const AddCollectionPoint: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user?.profileId) {
+    if (!user?.id) { // Validar con el UID de Supabase
       setError('Debes iniciar sesión para agregar un punto de recolección');
       return;
     }
@@ -192,7 +192,7 @@ const AddCollectionPoint: React.FC = () => {
         .from('collection_points')
         .insert([
           {
-            user_id: user.profileId, // Usar el ID interno de profiles
+            user_id: user.id, // Usar el UID de Supabase
             address,
             district,
             materials,
@@ -209,7 +209,7 @@ const AddCollectionPoint: React.FC = () => {
       // Notificación para el residente (creador)
       try {
         await createNotification({
-          user_id: user.profileId, // Notificar al perfil correcto
+          user_id: user.id, // Notificar al UID correcto
           title: 'Punto de recolección creado',
           content: `Has creado un nuevo punto de recolección en ${address}.`,
           type: 'collection_point_created',
@@ -234,7 +234,7 @@ const AddCollectionPoint: React.FC = () => {
               content: `Se ha creado un nuevo punto de recolección en ${address}.`,
               type: 'new_collection_point',
               related_id: newPoint?.id
-              // No email/name for recycladores here
+              // No email/name for recicladores here
             });
           } catch (notifErr) {
             toast.error(`No se pudo notificar al reciclador (${recycler.user_id}).`);

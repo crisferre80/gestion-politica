@@ -59,6 +59,7 @@ const DashboardRecycler: React.FC = () => {
           .select('*')
           .eq('recycler_id', user.id) // Cambiado a recycler_id
           .order('created_at', { ascending: false });
+        console.log('DEBUG: claimsData (recycler):', claimsData);
         if (claimsError) throw claimsError;
         // Para cada claim, obtener el punto y el perfil del residente
         let claimed: CollectionPoint[] = [];
@@ -69,6 +70,7 @@ const DashboardRecycler: React.FC = () => {
             .from('collection_points')
             .select('*')
             .in('id', pointIds);
+          console.log('DEBUG: pointsData (claimed):', pointsData);
           if (pointsError) throw pointsError;
           // Obtener todos los user_id de los residentes
           const residentUserIds = [...new Set(pointsData.map(p => p.user_id))];
@@ -103,12 +105,14 @@ const DashboardRecycler: React.FC = () => {
             };
           });
         }
+        console.log('DEBUG: claimed array:', claimed);
       // Puntos disponibles (igual que antes)
       const { data: availableData, error: availableError } = await supabase
         .from('collection_points')
         .select('*')
         .eq('status', 'available')
         .order('created_at', { ascending: false });
+      console.log('DEBUG: availableData (raw):', availableData);
       if (availableError) throw availableError;
       let availablePointsRaw = availableData || [];
       // Debug: mostrar cuántos puntos trae la consulta inicial
@@ -123,6 +127,7 @@ const DashboardRecycler: React.FC = () => {
           .from('collection_claims')
           .select('collection_point_id, status')
           .in('collection_point_id', availableIds);
+        console.log('DEBUG: claims for available points:', claims);
         if (!claimsError2 && claims) {
           claimedPointIds = claims
             .filter(c => c.status === 'claimed' || c.status === 'completed')
@@ -159,6 +164,7 @@ const DashboardRecycler: React.FC = () => {
           profiles: profile,
         };
       });
+      console.log('DEBUG: available array (final):', available);
       setClaimedPoints(claimed);
       setAvailablePoints(available);
     } catch (err) {
@@ -428,6 +434,9 @@ const DashboardRecycler: React.FC = () => {
   // Exclude points that are already claimed by this recycler (by id)
   const claimedIds = new Set(claimedPoints.map(p => p.id));
   const trulyAvailablePoints = availablePoints.filter(p => !claimedIds.has(p.id));
+  console.log('DEBUG: claimedPoints:', claimedPoints);
+  console.log('DEBUG: availablePoints:', availablePoints);
+  console.log('DEBUG: trulyAvailablePoints:', trulyAvailablePoints);
 
   // Handler para cambio de vista que limpia el residente enfocado
   const handleSetView = (newView: string) => {

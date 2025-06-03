@@ -44,36 +44,57 @@ const DashboardRecycler: React.FC = () => {
         setLoading(false);
         return;
       }
-      // Reclamos del reciclador
+      // Reclamos del reciclador (usando user_id en vez de id)
       const { data: claimsData, error: claimsError } = await supabase
         .from('collection_claims')
-        .select(`
-          *,
-          collection_point:collection_points (
-            *,
-            profiles:profiles!collection_points_user_id_fkey (
-              name,
-              email,
-              phone,
-              avatar_url
-            )
-          )
-        `)
-        .eq('recycler_id', user.id)
+        .select('*')
+        .eq('recycler_user_id', user.id) // Cambiado a recycler_user_id
         .order('created_at', { ascending: false });
       if (claimsError) throw claimsError;
-      const claimed = (claimsData || []).map(claim => ({
-        ...claim.collection_point,
-        claim_id: claim.id,
-        status: claim.status,
-        creator_name: claim.collection_point?.profiles?.name || 'Usuario Anónimo',
-        creator_email: claim.collection_point?.profiles?.email,
-        creator_phone: claim.collection_point?.profiles?.phone,
-        creator_avatar: claim.collection_point?.profiles?.avatar_url,
-        pickup_time: claim.pickup_time
-      }));
-
-      // Puntos disponibles (step 1: fetch points)
+      // Para cada claim, obtener el punto y el perfil del residente
+      let claimed: any[] = [];
+      if (claimsData && claimsData.length > 0) {
+        // Obtener todos los point_user_id únicos
+        const pointIds = claimsData.map(claim => claim.collection_point_id);
+        const { data: pointsData, error: pointsError } = await supabase
+          .from('collection_points')
+          .select('*')
+          .in('id', pointIds);
+        if (pointsError) throw pointsError;
+        // Obtener todos los user_id de los residentes
+        const residentUserIds = [...new Set(pointsData.map(p => p.user_id))];
+        let profilesById: Record<string, any> = {};
+        if (residentUserIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('profiles')
+            .select('user_id, name, email, phone, avatar_url')
+            .in('user_id', residentUserIds);
+          if (profilesError) throw profilesError;
+          profilesById = (profilesData || []).reduce((acc, profile) => {
+            acc[profile.user_id] = profile;
+            return acc;
+          }, {} as Record<string, any>);
+        }
+        claimed = claimsData.map(claim => {
+          const point = pointsData.find(p => p.id === claim.collection_point_id) || {};
+          const profile = profilesById[point.user_id] || {};
+          return {
+            ...point,
+            claim_id: claim.id,
+            status: claim.status,
+            creator_name: profile.name || 'Usuario Anónimo',
+            creator_email: profile.email,
+            creator_phone: profile.phone,
+            creator_avatar: profile.avatar_url,
+            pickup_time: claim.pickup_time,
+            profiles: profile,
+            cancelled_at: claim.cancelled_at,
+            cancellation_reason: claim.cancellation_reason,
+            completed_at: claim.completed_at,
+          };
+        });
+      }
+      // Puntos disponibles (igual que antes)
       const { data: availableData, error: availableError } = await supabase
         .from('collection_points')
         .select('*')
@@ -81,41 +102,30 @@ const DashboardRecycler: React.FC = () => {
         .order('created_at', { ascending: false });
       if (availableError) throw availableError;
       const availablePointsRaw = availableData || [];
-      console.log('Puntos disponibles crudos:', availablePointsRaw);
-      // Step 2: get all unique user_ids
       const userIds = [...new Set(availablePointsRaw.map(p => p.user_id))];
-      console.log('userIds únicos:', userIds);
-      let profilesById: Record<string, Pick<import('../lib/supabase').User, 'name' | 'email' | 'phone' | 'avatar_url'>> = {};
+      let profilesById: Record<string, any> = {};
       if (userIds.length > 0) {
-        // Step 3: fetch all profiles for these user_ids
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('user_id, name, email, phone, avatar_url')
           .in('user_id', userIds);
         if (profilesError) throw profilesError;
-        console.log('Perfiles obtenidos:', profilesData);
         profilesById = (profilesData || []).reduce((acc, profile) => {
           acc[profile.user_id] = profile;
           return acc;
-        }, {} as Record<string, Pick<import('../lib/supabase').User, 'name' | 'email' | 'phone' | 'avatar_url'>>);
+        }, {} as Record<string, any>);
       }
-      // Step 4: merge profile info into points
       const available = availablePointsRaw.map(point => {
         const profile = profilesById[point.user_id];
-        if (!profile) {
-          console.warn('No se encontró perfil para user_id', point.user_id);
-        }
         return {
           ...point,
           creator_name: profile?.name || 'Usuario Anónimo',
           creator_email: profile?.email,
           creator_phone: profile?.phone,
           creator_avatar: profile?.avatar_url,
-          profiles: profile, // for phone in UI
+          profiles: profile,
         };
       });
-      console.log('Puntos disponibles con perfil:', available);
-
       setClaimedPoints(claimed);
       setAvailablePoints(available);
     } catch (err) {

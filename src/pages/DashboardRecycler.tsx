@@ -49,7 +49,7 @@ const DashboardRecycler: React.FC = () => {
         .from('collection_claims')
         .select(`
           *,
-          collection_point:collection_points!collection_claims_collection_point_id_fkey (
+          collection_point:collection_points (
             *,
             profiles:profiles!collection_points_user_id_fkey (
               name,

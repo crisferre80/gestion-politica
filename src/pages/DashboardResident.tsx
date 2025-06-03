@@ -279,7 +279,7 @@ const DashboardResident: React.FC = () => {
       .select(`*,
         claim:collection_claims!collection_point_id (
           *,
-          recycler:profiles!collection_claims_recycler_id_fkey (
+          recycler:profiles!id (
             id, user_id, name, avatar_url, email, phone
           )
         )
@@ -416,12 +416,13 @@ const DashboardResident: React.FC = () => {
     // Asegura que el perfil existe antes de cargar puntos
     ensureUserProfile({ id: user.id, email: user.email, name: user.name });
     const fetchDetailedPoints = async () => {
+      // CORREGIDO: select anidado con el nombre correcto de la foreign key
       const { data, error } = await supabase
         .from('collection_points')
         .select(`*,
           claim:collection_claims!collection_point_id (
             *,
-            recycler:profiles!collection_claims_recycler_id_fkey (
+            recycler:profiles!id (
               id, user_id, name, avatar_url, email, phone
             )
           )
@@ -546,7 +547,7 @@ const handleSubmitRating = async () => {
         type: 'recycler_rated',
         user_name: ratingTarget.recyclerName
       });
-    } catch (notifErr) {
+    } catch {
       setRatingError('La calificación fue enviada, pero no se pudo notificar al reciclador.');
     }
     setRatingSuccess('¡Calificación enviada correctamente!');

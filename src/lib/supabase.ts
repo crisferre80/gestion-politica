@@ -415,19 +415,34 @@ export async function updateOnlineStatus(userId: string, online: boolean): Promi
  */
 export async function ensureUserProfile(user: { id: string; email?: string; name?: string }) {
   if (!user?.id) return;
-  // Verifica si existe el perfil
-  const { data } = await supabase
-    .from('profiles')
-    .select('user_id')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  try {
+    // Verifica si existe el perfil
+    const { data, error: selectError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-  if (!data) {
-    // Si no existe, crea el perfil mínimo
-    await supabase.from('profiles').insert({
-      user_id: user.id,
-      email: user.email || '',
-      name: user.name || '',
-    });
+    if (selectError) {
+      console.error('Error checking user profile:', selectError);
+      return;
+    }
+
+    if (!data) {
+      // Si no existe, crea el perfil mínimo con role por defecto
+      const { error: insertError } = await supabase.from('profiles').insert([
+        {
+          user_id: user.id,
+          email: user.email || '',
+          name: user.name || '',
+          role: 'resident', // valor por defecto
+        }
+      ]);
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
+      }
+    }
+  } catch (err) {
+    console.error('ensureUserProfile error:', err);
   }
 }

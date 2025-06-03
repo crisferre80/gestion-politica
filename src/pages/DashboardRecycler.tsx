@@ -385,28 +385,36 @@ const DashboardRecycler: React.FC = () => {
     };
   }, [user]);
 
-  // Suscripción en tiempo real a collection_points para actualización instantánea de puntos
+  // Suscripción en tiempo real a collection_points y collection_claims para actualización instantánea
   useEffect(() => {
     if (!user?.id) return;
-    // Solo recicladores activos
-    const channel = supabase.channel('recycler-collection-points')
+    // Suscripción a collection_points (ya existente)
+    const channelPoints = supabase.channel('recycler-collection-points')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'collection_points',
-      }, (payload) => {
+      }, () => {
         // Si el punto es nuevo, cambia de estado, o es eliminado, refresca los datos
-        if (
-          payload.eventType === 'INSERT' ||
-          (payload.eventType === 'UPDATE' && (payload.new.status === 'available' || payload.old.status === 'available')) ||
-          payload.eventType === 'DELETE'
-        ) {
-          fetchData();
-        }
-      })
-      .subscribe();
+        fetchData();
+      });
+    // Suscripción a collection_claims (NUEVO: para que los reclamos actualicen en tiempo real)
+    const channelClaims = supabase.channel('recycler-collection-claims')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'collection_claims',
+        filter: `recycler_id=eq.${user.id}`,
+      }, () => {
+        // Cualquier cambio relevante en los claims del reciclador refresca los datos
+        fetchData();
+      });
+    // Activar ambos canales
+    channelPoints.subscribe();
+    channelClaims.subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channelPoints);
+      supabase.removeChannel(channelClaims);
     };
   }, [user, fetchData]);
 

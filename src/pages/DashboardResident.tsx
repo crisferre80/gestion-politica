@@ -270,6 +270,17 @@ const DashboardResident: React.FC = () => {
     if (!errorDetailed && detailed) setDetailedPoints(detailed);
   }, [user?.id]);
 
+  // Refresca datos al cambiar de tab
+  useEffect(() => {
+    if (activeTab === 'puntos') {
+      refreshCollectionPoints();
+    }
+    if (activeTab === 'recicladores') {
+      fetchRecyclers();
+    }
+    // Si necesitas estadísticas, llama aquí a la función de fetch de estadísticas
+  }, [activeTab, refreshCollectionPoints]);
+
   const handleDelete = async (pointId: string) => { // <-- Cambiado a string
     if (!user?.id) {
       setError('Usuario no autenticado');

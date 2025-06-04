@@ -446,3 +446,32 @@ export async function ensureUserProfile(user: { id: string; email?: string; name
     console.error('ensureUserProfile error:', err);
   }
 }
+
+/**
+ * Obtiene los mensajes entre dos usuarios (ordenados por fecha ascendente)
+ */
+export async function fetchMessages(userId1: string, userId2: string) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Envía un mensaje de un usuario a otro
+ */
+export async function sendMessage(senderId: string, receiverId: string, content: string) {
+  const { error } = await supabase
+    .from('messages')
+    .insert([
+      {
+        sender_id: senderId,
+        receiver_id: receiverId,
+        content,
+      }
+    ]);
+  if (error) throw error;
+}

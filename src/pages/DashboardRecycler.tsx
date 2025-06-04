@@ -140,7 +140,23 @@ const DashboardRecycler: React.FC = () => {
       availablePointsRaw = availablePointsRaw.filter(p => !claimedPointIds.includes(p.id));
       // Debug: mostrar cuántos puntos quedan tras el filtro
       console.log('DEBUG: Puntos disponibles tras filtro:', availablePointsRaw.length, availablePointsRaw.map(p => p.id));
-      const userIds = [...new Set(availablePointsRaw.map(p => p.user_id))];
+      // Buscar claims cancelados recientes por este reciclador
+      let penalizedPointIds: string[] = [];
+      if (claimsData && claimsData.length > 0) {
+        const now = new Date();
+        penalizedPointIds = claimsData
+          .filter(c => c.status === 'cancelled' && c.cancelled_at)
+          .filter(c => {
+            const cancelledAt = new Date(c.cancelled_at);
+            return (now.getTime() - cancelledAt.getTime()) < 3 * 60 * 60 * 1000; // 3 horas
+          })
+          .map(c => c.collection_point_id);
+      }
+      // Excluir los puntos penalizados para este reciclador
+      const trulyAvailablePointsRaw = availablePointsRaw.filter(p => !penalizedPointIds.includes(p.id));
+      // Debug: mostrar cuántos puntos quedan tras el filtro de penalización
+      console.log('DEBUG: Puntos disponibles tras filtro de penalización:', trulyAvailablePointsRaw.length, trulyAvailablePointsRaw.map(p => p.id));
+      const userIds = [...new Set(trulyAvailablePointsRaw.map(p => p.user_id))];
       let profilesById: Record<string, ResidentProfile> = {};
       if (userIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
@@ -153,7 +169,8 @@ const DashboardRecycler: React.FC = () => {
           return acc;
         }, {} as Record<string, ResidentProfile>);
       }
-      const available = availablePointsRaw.map(point => {
+      setClaimedPoints(claimed);
+      setAvailablePoints(trulyAvailablePointsRaw.map(point => {
         const profile = profilesById[point.user_id];
         return {
           ...point,
@@ -163,10 +180,7 @@ const DashboardRecycler: React.FC = () => {
           creator_avatar: profile?.avatar_url,
           profiles: profile,
         };
-      });
-      console.log('DEBUG: available array (final):', available);
-      setClaimedPoints(claimed);
-      setAvailablePoints(available);
+      }));
     } catch (err) {
       // Mostrar el error real de Supabase si existe
       if (err && typeof err === 'object' && 'message' in err) {

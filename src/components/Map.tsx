@@ -20,7 +20,8 @@ interface MapComponentProps {
     lng: number;
     title: string;
     avatar_url?: string;
-    isRecycler?: boolean;
+    role?: string; // <-- ahora usamos role
+    online?: boolean; // <-- aseguramos que online esté disponible
   }>;
   onMarkerClick?: (id: string) => void;
   onMapClick?: (event: { lng: number; lat: number }) => void;
@@ -160,8 +161,17 @@ const MapComponent: React.FC<MapComponentProps> = ({
     }
   };
 
+  // Normalizar lat/lng a número y role/online
+  const normalizedPoints = points.map((point) => ({
+    ...point,
+    lat: typeof point.lat === 'string' ? parseFloat(point.lat) : point.lat,
+    lng: typeof point.lng === 'string' ? parseFloat(point.lng) : point.lng,
+    role: point.role,
+    online: String(point.online) === 'true' || String(point.online) === '1',
+  }));
+
   // Filtrar puntos con coordenadas válidas
-  const validPoints = points.filter(
+  const validPoints = normalizedPoints.filter(
     (point) =>
       typeof point.lat === 'number' &&
       typeof point.lng === 'number' &&
@@ -169,16 +179,16 @@ const MapComponent: React.FC<MapComponentProps> = ({
       !isNaN(point.lng)
   );
 
-  // Filtrar solo recicladores en línea (sin usar any)
+  // Filtrar solo recicladores en línea por role y online
   const onlineRecyclers = validPoints.filter(
-    (point) => point.isRecycler && (point as { online?: boolean }).online === true
+    (point) => point.role === 'recycler' && point.online === true
   );
 
   // Los puntos a mostrar: recicladores en línea o puntos normales
   const pointsToShow = onlineRecyclers.length > 0 ?
     [
       ...onlineRecyclers,
-      ...validPoints.filter(p => !p.isRecycler)
+      ...validPoints.filter(p => p.role !== 'recycler')
     ] : validPoints;
 
   return (
@@ -198,7 +208,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
       >
         <NavigationControl position="top-right" />
         {/* Solo mostrar la ubicación del usuario si no es un reciclador */}
-        {userLocation && !points.some(p => p.isRecycler && p.lat === userLocation.latitude && p.lng === userLocation.longitude) && (
+        {userLocation && !points.some(p => p.role === 'recycler' && p.lat === userLocation.latitude && p.lng === userLocation.longitude) && (
           <Marker
             longitude={userLocation.lng}
             latitude={userLocation.lat}
@@ -219,7 +229,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
             }}
           >
             <div className="cursor-pointer transform -translate-x-1/2 -translate-y-1/2 relative flex flex-col items-center">
-              {point.isRecycler ? (
+              {point.role === 'recycler' ? (
                 <>
                   <img
                     src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png"

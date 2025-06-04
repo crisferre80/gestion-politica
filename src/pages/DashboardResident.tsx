@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone, Star } from 'lucide-react';
+import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone } from 'lucide-react';
 import { supabase, deleteCollectionPoint, ensureUserProfile } from '../lib/supabase';
 // Importa uploadProfilePhoto desde el módulo correcto si existe, por ejemplo:
 // import { uploadProfilePhoto } from '../lib/uploadProfilePhoto';
@@ -76,6 +76,7 @@ const DashboardResident: React.FC = () => {
   // const [] = useState(false);
   // const [] = useState(false);
   type Recycler = {
+    role: string;
     id: string; // <-- Cambiado a string
     user_id?: string;
     profiles?: {
@@ -127,30 +128,31 @@ const DashboardResident: React.FC = () => {
       setRecyclers([]);
     } else {
       setRecyclers(
-        (data || [])
-          .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
-          .map((rec) => ({
-            id: String(rec.id),
-            user_id: rec.user_id || rec.id,
-            profiles: {
-              avatar_url: rec.avatar_url,
-              name: rec.name,
-              email: rec.email,
-              phone: rec.phone,
-            },
-            rating_average: rec.rating_average || 0,
-            total_ratings: rec.total_ratings || 0,
-            materials: Array.isArray(rec.materials)
-              ? rec.materials
-              : (typeof rec.materials === 'string' && rec.materials.length > 0
-                  ? [rec.materials]
-                  : []),
-            bio: typeof rec.bio === 'string' ? rec.bio : '',
-            lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
-            lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
-            online: rec.online === true || rec.online === 'true' || rec.online === 1,
-          }))
-      );
+              (data || [])
+                .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
+                .map((rec) => ({
+                  role: rec.role, // <-- Añadido para cumplir con el tipo Recycler
+                  id: String(rec.id),
+                  user_id: rec.user_id || rec.id,
+                  profiles: {
+                    avatar_url: rec.avatar_url,
+                    name: rec.name,
+                    email: rec.email,
+                    phone: rec.phone,
+                  },
+                  rating_average: rec.rating_average || 0,
+                  total_ratings: rec.total_ratings || 0,
+                  materials: Array.isArray(rec.materials)
+                    ? rec.materials
+                    : (typeof rec.materials === 'string' && rec.materials.length > 0
+                        ? [rec.materials]
+                        : []),
+                  bio: typeof rec.bio === 'string' ? rec.bio : '',
+                  lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
+                  lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
+                  online: rec.online === true || rec.online === 'true' || rec.online === 1,
+                }))
+            );
     }
     setLoadingRecyclers(false);
   };
@@ -189,11 +191,13 @@ const DashboardResident: React.FC = () => {
               const normalizedOnline = newRec.online === true || newRec.online === 'true' || newRec.online === 1;
               const normalizedLat = typeof newRec.lat === 'number' ? newRec.lat : (newRec.lat !== null && newRec.lat !== undefined ? Number(newRec.lat) : undefined);
               const normalizedLng = typeof newRec.lng === 'number' ? newRec.lng : (newRec.lng !== null && newRec.lng !== undefined ? Number(newRec.lng) : undefined);
+              const safeRole = typeof newRec.role === 'string' ? newRec.role : 'recycler';
               if (exists) {
                 return prev.map((r) =>
                   r.id === String(newRec.id)
                     ? {
                         ...r,
+                        role: safeRole,
                         id: String(newRec.id),
                         user_id: newRec.user_id || newRec.id,
                         profiles: {
@@ -216,6 +220,7 @@ const DashboardResident: React.FC = () => {
                 return [
                   ...prev,
                   {
+                    role: safeRole,
                     id: String(newRec.id),
                     user_id: newRec.user_id || newRec.id,
                     profiles: {
@@ -550,7 +555,7 @@ const handleSubmitRating = async () => {
 
   // --- Estado para modal de ratings de reciclador ---
   const [showRatingsModal, setShowRatingsModal] = useState(false);
-  const [ratingsModalTarget, setRatingsModalTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
+  const [ratingsModalTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 
   useEffect(() => {
     // Refresca puntos si se navega with el flag refresh (tras crear un punto)
@@ -928,11 +933,12 @@ const handleSubmitRating = async () => {
           <h2 className="text-2xl font-bold mb-6 text-center">Recicladores</h2>
           {loadingRecyclers ? (
             <p className="text-gray-500 text-center">Cargando recicladores...</p>
-          ) : recyclers.length === 0 ? (
-            <p className="text-gray-500 text-center">No hay recicladores registrados.</p>
-          ) : (
+          ) :
+            recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).length === 0 ? (
+              <p className="text-gray-500 text-center">No hay recicladores en línea con ubicación disponible.</p>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {recyclers.map((rec) => (
+              {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map((rec) => (
                 <div key={rec.id} className="border rounded-lg p-4 flex flex-col items-center bg-gray-50 shadow-sm">
                   <div className="w-20 h-20 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
                     {rec.profiles?.avatar_url ? (
@@ -943,30 +949,10 @@ const handleSubmitRating = async () => {
                   </div>
                   <h3 className="text-lg font-semibold text-green-700 mb-1 flex items-center gap-2">
                     {rec.profiles?.name || 'Reciclador'}
-                    {rec.online && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold animate-pulse ml-2">
-                        <span className="w-2 h-2 bg-white rounded-full mr-1"></span>En línea
-                      </span>
-                    )}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold animate-pulse ml-2">
+                      <span className="w-2 h-2 bg-white rounded-full mr-1"></span>En línea
+                    </span>
                   </h3>
-                  <div className="flex items-center mb-1">
-                    <Star className="h-5 w-5 text-yellow-400 mr-1" />
-                    <span className="font-medium">{rec.rating_average?.toFixed(1) || '0.0'}</span>
-                    <span className="ml-2 text-gray-400 text-sm">({rec.total_ratings || 0})</span>
-                    <button
-                      className="ml-3 px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 border border-yellow-200"
-                      onClick={() => {
-                        setRatingsModalTarget({
-                          recyclerId: rec.user_id || '',
-                          recyclerName: rec.profiles?.name || 'Reciclador',
-                          avatarUrl: rec.profiles?.avatar_url,
-                        });
-                        setShowRatingsModal(true);
-                      }}
-                    >
-                      Ver comentarios
-                    </button>
-                  </div>
                   <p className="text-gray-500 text-sm mb-1 flex items-center"><Mail className="h-4 w-4 mr-1" />{rec.profiles?.email}</p>
                   {rec.profiles?.phone && <p className="text-gray-500 text-sm mb-1 flex items-center"><Phone className="h-4 w-4 mr-1" />{rec.profiles.phone}</p>}
                   <div className="flex flex-wrap gap-2 mt-2 justify-center">

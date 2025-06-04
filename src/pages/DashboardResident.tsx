@@ -16,17 +16,18 @@ import PhotoCapture from '../components/PhotoCapture';
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
   id: string; // <-- Cambiado a string (uuid)
+  user_id?: string; // <-- Agregado para acceso correcto
   avatar_url?: string;
   name?: string;
   email?: string;
   phone?: string;
   rating_average?: number;
   total_ratings?: number;
-  materials?: string[];
+  materials?: string[] | string; // <-- Puede ser string[] o string
   bio?: string;
-  lat?: number;
-  lng?: number;
-  online?: boolean;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  online?: boolean | string | number; // <-- Puede venir como string, number o boolean
   role?: string;
 };
 
@@ -122,146 +123,128 @@ const DashboardResident: React.FC = () => {
       .from('profiles')
       .select('id, avatar_url, name, email, phone, materials, bio, lat, lng, online, role, user_id, rating_average, total_ratings')
       .eq('role', 'recycler');
-    console.log('Recyclers fetched from Supabase:', data, error); // DEBUG
     if (error) {
       setRecyclers([]);
     } else {
       setRecyclers(
-        (data || []).map((rec) => ({
-          id: String(rec.id), // <-- Forzamos a string
-          user_id: rec.user_id || rec.id,
-          profiles: {
-            avatar_url: rec.avatar_url,
-            name: rec.name,
-            email: rec.email,
-            phone: rec.phone,
-          },
-          rating_average: rec.rating_average || 0,
-          total_ratings: rec.total_ratings || 0,
-          materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
-          bio: typeof rec.bio === 'string' ? rec.bio : '',
-          lat: rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined,
-          lng: rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined,
-          online: rec.online === true || rec.online === 'true' || rec.online === 1,
-        }))
+        (data || [])
+          .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
+          .map((rec) => ({
+            id: String(rec.id),
+            user_id: rec.user_id || rec.id,
+            profiles: {
+              avatar_url: rec.avatar_url,
+              name: rec.name,
+              email: rec.email,
+              phone: rec.phone,
+            },
+            rating_average: rec.rating_average || 0,
+            total_ratings: rec.total_ratings || 0,
+            materials: Array.isArray(rec.materials)
+              ? rec.materials
+              : (typeof rec.materials === 'string' && rec.materials.length > 0
+                  ? [rec.materials]
+                  : []),
+            bio: typeof rec.bio === 'string' ? rec.bio : '',
+            lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
+            lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
+            online: rec.online === true || rec.online === 'true' || rec.online === 1,
+          }))
       );
     }
     setLoadingRecyclers(false);
   };
 
+  // Polling para actualizar recicladores en tiempo real SOLO si el tab es 'recicladores'
   useEffect(() => {
-    if (activeTab === 'recicladores') {
-      fetchRecyclers();
-      // SUSCRIPCIÓN EN TIEMPO REAL PARA ACTUALIZAR CARDS
-      const channel = supabase.channel('recyclers-profiles')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'profiles',
-            filter: 'role=eq.recycler',
-          },
-          (payload) => {
-            const newRec = payload.new as ProfileRealtimePayload;
-            const oldRec = payload.old as ProfileRealtimePayload;
-            if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
-              setRecyclers((prev) => {
-                const exists = prev.find((r) => r.id === String(newRec.id));
-                if (exists) {
-                  // Actualiza el reciclador existente
-                  return prev.map((r) =>
-                    r.id === String(newRec.id)
-                      ? {
-                          ...r,
-                          id: String(newRec.id),
-                          profiles: {
-                            avatar_url: newRec.avatar_url,
-                            name: newRec.name,
-                            email: newRec.email,
-                            phone: newRec.phone,
-                          },
-                          rating_average: newRec.rating_average || 0,
-                          total_ratings: newRec.total_ratings || 0,
-                          materials: newRec.materials || [],
-                          bio: newRec.bio || '',
-                          lat: newRec.lat,
-                          lng: newRec.lng,
-                          online: newRec.online,
-                        }
-                      : r
-                  );
-                } else {
-                  // Nuevo reciclador
-                  return [
-                    ...prev,
-                    {
-                      id: String(newRec.id),
-                      profiles: {
-                        avatar_url: newRec.avatar_url,
-                        name: newRec.name,
-                        email: newRec.email,
-                        phone: newRec.phone,
-                      },
-                      rating_average: newRec.rating_average || 0,
-                      total_ratings: newRec.total_ratings || 0,
-                      materials: newRec.materials || [],
-                      bio: newRec.bio || '',
-                      lat: newRec.lat,
-                      lng: newRec.lng,
-                      online: newRec.online,
-                    },
-                  ];
-                }
-              });
-            }
-            if (payload.eventType === 'DELETE' && oldRec && oldRec.role && oldRec.role.toLowerCase() === 'recycler') {
-              setRecyclers((prev) => prev.filter((r) => r.id !== String(oldRec.id)));
-            }
-          }
-        )
-        .subscribe();
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
+    if (activeTab !== 'recicladores') return;
+    fetchRecyclers();
+    const interval = setInterval(fetchRecyclers, 10000); // cada 10 segundos
+    return () => clearInterval(interval);
   }, [activeTab]);
 
-  // Polling para actualizar recicladores en tiempo real
+  // Suscripción realtime SOLO si el tab es 'recicladores'
   useEffect(() => {
-    if (activeTab !== 'puntos') return;
-
-    const fetchRecyclersRealtime = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*');
-      if (!error && data) {
-        setRecyclers(
-          (data || [])
-            .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
-            .map((rec) => ({
-              id: rec.id,
-              profiles: {
-                avatar_url: rec.avatar_url,
-                name: rec.name,
-                email: rec.email,
-                phone: rec.phone,
-              },
-              rating_average: rec.rating_average || 0,
-              total_ratings: rec.total_ratings || 0,
-              materials: Array.isArray(rec.materials) ? rec.materials : (typeof rec.materials === 'string' && rec.materials.length > 0 ? [rec.materials] : []),
-              bio: typeof rec.bio === 'string' ? rec.bio : '',
-              lat: rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined,
-              lng: rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined,
-              online: rec.online === true || rec.online === 'true' || rec.online === 1,
-            }))
-        );
-      }
+    if (activeTab !== 'recicladores') return;
+    const channel = supabase.channel('recyclers-profiles')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'role=eq.recycler',
+        },
+        (payload) => {
+          const newRec = payload.new as ProfileRealtimePayload;
+          const oldRec = payload.old as ProfileRealtimePayload;
+          if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
+            setRecyclers((prev) => {
+              const exists = prev.find((r) => r.id === String(newRec.id));
+              const normalizedMaterials = Array.isArray(newRec.materials)
+                ? newRec.materials
+                : (typeof newRec.materials === 'string' && newRec.materials.length > 0
+                    ? [newRec.materials]
+                    : []);
+              const normalizedOnline = newRec.online === true || newRec.online === 'true' || newRec.online === 1;
+              const normalizedLat = typeof newRec.lat === 'number' ? newRec.lat : (newRec.lat !== null && newRec.lat !== undefined ? Number(newRec.lat) : undefined);
+              const normalizedLng = typeof newRec.lng === 'number' ? newRec.lng : (newRec.lng !== null && newRec.lng !== undefined ? Number(newRec.lng) : undefined);
+              if (exists) {
+                return prev.map((r) =>
+                  r.id === String(newRec.id)
+                    ? {
+                        ...r,
+                        id: String(newRec.id),
+                        user_id: newRec.user_id || newRec.id,
+                        profiles: {
+                          avatar_url: newRec.avatar_url,
+                          name: newRec.name,
+                          email: newRec.email,
+                          phone: newRec.phone,
+                        },
+                        rating_average: newRec.rating_average || 0,
+                        total_ratings: newRec.total_ratings || 0,
+                        materials: normalizedMaterials,
+                        bio: typeof newRec.bio === 'string' ? newRec.bio : '',
+                        lat: normalizedLat,
+                        lng: normalizedLng,
+                        online: normalizedOnline,
+                      }
+                    : r
+                );
+              } else {
+                return [
+                  ...prev,
+                  {
+                    id: String(newRec.id),
+                    user_id: newRec.user_id || newRec.id,
+                    profiles: {
+                      avatar_url: newRec.avatar_url,
+                      name: newRec.name,
+                      email: newRec.email,
+                      phone: newRec.phone,
+                    },
+                    rating_average: newRec.rating_average || 0,
+                    total_ratings: newRec.total_ratings || 0,
+                    materials: normalizedMaterials,
+                    bio: typeof newRec.bio === 'string' ? newRec.bio : '',
+                    lat: normalizedLat,
+                    lng: normalizedLng,
+                    online: normalizedOnline,
+                  },
+                ];
+              }
+            });
+          }
+          if (payload.eventType === 'DELETE' && oldRec && oldRec.role && oldRec.role.toLowerCase() === 'recycler') {
+            setRecyclers((prev) => prev.filter((r) => r.id !== String(oldRec.id)));
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
     };
-
-    const interval = setInterval(fetchRecyclersRealtime, 5000); // cada 5 segundos
-    fetchRecyclersRealtime();
-    return () => clearInterval(interval);
   }, [activeTab]);
 
   // Refresca los puntos de recolección y detalles

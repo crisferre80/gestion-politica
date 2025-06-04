@@ -267,7 +267,7 @@ const DashboardResident: React.FC = () => {
       .select(`*,
         claim:collection_claims!collection_point_id (
           *,
-          recycler:profiles!user_id (
+          recycler:profiles!recycler_id (
             id, user_id, name, avatar_url, email, phone
           )
         )
@@ -410,7 +410,7 @@ const DashboardResident: React.FC = () => {
         .select(`*,
           claim:collection_claims!collection_point_id (
             *,
-            recycler:profiles!user_id (
+            recycler:profiles!recycler_id (
               id, user_id, name, avatar_url, email, phone
             )
           )

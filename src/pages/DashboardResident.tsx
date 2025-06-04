@@ -455,12 +455,17 @@ const DashboardResident: React.FC = () => {
   );
 
   const puntosReclamados = detailedPoints.filter(p => {
-    // Considera reclamado si el claim está en claimed y no está completado ni cancelado
+    // Aparece en reclamados si:
+    // 1. Tiene un claim en estado 'claimed' (activo)
     if (p.claim && p.claim.status === 'claimed') return true;
-    // O si el status del punto es claimed/reclamado y el claim no está completado/cancelado
+    // 2. O si el status del punto es 'claimed'/'reclamado' y el claim no está completado/cancelado
     if ((p.status === 'claimed' || p.status === 'reclamado') && (!p.claim || (p.claim.status !== 'completed' && p.claim.status !== 'cancelled'))) return true;
+    // 3. O si el status es 'claimed'/'reclamado' y no tiene claim (caso raro pero posible por inconsistencia)
+    if ((p.status === 'claimed' || p.status === 'reclamado') && !p.claim) return true;
     return false;
   });
+
+  console.log('[DEBUG][puntosReclamados] Detalle:', detailedPoints.map(p => ({id: p.id, status: p.status, claimStatus: p.claim?.status})));
 
   const puntosRetirados = detailedPoints.filter(p => {
     // Considera retirado si el status del punto es completed o el claim está en completed

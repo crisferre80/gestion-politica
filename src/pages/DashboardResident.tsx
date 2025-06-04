@@ -255,19 +255,14 @@ const DashboardResident: React.FC = () => {
   // Refresca los puntos de recolección y detalles
   const refreshCollectionPoints = React.useCallback(async () => {
     if (!user?.id) return;
-    // Actualiza collectionPoints
-    const { data, error } = await supabase
-      .from('collection_points')
-      .select('*')
-      .eq('user_id', user.id);
-    if (!error && data) setDetailedPoints(data);
-    // Actualiza detailedPoints
+    // Solo consulta detallada, elimina la consulta simple
     const { data: detailed, error: errorDetailed } = await supabase
       .from('collection_points')
       .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (!errorDetailed && detailed) setDetailedPoints(detailed);
+    else setDetailedPoints([]);
   }, [user?.id]);
 
   // Refresca datos al cambiar de tab

@@ -171,7 +171,21 @@ const DashboardRecycler: React.FC = () => {
       }
       setClaimedPoints(claimed);
       setAvailablePoints(trulyAvailablePointsRaw.map(point => {
-        const profile = profilesById[point.user_id];
+        const profile = profilesById[point.user_id] || {};
+        // Asegura que point.materials sea siempre un array
+        let materials: string[] = [];
+        if (Array.isArray(point.materials)) {
+          materials = point.materials;
+        } else if (typeof point.materials === 'string' && point.materials.length > 0) {
+          try {
+            // Intenta parsear como JSON si es string tipo '["Papel","Plástico"]'
+            const parsed = JSON.parse(point.materials);
+            if (Array.isArray(parsed)) materials = parsed;
+            else materials = [point.materials];
+          } catch {
+            materials = [point.materials];
+          }
+        }
         return {
           ...point,
           creator_name: profile?.name || 'Usuario Anónimo',
@@ -179,6 +193,7 @@ const DashboardRecycler: React.FC = () => {
           creator_phone: profile?.phone,
           creator_avatar: profile?.avatar_url,
           profiles: profile,
+          materials,
         };
       }));
     } catch (err) {

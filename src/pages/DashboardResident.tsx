@@ -446,6 +446,7 @@ const DashboardResident: React.FC = () => {
       }, () => {
         fetchDetailedPoints();
       })
+      
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

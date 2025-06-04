@@ -169,6 +169,18 @@ const MapComponent: React.FC<MapComponentProps> = ({
       !isNaN(point.lng)
   );
 
+  // Filtrar solo recicladores en línea (sin usar any)
+  const onlineRecyclers = validPoints.filter(
+    (point) => point.isRecycler && (point as { online?: boolean }).online === true
+  );
+
+  // Los puntos a mostrar: recicladores en línea o puntos normales
+  const pointsToShow = onlineRecyclers.length > 0 ?
+    [
+      ...onlineRecyclers,
+      ...validPoints.filter(p => !p.isRecycler)
+    ] : validPoints;
+
   return (
     <div className="relative">
       <Map
@@ -196,8 +208,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
             </div>
           </Marker>
         )}
-        {/* Mostrar solo puntos válidos */}
-        {validPoints.map((point) => (
+        {/* Mostrar solo puntos válidos y recicladores en línea */}
+        {pointsToShow.map((point) => (
           <Marker
             key={point.id}
             longitude={point.lng}
@@ -212,7 +224,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   <img
                     src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png"
                     alt="Reciclador"
-                    className="w-16 h-16 object-contain drop-shadow-lg z-0" // Agranda la bicicleta
+                    className="w-16 h-16 object-contain drop-shadow-lg z-0"
                   />
                   {point.avatar_url && (
                     <div className="w-12 h-12 rounded-full border-4 border-green-600 shadow-lg overflow-hidden z-10 absolute -top-4 left-1/2 -translate-x-1/2" style={{ background: '#fff' }}>

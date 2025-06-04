@@ -904,7 +904,8 @@ const handleSubmitRating = async () => {
                   lng: rec.lng ?? 0,
                   title: rec.profiles?.name || 'Reciclador',
                   avatar_url: rec.profiles?.avatar_url || undefined,
-                  isRecycler: true
+                  isRecycler: true,
+                  online: rec.online === true // <-- Asegura que la propiedad online esté presente
                 }))}
               showUserLocation={true}
             />

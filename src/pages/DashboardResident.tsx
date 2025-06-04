@@ -264,14 +264,7 @@ const DashboardResident: React.FC = () => {
     // Actualiza detailedPoints
     const { data: detailed, error: errorDetailed } = await supabase
       .from('collection_points')
-      .select(`*,
-        claim:collection_claims!collection_point_id (
-          *,
-          recycler:profiles!recycler_id (
-            id, user_id, name, avatar_url, email, phone
-          )
-        )
-      `)
+      .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (!errorDetailed && detailed) setDetailedPoints(detailed);
@@ -407,14 +400,7 @@ const DashboardResident: React.FC = () => {
       // CORREGIDO: select anidado con el nombre correcto de la foreign key
       const { data, error } = await supabase
         .from('collection_points')
-        .select(`*,
-          claim:collection_claims!collection_point_id (
-            *,
-            recycler:profiles!recycler_id (
-              id, user_id, name, avatar_url, email, phone
-            )
-          )
-        `)
+        .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
     if (!error && data) {

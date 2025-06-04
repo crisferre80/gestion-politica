@@ -128,46 +128,44 @@ const DashboardResident: React.FC = () => {
       setRecyclers([]);
     } else {
       setRecyclers(
-              (data || [])
-                .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
-                .map((rec) => ({
-                  role: rec.role, // <-- Añadido para cumplir con el tipo Recycler
-                  id: String(rec.id),
-                  user_id: rec.user_id || rec.id,
-                  profiles: {
-                    avatar_url: rec.avatar_url,
-                    name: rec.name,
-                    email: rec.email,
-                    phone: rec.phone,
-                  },
-                  rating_average: rec.rating_average || 0,
-                  total_ratings: rec.total_ratings || 0,
-                  materials: Array.isArray(rec.materials)
-                    ? rec.materials
-                    : (typeof rec.materials === 'string' && rec.materials.length > 0
-                        ? [rec.materials]
-                        : []),
-                  bio: typeof rec.bio === 'string' ? rec.bio : '',
-                  lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
-                  lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
-                  online: rec.online === true || rec.online === 'true' || rec.online === 1,
-                }))
-            );
+        (data || [])
+          .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
+          .map((rec) => ({
+            role: rec.role,
+            id: String(rec.id),
+            user_id: rec.user_id || rec.id,
+            profiles: {
+              avatar_url: rec.avatar_url,
+              name: rec.name,
+              email: rec.email,
+              phone: rec.phone,
+            },
+            rating_average: rec.rating_average || 0,
+            total_ratings: rec.total_ratings || 0,
+            materials: Array.isArray(rec.materials)
+              ? rec.materials
+              : (typeof rec.materials === 'string' && rec.materials.length > 0
+                  ? [rec.materials]
+                  : []),
+            bio: typeof rec.bio === 'string' ? rec.bio : '',
+            lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
+            lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
+            online: rec.online === true || rec.online === 'true' || rec.online === 1,
+          }))
+      );
     }
     setLoadingRecyclers(false);
   };
 
-  // Polling para actualizar recicladores en tiempo real SOLO si el tab es 'recicladores'
+  // Polling para actualizar recicladores en tiempo real SIEMPRE (no depende del tab)
   useEffect(() => {
-    if (activeTab !== 'recicladores') return;
     fetchRecyclers();
     const interval = setInterval(fetchRecyclers, 10000); // cada 10 segundos
     return () => clearInterval(interval);
-  }, [activeTab]);
+  }, []);
 
-  // Suscripción realtime SOLO si el tab es 'recicladores'
+  // Suscripción realtime SIEMPRE (no depende del tab)
   useEffect(() => {
-    if (activeTab !== 'recicladores') return;
     const channel = supabase.channel('recyclers-profiles')
       .on(
         'postgres_changes',
@@ -250,7 +248,7 @@ const DashboardResident: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeTab]);
+  }, []);
 
   // Refresca los puntos de recolección y detalles
   const refreshCollectionPoints = React.useCallback(async () => {
@@ -674,10 +672,7 @@ const handleSubmitRating = async () => {
               ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
               : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
           `}
-          onClick={() => {
-            setActiveTab('recicladores');
-            fetchRecyclers(); // Refresca la lista al hacer click
-          }}
+          onClick={() => setActiveTab('recicladores')}
         >
           Recicladores
         </button>
@@ -926,7 +921,8 @@ const handleSubmitRating = async () => {
                   title: rec.profiles?.name || 'Reciclador',
                   avatar_url: rec.profiles?.avatar_url || undefined,
                   isRecycler: true,
-                  online: rec.online === true // <-- Asegura que la propiedad online esté presente
+                  online: rec.online === true,
+                  bikeIconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png',
                 }))}
               showUserLocation={true}
             />

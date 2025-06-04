@@ -920,7 +920,7 @@ const handleSubmitRating = async () => {
                   lng: rec.lng ?? 0,
                   title: rec.profiles?.name || 'Reciclador',
                   avatar_url: rec.profiles?.avatar_url || undefined,
-                  isRecycler: true,
+                  role: 'recycler', // <-- Esto habilita la bicicleta en el Map
                   online: rec.online === true,
                   bikeIconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png',
                 }))}

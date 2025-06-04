@@ -437,14 +437,27 @@ const DashboardResident: React.FC = () => {
   // Filtrado por sub-tab
   const now = new Date();
   // Un punto está disponible si su status es 'available' y no tiene un claim activo
+  // (Eliminado tipo duplicado DetailedPoint)
+
   const puntosTodos = detailedPoints.filter(p =>
-    (p.status === 'available' || !p.status) && (!p.claim || p.claim.status !== 'claimed')
+    (p.status === 'available' || !p.status) && (!p.claim || !p.claim.status || p.claim.status === 'cancelled')
   );
-  // Un punto está reclamado si su status es 'claimed', 'reclamado' o el claim está en 'claimed'
-  const puntosReclamados = detailedPoints.filter(p =>
-    p.status === 'claimed' || p.status === 'reclamado' || (p.claim && p.claim.status === 'claimed')
-  );
-  const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || (p.claim && p.claim.status === 'completed'));
+
+  const puntosReclamados = detailedPoints.filter(p => {
+    // Considera reclamado si el claim está en claimed y no está completado ni cancelado
+    if (p.claim && p.claim.status === 'claimed') return true;
+    // O si el status del punto es claimed/reclamado y el claim no está completado/cancelado
+    if ((p.status === 'claimed' || p.status === 'reclamado') && (!p.claim || (p.claim.status !== 'completed' && p.claim.status !== 'cancelled'))) return true;
+    return false;
+  });
+
+  const puntosRetirados = detailedPoints.filter(p => {
+    // Considera retirado si el status del punto es completed o el claim está en completed
+    if (p.status === 'completed') return true;
+    if (p.claim && p.claim.status === 'completed') return true;
+    return false;
+  });
+
   const puntosDemorados = detailedPoints.filter(p => {
     if ((p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'claimed' && p.claim.pickup_time) {
       const pickup = new Date(p.claim.pickup_time);
@@ -452,6 +465,12 @@ const DashboardResident: React.FC = () => {
     }
     return false;
   });
+
+  // DEBUG LOGS
+  console.log('[DEBUG] puntosTodos:', puntosTodos.map(p => p.id));
+  console.log('[DEBUG] puntosReclamados:', puntosReclamados.map(p => p.id));
+  console.log('[DEBUG] puntosRetirados:', puntosRetirados.map(p => p.id));
+  console.log('[DEBUG] puntosDemorados:', puntosDemorados.map(p => p.id));
 
   // Estado para el modal de reciclador
   const [selectedRecycler, setSelectedRecycler] = useState<{

@@ -74,17 +74,8 @@ function PuntosRecoleccion() {
       return;
     }
     try {
-      const { error } = await supabase
-        .from('collection_points')
-        .delete()
-        .eq('id', pointId)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
+      await import('../lib/supabase').then(mod => mod.deleteCollectionPoint(pointId, user.id));
       await fetchPoints();
-      // Notificación de éxito
-      // Opcional: podrías crear una notificación en la tabla desde el backend, pero aquí solo mostramos toast
       alert('Punto de recolección eliminado exitosamente');
     } catch (err) {
       console.error('Error eliminando punto:', err);

@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone } from 'lucide-react';
 import { supabase, deleteCollectionPoint, ensureUserProfile } from '../lib/supabase';
-// Importa uploadProfilePhoto desde el módulo correcto si existe, por ejemplo:
-// import { uploadProfilePhoto } from '../lib/uploadProfilePhoto';
+import { uploadAvatar, updateProfileAvatar } from '../lib/uploadAvatar';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
@@ -274,20 +273,25 @@ const DashboardResident: React.FC = () => {
     // Si necesitas estadísticas, llama aquí a la función de fetch de estadísticas
   }, [activeTab, refreshCollectionPoints]);
 
-  const handleDelete = async (pointId: string) => { // <-- Cambiado a string
+  const handleDelete = async (pointId: string) => {
     if (!user?.id) {
       setError('Usuario no autenticado');
+      toast.error('Usuario no autenticado');
       return;
     }
     setIsDeleting(true);
     setError(null);
     setSuccess(null);
     try {
-      await deleteCollectionPoint(pointId);
+      await deleteCollectionPoint(pointId, user.id);
       setSuccess('Punto de recolección eliminado con éxito');
+      toast.success('Punto de recolección eliminado con éxito');
       await refreshCollectionPoints();
-    } catch {
+      // Si quieres notificar a otros usuarios (ej: reciclador que tenía un claim), puedes hacerlo aquí con createNotification
+      // await createNotification({ ... });
+    } catch (err: any) {
       setError('Error al eliminar el punto de recolección');
+      toast.error('Error al eliminar el punto de recolección');
     }
     setIsDeleting(false);
   };
@@ -344,7 +348,9 @@ const DashboardResident: React.FC = () => {
   const handlePhotoUpload = async (file: File) => {
     try {
       if (!user?.id) return;
-      await uploadProfilePhoto(file, user);
+      const publicUrl = await uploadAvatar(user.id, file);
+      if (!publicUrl) throw new Error('No se pudo obtener la URL de la imagen');
+      await updateProfileAvatar(user.id, publicUrl);
       // Obtener el perfil actualizado
       const { data: updatedProfile, error } = await supabase
         .from('profiles')
@@ -352,7 +358,6 @@ const DashboardResident: React.FC = () => {
         .eq('user_id', user.id)
         .single();
       if (!error && updatedProfile) {
-        // Normaliza los campos según el UserContext
         login({
           ...user,
           ...updatedProfile,
@@ -368,7 +373,6 @@ const DashboardResident: React.FC = () => {
       } else {
         toast.error('Error al actualizar el usuario');
       }
-      // No recargar la página
     } catch (err) {
       toast.error('Error al subir la foto');
       console.error(err);
@@ -850,7 +854,7 @@ const handleSubmitRating = async () => {
                             onClick={() => handleMakeAvailableAgain(point)}
                             className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md animate-bounce"
                           >
-                           Disponible
+                         Disponible
                           </button>
                         )}
                         {/* Botón para calificar reciclador en puntos retirados */}
@@ -915,9 +919,9 @@ const handleSubmitRating = async () => {
                   lng: rec.lng ?? 0,
                   title: rec.profiles?.name || 'Reciclador',
                   avatar_url: rec.profiles?.avatar_url || undefined,
-                  role: 'recycler', // <-- Esto habilita la bicicleta en el Map
+                  role: 'recycler',
                   online: rec.online === true,
-                  bikeIconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png',
+                  bikeIconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png'
                 }))}
               showUserLocation={true}
             />
@@ -1202,70 +1206,5 @@ const handleSubmitRating = async () => {
   );
 };
 
-// --- FUNCION PARA VOLVER PUNTO A DISPONIBLE ---
-
 export default DashboardResident;
-<style>{`
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1, transform: translateY(0); }
-}
-.animate-fade-in { animation: fadeInUp 0.7s; }
-.ripple-btn .ripple-effect {
-  position: absolute;
-  border-radius: 50%;
-  transform: scale(0);
-  animation: ripple 0.6s linear;
-  background-color: rgba(255,255,255,0.7);
-  pointer-events: none;
-  width: 120px;
-  height: 120px;
-  opacity: 0.7;
-  z-index: 10;
-}
-@keyframes ripple {
-  to {
-    transform: scale(2.5);
-    opacity: 0;
-  }
-}
-.active-tab-effect::after {
-  content: '';
-  display: block;
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  bottom: -6px;
-  height: 4px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, #22c55e 60%, #bbf7d0 100%);
-  opacity: 0.8;
-  animation: tab-underline 0.3s;
-}
-@keyframes tab-underline {
-  from { width: 0; opacity: 0; }
-  to { width: 80%; opacity: 0.8; }
-}
-`}</style>
- 
-async function uploadProfilePhoto(file: File, user: User | null | undefined) {
-  if (!user?.id) throw new Error('Usuario no autenticado');
-  // 1. Subir la imagen a Supabase Storage (sin subcarpeta)
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${user.id}_${Date.now()}.${fileExt}`;
-  const { error: uploadError } = await supabase.storage
-    .from('avatars')
-    .upload(fileName, file, { upsert: true });
-  if (uploadError) throw new Error('Error al subir la imagen');
-  // 2. Obtener la URL pública
-  const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-  const publicUrl = data.publicUrl;
-  if (!publicUrl) throw new Error('No se pudo obtener la URL de la imagen');
-  // 3. Actualizar el perfil del usuario
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ avatar_url: publicUrl })
-    .eq('user_id', user.id);
-  if (updateError) throw new Error('No se pudo actualizar el perfil con la foto');
-}
 

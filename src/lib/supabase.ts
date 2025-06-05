@@ -381,12 +381,13 @@ export async function completeCollection(
   }
 }
 
-export async function deleteCollectionPoint(pointId: string): Promise<void> {
+export async function deleteCollectionPoint(pointId: string, userId: string): Promise<void> {
   try {
     const { error } = await supabase
       .from('collection_points')
       .delete()
-      .eq('id', pointId);
+      .eq('id', pointId)
+      .eq('user_id', userId);
 
     if (error) throw error;
   } catch (error) {

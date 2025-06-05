@@ -36,7 +36,7 @@ const AdminAds: React.FC = () => {
       const { data, error } = await supabase
         .from('advertisements')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }); // OK: solo columna raíz
 
       if (error) throw error;
       setAds(data);

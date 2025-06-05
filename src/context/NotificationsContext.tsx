@@ -39,7 +39,7 @@ export const NotificationsProvider = ({ children }: { children: ReactNode }) => 
       .from('notifications')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }); // OK: solo columna raíz
     if (!error && data) setNotifications(data);
   }, [user]);
 

@@ -36,7 +36,7 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
         .from('recycler_ratings')
         .select('id, rating, comment, created_at, resident:profiles!recycler_ratings_resident_id_fkey(name, avatar_url)')
         .eq('recycler_id', recyclerId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }); // OK: solo columna raíz
       if (error) {
         setError('Error al cargar las calificaciones');
         setRatings([]);

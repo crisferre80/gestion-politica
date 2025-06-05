@@ -58,7 +58,7 @@ const DashboardRecycler: React.FC = () => {
           .from('collection_claims')
           .select('*')
           .eq('recycler_id', user.id) // Cambiado a recycler_id
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false }); // OK: solo columna raíz
         console.log('DEBUG: claimsData (recycler):', claimsData);
         if (claimsError) throw claimsError;
         // Para cada claim, obtener el punto y el perfil del residente

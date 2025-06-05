@@ -34,7 +34,7 @@ function PuntosRecoleccion() {
             phone
           )
         `)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }) // OK: solo columna raíz
         .eq('status', 'available');
 
       if (user && user.type === 'recycler') {

@@ -258,7 +258,7 @@ const DashboardResident: React.FC = () => {
       .from('collection_points')
       .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }); // Usar solo el nombre de la columna raíz
     if (!errorDetailed && detailed) setDetailedPoints(detailed);
     else setDetailedPoints([]);
   }, [user?.id]);
@@ -401,18 +401,16 @@ const DashboardResident: React.FC = () => {
     // Asegura que el perfil existe antes de cargar puntos
     ensureUserProfile({ id: user.id, email: user.email, name: user.name });
     const fetchDetailedPoints = async () => {
-      // CORREGIDO: select anidado con el nombre correcto de la foreign key
+      // CORREGIDO: select anidado con el nombre correcto de la foreign key y orden explícito
       const { data, error } = await supabase
         .from('collection_points')
         .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-    if (!error && data) {
-      console.log('[DEBUG] Resident Dashboard - fetched collection_points:', data);
-      setDetailedPoints(data);
-    }
-    else setDetailedPoints([]);
-  };
+      if (!error && data) {
+        setDetailedPoints(data);
+      } else setDetailedPoints([]);
+    };
     fetchDetailedPoints();
 
     const channelPoints = supabase.channel('resident-collection-points')
@@ -424,7 +422,6 @@ const DashboardResident: React.FC = () => {
       }, () => {
         fetchDetailedPoints();
       })
-      
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -458,8 +455,6 @@ const DashboardResident: React.FC = () => {
     return false;
   });
 
-  console.log('[DEBUG][puntosReclamados] Detalle:', detailedPoints.map(p => ({id: p.id, status: p.status, claimStatus: p.claim?.status})));
-
   const puntosRetirados = detailedPoints.filter(p => {
     // Considera retirado si el status del punto es completed o el claim está en completed
     if (p.status === 'completed') return true;
@@ -476,10 +471,10 @@ const DashboardResident: React.FC = () => {
   });
 
   // DEBUG LOGS
-  console.log('[DEBUG] puntosTodos:', puntosTodos.map(p => p.id));
-  console.log('[DEBUG] puntosReclamados:', puntosReclamados.map(p => p.id));
-  console.log('[DEBUG] puntosRetirados:', puntosRetirados.map(p => p.id));
-  console.log('[DEBUG] puntosDemorados:', puntosDemorados.map(p => p.id));
+  // console.log('[DEBUG] puntosTodos:', puntosTodos.map(p => p.id));
+  // console.log('[DEBUG] puntosReclamados:', puntosReclamados.map(p => p.id));
+  // console.log('[DEBUG] puntosRetirados:', puntosRetirados.map(p => p.id));
+  // console.log('[DEBUG] puntosDemorados:', puntosDemorados.map(p => p.id));
 
   // Estado para el modal de reciclador
   const [selectedRecycler, setSelectedRecycler] = useState<{

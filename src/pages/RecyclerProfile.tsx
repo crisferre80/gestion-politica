@@ -69,7 +69,7 @@ const RecyclerProfile: React.FC = () => {
         .from('recycler_ratings')
         .select('*')
         .eq('recycler_id', id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }); // OK: solo columna raíz
       if (!error && data) {
         setReviews(data);
         if (data.length > 0) {

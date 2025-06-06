@@ -289,7 +289,7 @@ const DashboardResident: React.FC = () => {
       await refreshCollectionPoints();
       // Si quieres notificar a otros usuarios (ej: reciclador que tenía un claim), puedes hacerlo aquí con createNotification
       // await createNotification({ ... });
-    } catch (err: any) {
+    } catch {
       setError('Error al eliminar el punto de recolección');
       toast.error('Error al eliminar el punto de recolección');
     }

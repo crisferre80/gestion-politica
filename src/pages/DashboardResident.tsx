@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Calendar, Plus, Trash2, Clock, User as UserIcon, Mail, Phone } from 'lucide-react';
-import { supabase, deleteCollectionPoint, ensureUserProfile } from '../lib/supabase';
+import { MapPin, Calendar, Plus, User as UserIcon, Mail, Phone } from 'lucide-react';
+import { supabase, ensureUserProfile, cancelClaim } from '../lib/supabase';
 import { uploadAvatar, updateProfileAvatar } from '../lib/uploadAvatar';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
@@ -64,7 +64,7 @@ const DashboardResident: React.FC = () => {
   // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // (Eliminado useState con patrón de array vacío inválido)
   const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>('puntos');
   // eslint-disable-next-line no-empty-pattern
   const [] = useState<{ id: number; name: string } | null>(null);
@@ -273,28 +273,6 @@ const DashboardResident: React.FC = () => {
     // Si necesitas estadísticas, llama aquí a la función de fetch de estadísticas
   }, [activeTab, refreshCollectionPoints]);
 
-  const handleDelete = async (pointId: string) => {
-    if (!user?.id) {
-      setError('Usuario no autenticado');
-      toast.error('Usuario no autenticado');
-      return;
-    }
-    setIsDeleting(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await deleteCollectionPoint(pointId, user.id);
-      setSuccess('Punto de recolección eliminado con éxito');
-      toast.success('Punto de recolección eliminado con éxito');
-      await refreshCollectionPoints();
-      // Si quieres notificar a otros usuarios (ej: reciclador que tenía un claim), puedes hacerlo aquí con createNotification
-      // await createNotification({ ... });
-    } catch {
-      setError('Error al eliminar el punto de recolección');
-      toast.error('Error al eliminar el punto de recolección');
-    }
-    setIsDeleting(false);
-  };
 
   // Hooks de estado para los campos editables
   const [editName, setEditName] = useState(user?.name || '');
@@ -441,38 +419,53 @@ const DashboardResident: React.FC = () => {
 
   // Filtrado por sub-tab
   const now = new Date();
-  // Un punto está disponible si su status es 'available' y no tiene un claim activo
-  // (Eliminado tipo duplicado DetailedPoint)
+  // Normaliza claim: si es array, toma el primero; si es objeto, lo deja igual
+type ClaimType = {
+  id?: string;
+  status?: string;
+  pickup_time?: string;
+  recycler?: {
+    id?: string;
+    user_id?: string;
+    name?: string;
+    avatar_url?: string;
+    email?: string;
+    phone?: string;
+  };
+} | null;
 
-  const puntosTodos = detailedPoints.filter(p =>
-    (p.status === 'available' || !p.status) && (!p.claim || !p.claim.status || p.claim.status === 'cancelled')
-  );
+const normalizeClaim = (claim: ClaimType | ClaimType[] | null | undefined): ClaimType => {
+  if (Array.isArray(claim)) return claim[0] || null;
+  return claim || null;
+};
 
-  const puntosReclamados = detailedPoints.filter(p => {
-    // Aparece en reclamados si:
-    // 1. Tiene un claim en estado 'claimed' (activo)
-    if (p.claim && p.claim.status === 'claimed') return true;
-    // 2. O si el status del punto es 'claimed'/'reclamado' y el claim no está completado/cancelado
-    if ((p.status === 'claimed' || p.status === 'reclamado') && (!p.claim || (p.claim.status !== 'completed' && p.claim.status !== 'cancelled'))) return true;
-    // 3. O si el status es 'claimed'/'reclamado' y no tiene claim (caso raro pero posible por inconsistencia)
-    if ((p.status === 'claimed' || p.status === 'reclamado') && !p.claim) return true;
-    return false;
-  });
+const puntosTodos = detailedPoints.filter(p => {
+  const claim = normalizeClaim(p.claim);
+  // Un punto está disponible si su status es 'available' o vacío y NO tiene claim activo (status: 'claimed')
+  return (!claim || claim.status !== 'claimed');
+});
 
-  const puntosRetirados = detailedPoints.filter(p => {
-    // Considera retirado si el status del punto es completed o el claim está en completed
-    if (p.status === 'completed') return true;
-    if (p.claim && p.claim.status === 'completed') return true;
-    return false;
-  });
+// Ajustar filtro de puntos reclamados para depender solo de claim.status === 'claimed'
+const puntosReclamados = detailedPoints.filter(p => {
+  const claim = normalizeClaim(p.claim);
+  return claim && claim.status === 'claimed';
+});
 
-  const puntosDemorados = detailedPoints.filter(p => {
-    if ((p.status === 'claimed' || p.status === 'reclamado') && p.claim && p.claim.status === 'claimed' && p.claim.pickup_time) {
-      const pickup = new Date(p.claim.pickup_time);
-      return pickup < now;
-    }
-    return false;
-  });
+const puntosRetirados = detailedPoints.filter(p => {
+  const claim = normalizeClaim(p.claim);
+  if (p.status === 'completed') return true;
+  if (claim && claim.status === 'completed') return true;
+  return false;
+});
+
+const puntosDemorados = detailedPoints.filter(p => {
+  const claim = normalizeClaim(p.claim);
+  if (claim && claim.status === 'claimed' && claim.pickup_time) {
+    const pickup = new Date(claim.pickup_time);
+    return pickup < now;
+  }
+  return false;
+});
 
   // DEBUG LOGS
   // console.log('[DEBUG] puntosTodos:', puntosTodos.map(p => p.id));
@@ -486,7 +479,41 @@ const DashboardResident: React.FC = () => {
     avatar_url?: string;
     email?: string;
     phone?: string;
+    user_id?: string;
   } | null>(null);
+
+  // Función para volver a poner un punto como disponible
+  const handleMakeAvailableAgain = async (point: DetailedPoint) => {
+    try {
+      const claimId = point.claim_id || point.claim?.id;
+      if (claimId) {
+        await cancelClaim(claimId, point.id, 'Cancelado por el residente');
+        toast.success('El punto está disponible nuevamente.');
+        refreshCollectionPoints();
+      } else {
+        toast.error('No se encontró un reclamo activo para cancelar.');
+      }
+    } catch (err) {
+      toast.error('Error al volver a poner el punto como disponible.');
+      console.error(err);
+    }
+  };
+
+  // Función para eliminar un punto de recolección
+  const handleDeletePoint = async (point: DetailedPoint) => {
+    try {
+      // Elimina el punto de recolección
+      await supabase
+        .from('collection_points')
+        .delete()
+        .eq('id', point.id);
+      toast.success('Punto eliminado correctamente.');
+      refreshCollectionPoints();
+    } catch (err) {
+      toast.error('Error al eliminar el punto.');
+      console.error(err);
+    }
+  };
 
   // --- Calificación de recicladores ---
 const [showRatingModal, setShowRatingModal] = useState(false);
@@ -724,6 +751,8 @@ const handleSubmitRating = async () => {
               return (
                 <ul className="space-y-4">
                   {pointsToShow.map((point) => {
+                    const claim = normalizeClaim(point.claim);
+                    const isClaimed = claim && claim.status === 'claimed';
                     // Determinar si el punto debe verse apagado
                     let isInactive = false;
                     if (activePointsTab === 'todos') {
@@ -731,67 +760,6 @@ const handleSubmitRating = async () => {
                     } else if (activePointsTab === 'reclamados' || activePointsTab === 'demorados') {
                       isInactive = false; // Ahora los puntos reclamados y demorados están activos
                     } // En 'retirados' nunca se apaga
-                    function getStatusLabel(status: string): React.ReactNode {
-                      switch (status) {
-                        case 'available':
-                          return 'Disponible';
-                        case 'claimed':
-                        case 'reclamado':
-                          return 'Reclamado';
-                        case 'completed':
-                          return 'Retirado';
-                        case 'demorado':
-                          return 'Demorado';
-                        default:
-                          return status;
-                      }
-                    }
-
-                    // Mostrar etiqueta "Reclamado" si el punto tiene claim.status === 'claimed' o status === 'claimed'/'reclamado'
-                    const isClaimed = (point.claim && point.claim.status === 'claimed') || point.status === 'claimed' || point.status === 'reclamado';
-
-
-                    async function handleMakeAvailableAgain(point: CollectionPoint & {
-                      status?: string; claim_id?: string | null;
-                      claim?: {
-                      id?: string;
-                      status?: string;
-                      pickup_time?: string;
-                      recycler?: {
-                        id?: string;
-                        user_id?: string;
-                        name?: string;
-                        avatar_url?: string;
-                        email?: string;
-                        phone?: string;
-                      };
-                      };
-                    }): Promise<void> {
-                      if (!user?.id) {
-                      setError('Usuario no autenticado');
-                      toast.error('Usuario no autenticado');
-                      return;
-                      }
-                      try {
-                      // Si hay un claim activo, cancélalo primero
-                      if (point.claim && point.claim.status === 'claimed' && point.claim.id) {
-                        await supabase
-                        .from('collection_claims')
-                        .update({ status: 'cancelled' })
-                        .eq('id', point.claim.id);
-                      }
-                      // Actualiza el punto a disponible
-                      await supabase
-                        .from('collection_points')
-                        .update({ status: 'available' })
-                        .eq('id', point.id);
-                      setSuccess('El punto está disponible nuevamente.');
-                      await refreshCollectionPoints();
-                      } catch {
-                      setError('No se pudo volver a poner disponible el punto.');
-                      toast.error('No se pudo volver a poner disponible el punto.');
-                      }
-                    }
 
                     return (
                       <li
@@ -804,17 +772,17 @@ const handleSubmitRating = async () => {
                             <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Punto de Recolección" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
                             <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
                             {/* Etiqueta de estado */}
-                            {activePointsTab === 'todos' && (!point.status || point.status === 'available') && !isClaimed && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">{getStatusLabel('available')}</span>
-                            )}
                             {isClaimed && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">{getStatusLabel('claimed')}</span>
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold border border-yellow-300">Reclamado</span>
+                            )}
+                            {activePointsTab === 'todos' && (!point.status || point.status === 'available') && !isClaimed && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-300">Disponible</span>
                             )}
                             {point.status === 'completed' && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">{getStatusLabel('completed')}</span>
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold border border-green-300">Retirado</span>
                             )}
                             {activePointsTab==='demorados' && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold">{getStatusLabel('demorado')}</span>
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-300">Demorado</span>
                             )}
                           </div>
                           <p className="text-gray-500"><MapPin className="inline-block w-4 h-4 mr-1" />{point.district}</p>
@@ -823,23 +791,40 @@ const handleSubmitRating = async () => {
                           {point.notas && (<p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>)}
                           {point.additional_info && (<p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>)}
                           {/* Info del reciclador reclamante */}
-                          {point.claim && point.claim.recycler && (
-                            <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 shadow-sm">
-                              <UserIcon className="w-5 h-5 text-blue-700" />
-                              <span className="font-semibold text-blue-900 text-base">
-                                Reclamado por:
-                                <button
-                                  type="button"
-                                  className="ml-1 underline font-bold text-blue-800 hover:text-blue-600 focus:outline-none transition-colors duration-150"
-                                  onClick={() => setSelectedRecycler(point.claim?.recycler || null)}
-                                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                                >
-                                  {point.claim.recycler.name}
-                                </button>
-                              </span>
-                              {point.claim.recycler.phone && <span className="ml-3 text-blue-700 text-sm font-medium">Tel: {point.claim.recycler.phone}</span>}
+                          {isClaimed && claim && claim.recycler && (
+                            <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 shadow-sm">
+                              <img
+                                src={claim.recycler.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(claim.recycler.name || 'Reciclador') + '&background=FACC15&color=fff&size=64'}
+                                alt="Avatar reciclador"
+                                className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover"
+                              />
+                              <div className="flex flex-col">
+                            <button
+                              type="button"
+                              className="font-bold text-yellow-800 text-base block text-left hover:underline focus:outline-none"
+                              onClick={() => setSelectedRecycler({
+                                name: claim?.recycler?.name,
+                                avatar_url: claim?.recycler?.avatar_url,
+                                email: claim?.recycler?.email,
+                                phone: claim?.recycler?.phone,
+                              })}
+                            >
+                              Ver reciclador
+                            </button>
+                            {/* Botón para volver a disponible solo en tab demorados */}
+                            {activePointsTab === 'demorados' && (
+                              <button
+                                onClick={async () => {
+                                  await handleMakeAvailableAgain(point);
+                                }}
+                                className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md animate-bounce"
+                              >
+                                Disponible
+                              </button>
+                            )}
                             </div>
-                          )}
+                          </div>
+                        )}
                         </div>
                         {/* Imagen estática en vez de GIF animado */}
                         <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
@@ -852,24 +837,9 @@ const handleSubmitRating = async () => {
                             />
                           </div>
                         </div>
+                        {/* Eliminar NO se muestra si está reclamado */}
                         <div className="flex-shrink-0 md:ml-4 mt-4 md:mt-0 flex items-center">
-                          <button
-                            onClick={(e) => {
-                              const btn = e.currentTarget;
-                              const ripple = document.createElement('span');
-                              ripple.className = 'ripple-effect';
-                              const rect = btn.getBoundingClientRect();
-                              ripple.style.left = `${e.clientX - rect.left}px`;
-                              ripple.style.top = `${e.clientY - rect.top}px`;
-                              btn.appendChild(ripple);
-                              setTimeout(() => ripple.remove(), 600);
-                              handleDelete(point.id); // <-- Ahora es string
-                            }}
-                            className={`bg-red-500 text-white rounded-lg px-4 py-2 flex items-center overflow-hidden relative ripple-btn ${isInactive ? 'opacity-50 pointer-events-none' : ''}`}
-                            disabled={isDeleting || isInactive}
-                          >
-                            {isDeleting ? <Clock className="animate-spin h-5 w-5 mr-2" /> : <Trash2 className="h-5 w-5 mr-2" />}Eliminar
-                          </button>
+                          {/* No mostrar botón eliminar si está reclamado */}
                         </div>
                         {/* Botón para volver a disponible solo en tab demorados */}
                         {activePointsTab === 'demorados' && (
@@ -906,6 +876,16 @@ const handleSubmitRating = async () => {
                             </button>
                           </>
                         )}
+                        {/* Eliminar SOLO se muestra si el punto está disponible (no reclamado ni retirado) */}
+{(!isClaimed && point.status !== 'completed') && (
+  <button
+    className="ml-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shadow-md"
+    onClick={() => handleDeletePoint(point)}
+    type="button"
+  >
+    Eliminar
+  </button>
+)}
                       </li>
                     );
       })}
@@ -1153,16 +1133,30 @@ const handleSubmitRating = async () => {
       {selectedRecycler && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 shadow-lg max-w-xs w-full flex flex-col items-center">
-            <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
-              {selectedRecycler.avatar_url && (
-                <img src={selectedRecycler.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
-              )}
+            <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-yellow-400">
+              <img
+                src={selectedRecycler.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(selectedRecycler.name || 'Reciclador') + '&background=FACC15&color=fff&size=128'}
+                alt="Foto de perfil"
+                className="w-full h-full object-cover"
+              />
             </div>
-            <h3 className="text-xl font-bold text-green-700 mb-2">{selectedRecycler.name}</h3>
-            {selectedRecycler.email && <p className="text-gray-600 text-sm mb-1">{selectedRecycler.email}</p>}
-            {selectedRecycler.phone && <p className="text-gray-600 text-sm mb-1">{selectedRecycler.phone}</p>}
+            <h3 className="text-xl font-bold text-yellow-800 mb-2">{selectedRecycler.name}</h3>
+            {selectedRecycler.email && <p className="text-yellow-700 text-sm mb-1">{selectedRecycler.email}</p>}
+            {selectedRecycler.phone && <p className="text-yellow-700 text-sm mb-1">{selectedRecycler.phone}</p>}
+            {/* Calificaciones del reciclador */}
+            {selectedRecycler.user_id && (
+              <div className="w-full mt-2">
+                <RecyclerRatingsModal
+                  recyclerId={selectedRecycler.user_id}
+                  recyclerName={selectedRecycler.name || ''}
+                  avatarUrl={selectedRecycler.avatar_url}
+                  open={true}
+                  onClose={() => setSelectedRecycler(null)}
+                />
+              </div>
+            )}
             <button
-              className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
               onClick={() => setSelectedRecycler(null)}
             >
               Cerrar

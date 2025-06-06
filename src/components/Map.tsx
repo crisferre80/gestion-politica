@@ -291,12 +291,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
           </Marker>
         )}
       </Map>
-      {/* Si no hay puntos válidos, mostrar advertencia */}
-      {validPoints.length === 0 && (
-        <div className="absolute top-4 left-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-3 rounded shadow">
-          No hay puntos de recolección con coordenadas válidas para mostrar en el mapa.
-        </div>
-      )}
+      
       {locationError && (
         <div className="absolute bottom-4 left-4 right-4 bg-red-50 border-l-4 border-red-400 p-4 rounded shadow-md">
           <div className="flex">

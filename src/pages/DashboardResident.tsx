@@ -747,27 +747,50 @@ const handleSubmitRating = async () => {
                       }
                     }
 
+                    // Mostrar etiqueta "Reclamado" si el punto tiene claim.status === 'claimed' o status === 'claimed'/'reclamado'
+                    const isClaimed = (point.claim && point.claim.status === 'claimed') || point.status === 'claimed' || point.status === 'reclamado';
 
 
-
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    function handleMakeAvailableAgain(_point: CollectionPoint & {
-                        status?: string; claim_id?: string | null; // <-- Añadido para acceso seguro
-                        // <-- Añadido para acceso seguro
-                        claim?: {
-                          id?: string; // <-- Añadido para fallback
-                          status?: string;
-                          pickup_time?: string;
-                          recycler?: {
-                            user_id?: string;
-                            name?: string;
-                            avatar_url?: string;
-                            email?: string;
-                            phone?: string;
-                          };
-                        };
-                      }): void {
-                      throw new Error('Function not implemented.');
+                    async function handleMakeAvailableAgain(point: CollectionPoint & {
+                      status?: string; claim_id?: string | null;
+                      claim?: {
+                      id?: string;
+                      status?: string;
+                      pickup_time?: string;
+                      recycler?: {
+                        id?: string;
+                        user_id?: string;
+                        name?: string;
+                        avatar_url?: string;
+                        email?: string;
+                        phone?: string;
+                      };
+                      };
+                    }): Promise<void> {
+                      if (!user?.id) {
+                      setError('Usuario no autenticado');
+                      toast.error('Usuario no autenticado');
+                      return;
+                      }
+                      try {
+                      // Si hay un claim activo, cancélalo primero
+                      if (point.claim && point.claim.status === 'claimed' && point.claim.id) {
+                        await supabase
+                        .from('collection_claims')
+                        .update({ status: 'cancelled' })
+                        .eq('id', point.claim.id);
+                      }
+                      // Actualiza el punto a disponible
+                      await supabase
+                        .from('collection_points')
+                        .update({ status: 'available' })
+                        .eq('id', point.id);
+                      setSuccess('El punto está disponible nuevamente.');
+                      await refreshCollectionPoints();
+                      } catch {
+                      setError('No se pudo volver a poner disponible el punto.');
+                      toast.error('No se pudo volver a poner disponible el punto.');
+                      }
                     }
 
                     return (
@@ -781,10 +804,10 @@ const handleSubmitRating = async () => {
                             <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Punto de Recolección" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
                             <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
                             {/* Etiqueta de estado */}
-                            {activePointsTab === 'todos' && (!point.status || point.status === 'available') && (
+                            {activePointsTab === 'todos' && (!point.status || point.status === 'available') && !isClaimed && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">{getStatusLabel('available')}</span>
                             )}
-                            {(point.status === 'claimed' || point.status === 'reclamado') && point.claim && point.claim.status === 'claimed' && (
+                            {isClaimed && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">{getStatusLabel('claimed')}</span>
                             )}
                             {point.status === 'completed' && (

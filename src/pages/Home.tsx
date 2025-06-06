@@ -73,6 +73,23 @@ const Home: React.FC = () => {
         </div>
       </section>
 
+      {/* Video institucional */}
+      <section className="py-12 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl font-bold text-center text-green-700 mb-6">Conoce Econecta2 en 1 minuto</h2>
+          <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-lg shadow-lg">
+            <iframe
+              className="absolute top-0 left-0 w-full h-full"
+              src="https://www.youtube.com/embed/G3Vlm8abEfc"
+              title="Video institucional Econecta2"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            ></iframe>
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

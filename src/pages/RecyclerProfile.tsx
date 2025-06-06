@@ -35,31 +35,33 @@ const RecyclerProfile: React.FC = () => {
   const [reviewSuccess, setReviewSuccess] = useState('');
   const [reviewError, setReviewError] = useState('');
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true);
-      setError('');
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', id)
-        .single();
-      if (error || !data) {
-        setError('No se pudo cargar el perfil');
-        setLoading(false);
-        return;
-      }
-      setEditName(data.name || '');
-      setEditEmail(data.email || '');
-      setEditPhone(data.phone || '');
-      setEditAddress(data.address || '');
-      setEditBio(data.bio || '');
-      setEditMaterials(Array.isArray(data.materials) ? data.materials.join(', ') : '');
-      setAvatarUrl(data.avatar_url || '');
+  // Move fetchProfile outside useEffect so it's accessible elsewhere
+  const fetchProfile = React.useCallback(async () => {
+    setLoading(true);
+    setError('');
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', id)
+      .single();
+    if (error || !data) {
+      setError('No se pudo cargar el perfil');
       setLoading(false);
-    };
-    if (id) fetchProfile();
+      return;
+    }
+    setEditName(data.name || '');
+    setEditEmail(data.email || '');
+    setEditPhone(data.phone || '');
+    setEditAddress(data.address || '');
+    setEditBio(data.bio || '');
+    setEditMaterials(Array.isArray(data.materials) ? data.materials.join(', ') : '');
+    setAvatarUrl(data.avatar_url || '');
+    setLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    if (id) fetchProfile();
+  }, [id, fetchProfile]);
 
   // Fetch ratings and reviews
   useEffect(() => {
@@ -264,6 +266,7 @@ const RecyclerProfile: React.FC = () => {
                       updateObj.materials = editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean);
                     }
                     await supabase.from('profiles').update(updateObj).eq('user_id', id);
+                    await fetchProfile(); // <-- Refresca el perfil tras actualizar
                   }}>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Nombre completo</label>

@@ -682,17 +682,29 @@ const DashboardRecycler: React.FC = () => {
                                   Ver en Mapa
                                 </button>
                                 {/* Botón Google Maps justo al lado */}
-                                {typeof point.lng === 'number' && typeof point.lat === 'number' && typeof user?.lng === 'number' && typeof user?.lat === 'number' ? (
+                                {typeof point.lng === 'number' && typeof point.lat === 'number' ? (
                                   <button
                                     onClick={e => {
                                       e.stopPropagation();
-                                      const latNum = Number(user.lat);
-                                      const lngNum = Number(user.lng);
-                                      const origin = (!isNaN(latNum) && !isNaN(lngNum) && Math.abs(latNum) > 0.01 && Math.abs(lngNum) > 0.01)
-                                        ? `${latNum},${lngNum}`
-                                        : 'current+location';
-                                      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.lat},${point.lng}&travelmode=driving`;
-                                      window.open(url, '_blank', 'noopener,noreferrer');
+                                      // Usar la ubicación actual del reciclador como origen
+                                      if (navigator.geolocation) {
+                                        navigator.geolocation.getCurrentPosition(
+                                          (position) => {
+                                            const origin = `${position.coords.latitude},${position.coords.longitude}`;
+                                            const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.lat},${point.lng}&travelmode=driving`;
+                                            window.open(url, '_blank', 'noopener,noreferrer');
+                                          },
+                                          () => {
+                                            // Si falla la geolocalización, usar solo destino
+                                            const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`;
+                                            window.open(url, '_blank', 'noopener,noreferrer');
+                                          }
+                                        );
+                                      } else {
+                                        // Si no hay geolocalización disponible
+                                        const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`;
+                                        window.open(url, '_blank', 'noopener,noreferrer');
+                                      }
                                     }}
                                     title="Ver ruta en Google Maps"
                                     className="ml-2 p-0 bg-transparent border-none shadow-none focus:outline-none"

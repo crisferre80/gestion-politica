@@ -47,6 +47,7 @@ export type CollectionPoint = {
   schedule: string;
   status: string;
   claim_id?: string | null; // <-- usa claim_id
+  claim_status?: string; // <-- Agregado para el estado real del claim
   pickup_time?: string | null;
   pickup_extra?: string | null; // Nuevo campo agregado
   // otros campos...

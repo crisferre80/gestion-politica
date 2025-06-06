@@ -86,13 +86,22 @@ const DashboardRecycler: React.FC = () => {
               return acc;
             }, {} as Record<string, ResidentProfile>);
           }
-          claimed = claimsData.map(claim => {
+          // Agrupar claims por collection_point_id y quedarnos con el más reciente (por created_at)
+          const latestClaimsByPoint: Record<string, any> = {};
+          claimsData.forEach(claim => {
+            const existing = latestClaimsByPoint[claim.collection_point_id];
+            if (!existing || new Date(claim.created_at) > new Date(existing.created_at)) {
+              latestClaimsByPoint[claim.collection_point_id] = claim;
+            }
+          });
+          claimed = Object.values(latestClaimsByPoint).map((claim: any) => {
             const point = pointsData.find(p => p.id === claim.collection_point_id) || {};
             const profile = profilesById[point.user_id] || {};
             return {
               ...point,
               claim_id: claim.id,
-              status: claim.status,
+              claim_status: claim.status, // status real del claim
+              status: claim.status, // para compatibilidad
               creator_name: profile.name || 'Usuario Anónimo',
               creator_email: profile.email,
               creator_phone: profile.phone,
@@ -729,10 +738,10 @@ const DashboardRecycler: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Reclamados</h2>
                   <div className="grid gap-6 md:grid-cols-2">
-                    {claimedPoints.filter(p => p.status === 'claimed').length === 0 ? (
+                    {claimedPoints.filter(p => p.claim_status === 'claimed').length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
                     ) : (
-                      claimedPoints.filter(p => p.status === 'claimed').map(point => (
+                      claimedPoints.filter(p => p.claim_status === 'claimed').map(point => (
                         <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                           <div className="p-6">
                             {/* Info principal */}
@@ -823,10 +832,10 @@ const DashboardRecycler: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Cancelados</h2>
                   <div className="grid gap-6 md:grid-cols-2">
-                    {claimedPoints.filter(p => p.status === 'cancelled').length === 0 ? (
+                    {claimedPoints.filter(p => p.claim_status === 'cancelled').length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos cancelados.</div>
                     ) : (
-                      claimedPoints.filter(p => p.status === 'cancelled').map(point => (
+                      claimedPoints.filter(p => p.claim_status === 'cancelled').map(point => (
                         <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                           <div className="p-6">
                             {/* Info principal */}
@@ -898,10 +907,10 @@ const DashboardRecycler: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Retirados</h2>
                   <div className="grid gap-6 md:grid-cols-2">
-                    {claimedPoints.filter(p => p.status === 'completed').length === 0 && (
+                    {claimedPoints.filter(p => p.claim_status === 'completed').length === 0 && (
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos retirados.</div>
                     )}
-                    {claimedPoints.filter(p => p.status === 'completed').map(point => (
+                    {claimedPoints.filter(p => p.claim_status === 'completed').map(point => (
                       <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                         <div className="p-6">
                           {/* Info principal */}
@@ -919,7 +928,7 @@ const DashboardRecycler: React.FC = () => {
                             <div className="flex-1">
                               <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
                               <div className="mt-2 flex flex-wrap gap-2">
-                                {point.materials.map((material: string, idx: number) => (
+                                {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
                                   <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
                                 ))}
                               </div>
@@ -939,18 +948,6 @@ const DashboardRecycler: React.FC = () => {
                           {point.completed_at && (
                             <div className="mt-2 text-xs text-gray-500">Retirado el: {new Date(point.completed_at).toLocaleString()}</div>
                           )}
-                          {/* Botón favorito (placeholder) */}
-                          <div className="mt-4 flex items-center gap-2">
-                            <button
-                              className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold hover:bg-yellow-200"
-                              // onClick={() => handleToggleFavorite(point.id)}
-                              disabled
-                            >
-                              ★ Marcar como favorito
-                            </button>
-                            {/* Si ya es favorito, mostrar opción para quitar */}
-                            {/* <button ...>Quitar de favoritos</button> */}
-                          </div>
                           {/* Info residente */}
                           <div className="mt-6 pt-6 border-t border-gray-200">
                             <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 
 export interface Advertisement {
   id: string;
@@ -46,6 +47,7 @@ const AdminAdsGrid: React.FC<AdminAdsGridProps> = ({ ads, onUpdate }) => {
   const [loading, setLoading] = useState(true);
   const [gridRows, setGridRows] = useState(GRID_ROWS);
   const [gridCols, setGridCols] = useState(GRID_COLS);
+  const navigate = useNavigate();
 
   // Cargar la grilla desde la base de datos
   useEffect(() => {
@@ -254,6 +256,13 @@ const AdminAdsGrid: React.FC<AdminAdsGridProps> = ({ ads, onUpdate }) => {
         className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 w-full sm:w-auto"
       >
         {saving ? 'Guardando...' : 'Guardar grilla'}
+      </button>
+      <button
+        onClick={() => navigate('/')}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full sm:w-auto ml-2"
+        type="button"
+      >
+        Ver en Inicio
       </button>
     </div>
   );

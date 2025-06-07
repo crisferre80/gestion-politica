@@ -240,6 +240,9 @@ const DashboardRecycler: React.FC = () => {
     setError(null); // Limpiar errores previos
   };
 
+  // Estado para mensaje de éxito al reclamar
+  const [claimSuccess, setClaimSuccess] = useState(false);
+
   // Confirmar reclamo con hora de recolección
   const handleConfirmClaim = async () => {
     if (!user) {
@@ -257,7 +260,6 @@ const DashboardRecycler: React.FC = () => {
     try {
       setError(null);
       setLoading(true);
-      // Obtener profiles.id del reciclador actual (opcional, pero usamos user.id para user_id)
       await claimCollectionPoint(
         pointToClaim.id, // collection_point_id
         user.id, // recycler_user_id
@@ -267,6 +269,9 @@ const DashboardRecycler: React.FC = () => {
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);
+      setViewState('reclamados'); // Redirigir a la pestaña de Puntos Reclamados
+      setClaimSuccess(true); // Mostrar mensaje de éxito
+      setTimeout(() => setClaimSuccess(false), 2500); // Ocultar tras 2.5s
     } catch (err: unknown) {
       let message = 'Error desconocido al reclamar el punto';
       if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
@@ -567,6 +572,14 @@ const DashboardRecycler: React.FC = () => {
             </div>
           </div>
           <div className="p-6">
+            {claimSuccess && (
+              <div className="flex items-center justify-center mb-6 animate-bounce-in">
+                <div className="bg-green-100 border border-green-400 text-green-800 px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                  <svg className="w-7 h-7 text-green-600 animate-ping" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <span className="font-semibold text-lg">¡Punto reclamado exitosamente!</span>
+                </div>
+              </div>
+            )}
             {error && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
                 <p className="text-sm text-red-700">{error}</p>
@@ -1159,6 +1172,19 @@ const DashboardRecycler: React.FC = () => {
 };
 
 export default DashboardRecycler;
+
+// Agrega la animación CSS al final del archivo o en tu CSS global:
+/*
+@keyframes bounce-in {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  80% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+.animate-bounce-in {
+  animation: bounce-in 0.7s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+*/
 
 
 

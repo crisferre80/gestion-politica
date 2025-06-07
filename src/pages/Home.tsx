@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, MapPin, Calendar, ArrowRight, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -25,6 +25,8 @@ interface GridAdCell {
 
 const Home: React.FC = () => {
   const [gridAds, setGridAds] = useState<GridAdCell[]>([]);
+  const [currentAd, setCurrentAd] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchGridAds();
@@ -42,6 +44,37 @@ const Home: React.FC = () => {
     } catch (err) {
       console.error('Error fetching grid ads:', err);
     }
+  };
+
+  // Carrusel automático solo en mobile
+  useEffect(() => {
+    if (window.innerWidth < 640 && gridAds.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setCurrentAd((prev) => (prev + 1) % gridAds.length);
+      }, 4000);
+      return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      };
+    } else {
+      setCurrentAd(0);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    }
+    return undefined;
+  }, [gridAds.length]);
+
+  // Swipe manual (opcional, solo mobile)
+  const touchStartX = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const diff = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(diff) > 50) {
+      if (diff < 0) setCurrentAd((prev) => (prev + 1) % gridAds.length);
+      else setCurrentAd((prev) => (prev - 1 + gridAds.length) % gridAds.length);
+    }
+    touchStartX.current = null;
   };
 
   return (
@@ -198,38 +231,104 @@ const Home: React.FC = () => {
       {gridAds.length > 0 && (
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Nuestros Auspiciantes</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="flex flex-col items-center mb-12">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100">
+                  <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="10" fill="#bbf7d0" />
+                    <path d="M8 12l2 2 4-4" stroke="#16a34a" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </svg>
+                </span>
+                <h2 className="text-3xl font-bold text-gray-900">Nuestros Auspiciantes</h2>
+              </div>
+              <p className="text-green-700 text-lg font-medium text-center max-w-2xl">Gracias a estas empresas y organizaciones que apoyan la economía circular y el reciclaje urbano.</p>
+              <div className="w-24 h-1 bg-gradient-to-r from-green-400 to-green-700 rounded-full mt-4 mb-2"></div>
+            </div>
+            {/* Mobile: Carrusel */}
+            <div className="block sm:hidden">
+              {gridAds.length > 0 && (
+                <div
+                  className="relative overflow-hidden"
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  style={{ minHeight: 320 }}
+                >
+                  {gridAds.map((cell, idx) => (
+                    cell.advertisement && cell.advertisement.active ? (
+                      <div
+                        key={cell.id}
+                        className={`absolute top-0 left-0 w-full transition-transform duration-700 ease-in-out ${idx === currentAd ? 'translate-x-0 opacity-100 z-10' : idx < currentAd ? '-translate-x-full opacity-0 z-0' : 'translate-x-full opacity-0 z-0'}`}
+                        style={{ pointerEvents: idx === currentAd ? 'auto' : 'none' }}
+                      >
+                        <div className="group bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-lg border border-green-100 overflow-hidden flex flex-col mx-auto max-w-xs">
+                          <div className="flex-1 flex items-center justify-center bg-gray-50 p-6" style={{ minHeight: '180px' }}>
+                            <img
+                              src={cell.advertisement.image_url}
+                              alt={cell.advertisement.title}
+                              className="object-contain max-h-40 w-full rounded-lg shadow-sm bg-white"
+                              style={{
+                                height: cell.size === '2x2' ? '220px' : cell.size === '2x1' ? '160px' : cell.size === '1x2' ? '120px' : '100px',
+                              }}
+                            />
+                          </div>
+                          <div className="p-5 flex flex-col items-center">
+                            <h3 className="font-semibold text-lg text-green-800 mb-2 text-center group-hover:text-green-600 transition">{cell.custom_label || cell.advertisement.title}</h3>
+                            {cell.advertisement.link && (
+                              <a
+                                href={cell.advertisement.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-block px-4 py-2 rounded-full bg-green-600 text-white font-medium shadow hover:bg-green-700 transition"
+                              >
+                                Más información
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null
+                  ))}
+                  {/* Indicadores */}
+                  <div className="flex justify-center gap-2 mt-4">
+                    {gridAds.filter(cell => cell.advertisement && cell.advertisement.active).map((_, idx) => (
+                      <button
+                        key={idx}
+                        className={`w-3 h-3 rounded-full ${idx === currentAd ? 'bg-green-600' : 'bg-green-200'}`}
+                        onClick={() => setCurrentAd(idx)}
+                        aria-label={`Ir al anuncio ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Desktop: grilla */}
+            <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
               {gridAds.map((cell) => (
                 cell.advertisement && cell.advertisement.active ? (
                   <div
                     key={cell.id}
-                    className="bg-white rounded-lg shadow-sm overflow-hidden flex flex-col justify-between"
+                    className="group bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-lg border border-green-100 overflow-hidden flex flex-col transition-transform duration-200 hover:scale-105 hover:shadow-2xl"
                     style={{ backgroundColor: cell.bg_color || undefined }}
                   >
-                    <img
-                      src={cell.advertisement.image_url}
-                      alt={cell.advertisement.title}
-                      style={{
-                        width: '100%',
-                        height: cell.size === '2x2' ? '320px' : cell.size === '2x1' ? '220px' : cell.size === '1x2' ? '180px' : '140px',
-                        objectFit: 'contain',
-                        maxHeight: '340px',
-                        margin: '0 auto',
-                        background: '#f3f4f6',
-                        borderRadius: '0.5rem',
-                      }}
-                    />
-                    <div className="p-4">
-                      <h3 className="font-medium text-lg text-gray-900">
-                        {cell.custom_label || cell.advertisement.title}
-                      </h3>
+                    <div className="flex-1 flex items-center justify-center bg-gray-50 p-6" style={{ minHeight: '180px' }}>
+                      <img
+                        src={cell.advertisement.image_url}
+                        alt={cell.advertisement.title}
+                        className="object-contain max-h-40 w-full rounded-lg shadow-sm bg-white"
+                        style={{
+                          height: cell.size === '2x2' ? '220px' : cell.size === '2x1' ? '160px' : cell.size === '1x2' ? '120px' : '100px',
+                        }}
+                      />
+                    </div>
+                    <div className="p-5 flex flex-col items-center">
+                      <h3 className="font-semibold text-lg text-green-800 mb-2 text-center group-hover:text-green-600 transition">{cell.custom_label || cell.advertisement.title}</h3>
                       {cell.advertisement.link && (
                         <a
                           href={cell.advertisement.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-2 inline-block text-green-600 hover:text-green-700"
+                          className="mt-2 inline-block px-4 py-2 rounded-full bg-green-600 text-white font-medium shadow hover:bg-green-700 transition"
                         >
                           Más información
                         </a>

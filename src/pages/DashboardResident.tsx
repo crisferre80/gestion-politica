@@ -357,7 +357,7 @@ const DashboardResident: React.FC = () => {
     }
   };
 
-  const [activePointsTab, setActivePointsTab] = useState<'todos' | 'reclamados' | 'demorados' | 'retirados'>('todos');
+  const [activePointsTab, setActivePointsTab] = useState<'todos' | 'disponibles' | 'reclamados' | 'demorados' | 'retirados'>('todos');
   type DetailedPoint = CollectionPoint & {
     status?: string;
     claim_id?: string | null; // <-- Añadido para acceso seguro
@@ -690,7 +690,7 @@ const handleSubmitRating = async () => {
           `}
           onClick={() => setActiveTab('puntos')}
         >
-          Mis Puntos de Recolección
+          Mis Puntos
         </button>
         <button
           className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
@@ -726,7 +726,7 @@ const handleSubmitRating = async () => {
       {activeTab === 'puntos' && (
         <div className="w-full max-w-4xl">
           <div className="mb-4 flex gap-2">
-            <button onClick={() => setActivePointsTab('todos')} className={`px-3 py-1 rounded ${activePointsTab==='todos'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Todos</button>
+            <button onClick={() => setActivePointsTab('todos')} className={`px-3 py-1 rounded ${activePointsTab==='todos'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Disponibles</button>
             <button onClick={() => setActivePointsTab('reclamados')} className={`px-3 py-1 rounded ${activePointsTab==='reclamados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos reclamados</button>
             <button onClick={() => setActivePointsTab('demorados')} className={`px-3 py-1 rounded ${activePointsTab==='demorados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos demorados</button>
             <button onClick={() => setActivePointsTab('retirados')} className={`px-3 py-1 rounded ${activePointsTab==='retirados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos retirados</button>

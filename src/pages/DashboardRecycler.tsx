@@ -6,6 +6,8 @@ import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
 import NotificationBell from '../components/NotificationBell';
 import HeaderRecycler from '../components/HeaderRecycler';
+import { uploadAvatar } from '../lib/uploadAvatar';
+import PhotoCapture from '../components/PhotoCapture';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -132,7 +134,7 @@ const DashboardRecycler: React.FC = () => {
         .select('*')
         .eq('status', 'available')
         .order('created_at', { ascending: false });
-      console.log('DEBUG: availableData (raw):', availableData);
+     
       if (availableError) throw availableError;
       let availablePointsRaw = availableData || [];
       // Debug: mostrar cuántos puntos trae la consulta inicial
@@ -475,6 +477,166 @@ const DashboardRecycler: React.FC = () => {
   const getAvatarUrl = (url: string | undefined) =>
     url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
 
+  // --- MODALES Y ESTADOS PARA ACCIONES DEL HEADER ---
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showPointsStatsModal, setShowPointsStatsModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
+  // Simulación de permiso para chat (ajusta según tu lógica real)
+  const canChatWithResident = true; // Cambia a false para probar el deshabilitado
+
+  // --- COMPONENTE EditProfileForm ---
+  // Define un tipo local para el perfil completo del reciclador
+  interface RecyclerProfile {
+    id: string;
+    user_id: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    avatar_url?: string;
+    address?: string;
+    bio?: string;
+  }
+
+  interface EditProfileFormProps {
+    user: RecyclerProfile;
+    onClose: () => void;
+    onProfileUpdated: () => void;
+  }
+
+  const EditProfileForm: React.FC<EditProfileFormProps> = ({ user, onClose, onProfileUpdated }) => {
+    const { login } = useUser(); // Para actualizar el contexto global
+    const [form, setForm] = React.useState({
+      name: user?.name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      address: user?.address || '',
+      bio: user?.bio || '',
+      avatar_url: user?.avatar_url || '',
+    });
+    const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
+    const [photoModal, setPhotoModal] = React.useState(false);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
+    const [success, setSuccess] = React.useState(false);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setForm({ ...form, [e.target.name]: e.target.value });
+    };
+
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+        setAvatarFile(e.target.files[0]);
+        setForm({ ...form, avatar_url: URL.createObjectURL(e.target.files[0]) });
+      }
+    };
+
+    const handlePhotoCapture = (file: File) => {
+      setAvatarFile(file);
+      setForm({ ...form, avatar_url: URL.createObjectURL(file) });
+      setPhotoModal(false);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError(null);
+      try {
+        let avatarUrl = form.avatar_url;
+        if (avatarFile) {
+          const url = await uploadAvatar(user.id, avatarFile);
+          if (url) avatarUrl = url;
+        }
+        // Actualizar perfil en Supabase
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            name: form.name,
+            email: form.email,
+            phone: form.phone,
+            address: form.address,
+            bio: form.bio,
+            avatar_url: avatarUrl,
+          })
+          .eq('user_id', user.id);
+        if (updateError) throw updateError;
+        // Obtener el perfil actualizado y actualizar el contexto global
+        const { data: updatedProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        if (updatedProfile) {
+          login({ ...user, ...updatedProfile });
+        }
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          onProfileUpdated();
+        }, 1200);
+      } catch (err) {
+        setError((err as Error).message || 'Error al actualizar el perfil');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex flex-col items-center gap-2 mb-4">
+          <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-green-400 bg-white">
+            {form.avatar_url ? (
+              <img src={form.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-16 h-16 text-gray-300 mx-auto my-4" />
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              title="Cambiar foto"
+              onChange={handleAvatarChange}
+            />
+          </div>
+          <button type="button" className="text-xs text-green-700 underline" onClick={() => setPhotoModal(true)}>
+            Tomar nueva foto
+          </button>
+        </div>
+        {photoModal && (
+          <PhotoCapture onCapture={handlePhotoCapture} onCancel={() => setPhotoModal(false)} />
+        )}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Nombre</label>
+          <input name="name" value={form.name} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Email</label>
+          <input name="email" type="email" value={form.email} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2" required />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Teléfono</label>
+          <input name="phone" value={form.phone} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Dirección</label>
+          <input name="address" value={form.address} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Bio</label>
+          <textarea name="bio" value={form.bio} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows={2} />
+        </div>
+        {error && <div className="text-red-600 text-sm">{error}</div>}
+        {success && <div className="text-green-600 text-sm">¡Perfil actualizado!</div>}
+        <div className="flex justify-end gap-2 mt-4">
+          <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cancelar</button>
+          <button type="submit" disabled={loading} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow">
+            {loading ? 'Actualizando...' : 'Actualizar perfil'}
+          </button>
+        </div>
+      </form>
+    );
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -504,6 +666,17 @@ const DashboardRecycler: React.FC = () => {
   const handleSetView = (newView: string) => {
     setViewState(newView);
   };
+
+  // Muestra un mensaje claro en español si el error es 'The object exceeded the maximum allowed size', indicando que el archivo es demasiado grande.
+  if (error && (error.includes('The object exceeded the maximum allowed size') || error.includes('exceeded the maximum allowed size'))) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl text-red-600 mb-4">La imagen o archivo que intentaste subir es demasiado grande. Por favor, selecciona una imagen más liviana (menor a 2MB) e inténtalo nuevamente.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -567,7 +740,33 @@ const DashboardRecycler: React.FC = () => {
                 <div className="mt-3 text-gray-600 text-sm italic max-w-2xl">{user.bio}</div>
               )}
               <div className="flex gap-4 mt-4">
-                {/* ...otros botones... */}
+                <button
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
+                  onClick={() => setShowEditProfileModal(true)}
+                >
+                  Editar Perfil
+                </button>
+                <button
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
+                  onClick={() => setShowStatsModal(true)}
+                >
+                  Ver Estadísticas
+                </button>
+                <button
+                  className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-semibold shadow"
+                  onClick={() => setShowPointsStatsModal(true)}
+                >
+                  Mis calificaciones
+                </button>
+                <button
+                  className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2"
+                  onClick={() => setShowChatModal(true)}
+                  disabled={!canChatWithResident}
+                  title={canChatWithResident ? "Abrir chat con residente" : "Solo disponible si el residente habilita el chat"}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4.28 1.07A1 1 0 013 19.13V17.6c0-.29.13-.56.35-.74A7.97 7.97 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                  Mensajes
+                </button>
               </div>
             </div>
           </div>
@@ -621,8 +820,7 @@ const DashboardRecycler: React.FC = () => {
                   <div className="grid gap-6 md:grid-cols-2">
                     {trulyAvailablePoints.length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">
-                        No hay puntos disponibles para reclamar en este momento.<br />
-                        <span className="text-xs text-red-500">Debug: {JSON.stringify(availablePoints)}</span>
+                        No hay puntos disponibles para reclamar en este momento.
                       </div>
                     ) : (
                       trulyAvailablePoints.map(point => (
@@ -1160,6 +1358,79 @@ const DashboardRecycler: React.FC = () => {
                       <Clock className="h-4 w-4 mr-2" />
                       {loading ? 'Procesando...' : 'Confirmar Reclamo'}
                     </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* --- MODAL EDITAR PERFIL COMPLETO --- */}
+            {showEditProfileModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 relative">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Editar Perfil</h3>
+                    <button onClick={() => setShowEditProfileModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+                  </div>
+                  <EditProfileForm
+                    user={{
+                      id: user.id,
+                      user_id: user.id,
+                      name: user.name,
+                      email: user.email,
+                      phone: user.phone,
+                      avatar_url: user.avatar_url,
+                      address: user.address,
+                      bio: user.bio,
+                    }}
+                    onClose={() => setShowEditProfileModal(false)}
+                    onProfileUpdated={async () => {
+                      await fetchData();
+                      setShowEditProfileModal(false);
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            {showStatsModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Estadísticas Generales</h3>
+                    <button onClick={() => setShowStatsModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+                  </div>
+                  {/* Aquí irían las estadísticas reales */}
+                  <div className="mb-4 text-gray-700">Visualización de estadísticas generales próximamente.</div>
+                  <div className="flex justify-end">
+                    <button onClick={() => setShowStatsModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {showPointsStatsModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Estadísticas de Puntos</h3>
+                    <button onClick={() => setShowPointsStatsModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+                  </div>
+                  {/* Aquí irían las estadísticas de puntos */}
+                  <div className="mb-4 text-gray-700">Visualización de estadísticas de puntos próximamente.</div>
+                  <div className="flex justify-end">
+                    <button onClick={() => setShowPointsStatsModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {showChatModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Mensajes con Residentes</h3>
+                    <button onClick={() => setShowChatModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
+                  </div>
+                  {/* Aquí iría el componente real de chat */}
+                  <div className="mb-4 text-gray-700">Funcionalidad de chat próximamente.</div>
+                  <div className="flex justify-end">
+                    <button onClick={() => setShowChatModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
                   </div>
                 </div>
               </div>

@@ -110,7 +110,7 @@ const Home: React.FC = () => {
       {/* Video institucional */}
       <section className="py-12 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold text-center text-green-700 mb-6">Conoce Econecta2 en 1 minuto</h2>
+          <h2 className="text-2xl font-bold text-center text-green-700 mb-6">Que es el Reciclado en 1 minuto</h2>
           <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-lg shadow-lg">
             <iframe
               className="absolute top-0 left-0 w-full h-full"

@@ -191,6 +191,31 @@ const MapComponent: React.FC<MapComponentProps> = ({
       ...validPoints.filter(p => p.role !== 'recycler')
     ] : validPoints;
 
+  // --- CENTRAR MAPA EN RECICLADORES EN LÍNEA SI EXISTEN ---
+  const [hasCentered, setHasCentered] = useState(false);
+  useEffect(() => {
+    if (onlineRecyclers.length > 0 && mapRef.current && !hasCentered) {
+      const bounds = new mapboxgl.LngLatBounds();
+      onlineRecyclers.forEach(r => {
+        bounds.extend([r.lng, r.lat]);
+      });
+      mapRef.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+      setHasCentered(true);
+    }
+  }, [onlineRecyclers, mapRef, hasCentered]);
+  // Permitir manipulación libre después de centrar
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const onMove = () => setHasCentered(true);
+    map.on('dragstart', onMove);
+    map.on('zoomstart', onMove);
+    return () => {
+      map.off('dragstart', onMove);
+      map.off('zoomstart', onMove);
+    };
+  }, [mapRef]);
+
   return (
     <div className="relative">
       <Map

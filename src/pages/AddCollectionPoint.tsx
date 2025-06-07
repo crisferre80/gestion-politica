@@ -217,7 +217,7 @@ const AddCollectionPoint: React.FC = () => {
           user_name: user?.name,
           user_email: user?.email
         });
-      } catch (notifErr) {
+      } catch {
         toast.error('El punto se creó, pero no se pudo enviar la notificación al creador.');
       }
       // Notificación para todos los recicladores activos
@@ -236,7 +236,7 @@ const AddCollectionPoint: React.FC = () => {
               related_id: newPoint?.id
               // No email/name for recicladores here
             });
-          } catch (notifErr) {
+          } catch {
             toast.error(`No se pudo notificar al reciclador (${recycler.user_id}).`);
           }
         }
@@ -428,35 +428,73 @@ const AddCollectionPoint: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Hora inicio</label>
-                    <DatePicker
-                      selected={collectionTimeStart}
-                      onChange={(date) => setCollectionTimeStart(date)}
-                      showTimeSelect
-                      showTimeSelectOnly
-                      timeIntervals={30}
-                      timeCaption="Hora"
-                      dateFormat="HH:mm"
-                      className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                      placeholderText="Hora inicio"
-                      locale={es}
-                      calendarStartDay={1}
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        value={collectionTimeStart ? collectionTimeStart.getHours() : ''}
+                        onChange={e => {
+                          const hour = parseInt(e.target.value);
+                          const date = collectionTimeStart ? new Date(collectionTimeStart) : new Date();
+                          date.setHours(hour);
+                          setCollectionTimeStart(date);
+                        }}
+                      >
+                        <option value="">Hora</option>
+                        {[...Array(24)].map((_, h) => (
+                          <option key={h} value={h}>{h.toString().padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        value={collectionTimeStart ? collectionTimeStart.getMinutes() : ''}
+                        onChange={e => {
+                          const min = parseInt(e.target.value);
+                          const date = collectionTimeStart ? new Date(collectionTimeStart) : new Date();
+                          date.setMinutes(min);
+                          setCollectionTimeStart(date);
+                        }}
+                      >
+                        <option value="">Min</option>
+                        {[0, 10, 15, 20, 30, 40, 45, 50].map(m => (
+                          <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Hora fin</label>
-                    <DatePicker
-                      selected={collectionTimeEnd}
-                      onChange={(date) => setCollectionTimeEnd(date)}
-                      showTimeSelect
-                      showTimeSelectOnly
-                      timeIntervals={30}
-                      timeCaption="Hora"
-                      dateFormat="HH:mm"
-                      className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                      placeholderText="Hora fin"
-                      locale={es}
-                      calendarStartDay={1}
-                    />
+                    <div className="flex gap-2">
+                      <select
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        value={collectionTimeEnd ? collectionTimeEnd.getHours() : ''}
+                        onChange={e => {
+                          const hour = parseInt(e.target.value);
+                          const date = collectionTimeEnd ? new Date(collectionTimeEnd) : new Date();
+                          date.setHours(hour);
+                          setCollectionTimeEnd(date);
+                        }}
+                      >
+                        <option value="">Hora</option>
+                        {[...Array(24)].map((_, h) => (
+                          <option key={h} value={h}>{h.toString().padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        value={collectionTimeEnd ? collectionTimeEnd.getMinutes() : ''}
+                        onChange={e => {
+                          const min = parseInt(e.target.value);
+                          const date = collectionTimeEnd ? new Date(collectionTimeEnd) : new Date();
+                          date.setMinutes(min);
+                          setCollectionTimeEnd(date);
+                        }}
+                      >
+                        <option value="">Min</option>
+                        {[0, 10, 15, 20, 30, 40, 45, 50].map(m => (
+                          <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>

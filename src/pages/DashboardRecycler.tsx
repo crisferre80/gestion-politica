@@ -87,14 +87,25 @@ const DashboardRecycler: React.FC = () => {
             }, {} as Record<string, ResidentProfile>);
           }
           // Agrupar claims por collection_point_id y quedarnos con el más reciente (por created_at)
-          const latestClaimsByPoint: Record<string, any> = {};
+          type CollectionClaim = {
+            id: string;
+            collection_point_id: string;
+            status: string;
+            created_at: string;
+            pickup_time?: string;
+            cancelled_at?: string;
+            cancellation_reason?: string;
+            completed_at?: string;
+            // [key: string]: any; // Index signature removed to avoid 'any' type. Add explicit fields if needed.
+          };
+          const latestClaimsByPoint: Record<string, CollectionClaim> = {};
           claimsData.forEach(claim => {
             const existing = latestClaimsByPoint[claim.collection_point_id];
             if (!existing || new Date(claim.created_at) > new Date(existing.created_at)) {
               latestClaimsByPoint[claim.collection_point_id] = claim;
             }
           });
-          claimed = Object.values(latestClaimsByPoint).map((claim: any) => {
+          claimed = Object.values(latestClaimsByPoint).map((claim: CollectionClaim) => {
             const point = pointsData.find(p => p.id === claim.collection_point_id) || {};
             const profile = profilesById[point.user_id] || {};
             return {

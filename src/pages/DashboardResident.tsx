@@ -159,7 +159,7 @@ const DashboardResident: React.FC = () => {
   // Polling para actualizar recicladores en tiempo real SIEMPRE (no depende del tab)
   useEffect(() => {
     fetchRecyclers();
-    const interval = setInterval(fetchRecyclers, 10000); // cada 10 segundos
+    const interval = setInterval(fetchRecyclers, 5000); // cada 5 segundos
     return () => clearInterval(interval);
   }, []);
 

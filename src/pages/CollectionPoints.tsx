@@ -19,6 +19,8 @@ function PuntosRecoleccion() {
   const [selectedPickupTime, setSelectedPickupTime] = useState<Date | null>(null);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [pickupExtra, setPickupExtra] = useState('');
+  type ActiveClaim = { collection_point_id: string; status: string };
+  const [claims, setClaims] = useState<ActiveClaim[]>([]);
 
   const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos'];
 
@@ -64,6 +66,24 @@ function PuntosRecoleccion() {
     fetchPoints();
   }, [fetchPoints]);
 
+  // Cargar claims activos para los puntos disponibles
+  useEffect(() => {
+    const fetchClaims = async () => {
+      const pointIds = collectionPoints.map(p => p.id);
+      if (pointIds.length === 0) {
+        setClaims([]);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('collection_claims')
+        .select('collection_point_id, status')
+        .in('collection_point_id', pointIds);
+      if (!error && data) setClaims(data);
+      else setClaims([]);
+    };
+    fetchClaims();
+  }, [collectionPoints]);
+
   // Función para eliminar un punto de recolección
   const handleDeletePoint = async (pointId: string) => {
     if (!user) {
@@ -92,6 +112,7 @@ function PuntosRecoleccion() {
     }
   };
 
+  // Filtrar puntos que no tienen claim activo
   const filteredPoints = collectionPoints.filter(point => {
     const matchesSearch =
       point.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -101,7 +122,9 @@ function PuntosRecoleccion() {
       selectedMaterials.length === 0 ||
       selectedMaterials.some(material => point.materials.includes(material));
 
-    return matchesSearch && matchesMaterials;
+    // Excluir puntos con claim activo (claimed o completed)
+    const claim = claims.find(c => c.collection_point_id === point.id && (c.status === 'claimed' || c.status === 'completed'));
+    return matchesSearch && matchesMaterials && !claim;
   });
 
   // Para el mapa, todos los puntos filtrados

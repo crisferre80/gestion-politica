@@ -75,7 +75,7 @@ const Register: React.FC = () => {
         try {
           await createNotification({
             user_id: data.user.id,
-            title: '¡Bienvenido a EcoConecta!',
+            title: '¡Bienvenido a EcoNecta2!',
             content: 'Tu registro fue exitoso. Ya puedes comenzar a usar la plataforma.',
             type: 'user_registered',
             user_name: name,

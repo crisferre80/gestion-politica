@@ -9,7 +9,7 @@ const Footer: React.FC = () => {
           <div>
             <div className="flex items-center mb-4">
               <Recycle className="h-8 w-8 mr-2" />
-              <span className="font-bold text-xl">Asura EcoConecta</span>
+              <span className="font-bold text-xl">Asura EcoNecta2</span>
             </div>
             <p className="text-green-200 mb-4">
               Conectando recicladores urbanos con residentes comprometidos con el medio ambiente.
@@ -63,7 +63,7 @@ const Footer: React.FC = () => {
         </div>
         
         <div className="border-t border-green-700 mt-8 pt-6 text-center text-green-300">
-          <p>&copy; {new Date().getFullYear()} Asura EcoConecta. Todos los derechos reservados.</p>
+          <p>&copy; {new Date().getFullYear()} Asura EcoNecta2. Todos los derechos reservados.</p>
         </div>
       </div>
     </footer>

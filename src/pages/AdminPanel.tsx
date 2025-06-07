@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { deleteCollectionPoint, supabase, CollectionPoint } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
 
 interface UserRow {
+  avatar_url: string | null;
   id: string;
   user_id: string; // <-- Agregado para notificaciones
   name?: string;
@@ -23,22 +24,44 @@ const AdminPanel: React.FC = () => {
   const [notifStatus, setNotifStatus] = useState('');
   const [stats, setStats] = useState<{[role: string]: number}>({});
   const [roleFilter, setRoleFilter] = useState<string>('');
+  const [showPointsModal, setShowPointsModal] = useState(false);
+  const [points, setPoints] = useState<CollectionPoint[]>([]);
+  const [pointsLoading, setPointsLoading] = useState(false);
+  const [pointsError, setPointsError] = useState<string|null>(null);
+  const [assigningPointId, setAssigningPointId] = useState<string|null>(null);
+  const [recyclers, setRecyclers] = useState<UserRow[]>([]);
+  // Nuevo: Mapa de conteo de puntos por usuario
+  const [userPointsCount, setUserPointsCount] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchUsersAndPoints = async () => {
       setLoading(true);
-      const { data, error } = await supabase.from('profiles').select('id, user_id, name, email, role');
-      if (!error && data) {
-        console.log('[ADMIN][USERS]', data); // <-- Log temporal para depuración
-        setUsers(data);
+      const { data: usersData, error: usersError } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
+      if (!usersError && usersData) {
+        setUsers(usersData);
         // Estadísticas por rol
         const stats: {[role: string]: number} = {};
-        data.forEach((u: UserRow) => {
+        usersData.forEach((u: UserRow) => {
           const role = u.role || 'sin rol';
           stats[role] = (stats[role] || 0) + 1;
         });
         setStats(stats);
-        if (selectedUser && !data.find(u => u.id === selectedUser.id)) {
+        // Cargar conteo de puntos de recolección por usuario SOLO puntos activos
+        const { data: pointsAgg } = await supabase
+          .from('collection_points')
+          .select('user_id')
+          .in('status', ['available', 'claimed']) // Solo puntos activos
+          .not('user_id', 'is', null);
+        const pointsCount: Record<string, number> = {};
+        if (pointsAgg) {
+          pointsAgg.forEach((row: { user_id: string }) => {
+            if (row.user_id) {
+              pointsCount[row.user_id] = (pointsCount[row.user_id] || 0) + 1;
+            }
+          });
+        }
+        setUserPointsCount(pointsCount);
+        if (selectedUser && !usersData.find(u => u.id === selectedUser.id)) {
           setSelectedUser(null);
         }
       } else {
@@ -46,13 +69,13 @@ const AdminPanel: React.FC = () => {
       }
       setLoading(false);
     };
-    fetchUsers();
+    fetchUsersAndPoints();
   }, [selectedUser]);
 
   // Refrescar usuarios después de enviar notificación global o eliminar usuario
   const refreshUsers = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('profiles').select('id, user_id, name, email, role');
+    const { data, error } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
     if (!error && data) {
       setUsers(data);
       const stats: {[role: string]: number} = {};
@@ -130,6 +153,51 @@ const AdminPanel: React.FC = () => {
     setNotifMsg('');
   };
 
+  // Cargar recicladores para asignación
+  useEffect(() => {
+    const fetchRecyclers = async () => {
+      const { data } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url').eq('role', 'recycler');
+      if (data) setRecyclers(data as UserRow[]);
+    };
+    fetchRecyclers();
+  }, []);
+
+  // Mostrar puntos de recolección de un usuario
+  const handleShowPoints = async (user: UserRow) => {
+    setSelectedUser(user);
+    setShowPointsModal(true);
+    setPointsLoading(true);
+    setPointsError(null);
+    const { data, error } = await supabase.from('collection_points').select('*').eq('user_id', user.user_id);
+    if (error) setPointsError('Error al cargar puntos');
+    setPoints(data || []);
+    setPointsLoading(false);
+  };
+
+  // Eliminar punto de recolección
+  const handleDeletePoint = async (pointId: string) => {
+    if (!selectedUser) return;
+    if (!window.confirm('¿Eliminar este punto de recolección?')) return;
+    try {
+      await deleteCollectionPoint(pointId, selectedUser.user_id);
+      setPoints(points.filter(p => p.id !== pointId));
+    } catch {
+      alert('Error al eliminar el punto');
+    }
+  };
+
+  // Asignar punto a reciclador
+  const handleAssignRecycler = async (pointId: string, recyclerId: string) => {
+    setAssigningPointId(pointId);
+    const { error } = await supabase.from('collection_points').update({ recycler_id: recyclerId, status: 'claimed' }).eq('id', pointId);
+    setAssigningPointId(null);
+    if (error) {
+      alert('Error al asignar reciclador');
+    } else {
+      setPoints(points.map(p => p.id === pointId ? { ...p, recycler_id: recyclerId, status: 'claimed' } : p));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <h1 className="text-3xl font-bold text-green-700 mb-6">Panel de Administrador</h1>
@@ -163,23 +231,57 @@ const AdminPanel: React.FC = () => {
                   <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
                   <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Rol</th>
                   <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">User ID</th>
+                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Avatar</th>
                   <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {users.filter(u => !roleFilter || u.role === roleFilter).length === 0 ? (
-                  <tr><td colSpan={5} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
+                  <tr><td colSpan={6} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
                 ) : (
                   users.filter(u => !roleFilter || u.role === roleFilter).map(u => (
                     <tr key={u.id} className={`border-b hover:bg-green-50 transition-colors ${!u.user_id || !u.role ? 'bg-yellow-100' : ''}`}>
-                      <td className="p-2 whitespace-nowrap">{u.name || <span className="text-red-600">Sin nombre</span>}</td>
+                      <td className="p-2 whitespace-nowrap">
+                        {u.avatar_url ? (
+                          <img src={u.avatar_url} alt="avatar" className="w-8 h-8 rounded-full object-cover border border-green-300 inline-block mr-2 align-middle" />
+                        ) : (
+                          <span className="inline-block w-8 h-8 rounded-full bg-gray-200 border border-green-100 mr-2 align-middle"></span>
+                        )}
+                        {u.name || <span className="text-red-600">Sin nombre</span>}
+                      </td>
                       <td className="p-2 whitespace-nowrap">{u.email || <span className="text-red-600">Sin email</span>}</td>
                       <td className="p-2 capitalize whitespace-nowrap">{u.role || <span className="text-red-600">Sin rol</span>}</td>
-                      <td className="p-2 text-xs font-mono break-all max-w-[120px] whitespace-pre-line">{u.user_id || <span className="text-red-600">Sin user_id</span>}</td>
+                      <td className="p-2 max-w-[160px] whitespace-nowrap overflow-x-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-green-50" style={{ WebkitOverflowScrolling: 'touch' }}>
+                        <div className="min-w-[120px] flex items-center">
+                          {u.user_id || <span className="text-red-600">Sin user_id</span>}
+                        </div>
+                      </td>
                       <td className="p-2 flex flex-col md:flex-row gap-2 items-start md:items-center">
                         <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => handleDeleteUser(u.id)}>Eliminar</button>
                         {u.user_id && (
                           <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => { setNotifTarget('individual'); setSelectedUser(u); }}>Notificar</button>
+                        )}
+                        {u.user_id && (
+                          <button className={`relative px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto flex items-center justify-center font-semibold transition-colors
+      ${userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0
+        ? 'bg-green-500 hover:bg-green-600 text-white border-2 border-green-700'
+        : 'bg-gray-200 hover:bg-green-200 text-green-700'}`}
+                            onClick={() => handleShowPoints(u)}
+                          >
+                            Ver puntos
+                            {/* Marca visual: check verde si tiene puntos activos */}
+                            {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
+                              <span className="ml-2 text-green-700 font-bold text-lg" title="Tiene puntos activos">✔</span>
+                            )}
+                            {/* También muestra la cantidad */}
+                            {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
+                              <span className="ml-1 text-xs font-bold">({userPointsCount[u.user_id]})</span>
+                            )}
+                            {/* Acción realizada */}
+                            {selectedUser && selectedUser.id === u.id && showPointsModal && (
+                              <span className="ml-2 text-xs text-blue-700 font-semibold">(Viendo puntos)</span>
+                            )}
+                          </button>
                         )}
                         {(!u.user_id || !u.role) && (
                           <span className="text-xs text-yellow-800 bg-yellow-200 rounded px-2 py-1 mt-1">Perfil incompleto</span>
@@ -214,6 +316,45 @@ const AdminPanel: React.FC = () => {
       <div className="mb-12">
         <AdminAds />
       </div>
+      {/* Modal de puntos de recolección */}
+      {showPointsModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl relative">
+            <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setShowPointsModal(false)}>✕</button>
+            <h3 className="text-lg font-bold mb-2">Puntos de {selectedUser.name || selectedUser.email}</h3>
+            {pointsLoading ? <p>Cargando...</p> : pointsError ? <p className="text-red-600">{pointsError}</p> : points.length === 0 ? <p>No hay puntos.</p> : (
+              <table className="w-full text-sm mb-2">
+                <thead>
+                  <tr>
+                    <th>Dirección</th>
+                    <th>Estado</th>
+                    <th>Reciclador</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {points.map(point => (
+                    <tr key={point.id}>
+                      <td>{point.address}</td>
+                      <td>{point.status}</td>
+                      <td>{point.recycler_id ? (recyclers.find(r => r.user_id === point.recycler_id)?.name || point.recycler_id) : 'Sin asignar'}</td>
+                      <td className="flex gap-2">
+                        <button className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleDeletePoint(point.id)}>Eliminar</button>
+                        <select className="border rounded px-1 py-0.5 text-xs" value={point.recycler_id || ''} disabled={assigningPointId === point.id} onChange={e => handleAssignRecycler(point.id, e.target.value)}>
+                          <option value="">Asignar reciclador</option>
+                          {recyclers.map(r => (
+                            <option key={r.user_id} value={r.user_id}>{r.name || r.email}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -42,7 +42,7 @@ const Navbar: React.FC = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <Recycle className="h-7 w-7 md:h-8 md:w-8 mr-2" />
-              <span className="font-bold text-lg md:text-xl">Asura EcoConecta</span>
+              <span className="font-bold text-lg md:text-xl">Asura EcoNecta2</span>
             </Link>
           </div>
 

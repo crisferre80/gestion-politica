@@ -64,8 +64,9 @@ const Home: React.FC = () => {
                 <Link to="/register" className="bg-white text-green-600 px-6 py-3 rounded-md font-medium hover:bg-gray-100 transition">
                   Registrarse
                 </Link>
-                <Link to="/collection-points" className="bg-green-700 text-white px-6 py-3 rounded-md font-medium hover:bg-green-800 transition">
-                  Ver puntos de recolección
+                <Link to="/login" className="bg-green-700 text-white px-6 py-3 rounded-md font-medium hover:bg-green-800 transition relative animate-glow focus:outline-none focus:ring-4 focus:ring-green-300">
+                  <span className="absolute inset-0 rounded-md pointer-events-none glow-effect"></span>
+                  Ingresar
                 </Link>
               </div>
             </div>
@@ -267,8 +268,25 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      
-   
+      {/* Animación de luz para el botón Ingresar */}
+      <style>
+      {`
+        @keyframes glow {
+          0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
+          50% { box-shadow: 0 0 16px 8px rgba(34,197,94,0.4); }
+          100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
+        }
+        .animate-glow {
+          animation: glow 2s infinite;
+        }
+        .glow-effect {
+          box-shadow: 0 0 16px 4px rgba(34,197,94,0.4);
+          opacity: 0.7;
+          z-index: 0;
+          animation: glow 2s infinite;
+        }
+      `}
+      </style>
     </div>
   );
 };

@@ -70,7 +70,6 @@ const DashboardRecycler: React.FC = () => {
         const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
         // Obtener los previews usando la función utilitaria
         const previews = await getChatPreviews(user.id, otherUserIds);
-        // Adaptar previews al tipo local de ChatPreview
         setChatPreviews(previews.map(p => ({
           id: p.userId,
           user_id: p.userId,
@@ -80,14 +79,44 @@ const DashboardRecycler: React.FC = () => {
           lastMessage: p.lastMessage,
           unreadCount: p.unreadCount
         })));
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (err) {
+       
+      } catch {
         setChatPreviews([]);
       } finally {
         setLoadingChats(false);
       }
     })();
   }, [showChatModal, user]);
+
+  // Fetch chat previews SIEMPRE que cambie el usuario (no solo al abrir el modal)
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        // Buscar todos los mensajes donde el reciclador es sender o receiver
+        const { data: messages, error } = await supabase
+          .from('messages')
+          .select('sender_id, receiver_id')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+        if (error) throw error;
+        // Extraer los user_id de los otros participantes
+        const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
+        // Obtener los previews usando la función utilitaria
+        const previews = await getChatPreviews(user.id, otherUserIds);
+        setChatPreviews(previews.map(p => ({
+          id: p.userId,
+          user_id: p.userId,
+          recycler_id: user.id,
+          name: p.name,
+          avatar_url: p.avatar_url,
+          lastMessage: p.lastMessage,
+          unreadCount: p.unreadCount
+        })));
+      } catch {
+        setChatPreviews([]);
+      }
+    })();
+  }, [user]);
 
   // NOTIFICACIONES DE MENSAJES NUEVOS
 
@@ -532,6 +561,75 @@ const DashboardRecycler: React.FC = () => {
     };
   }, [user, fetchData]);
 
+  // Suscripción en tiempo real a mensajes para actualizar badge de mensajes no leídos
+  useEffect(() => {
+    if (!user?.id) return;
+    // Suscribirse a cambios donde el usuario es sender
+    const channelSender = supabase.channel('recycler-messages-badge-sender')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `sender_id=eq.${user.id}`,
+      }, async () => {
+        try {
+          const { data: messages, error } = await supabase
+            .from('messages')
+            .select('sender_id, receiver_id')
+            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+          if (error) throw error;
+          const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
+          const previews = await getChatPreviews(user.id, otherUserIds);
+          setChatPreviews(previews.map(p => ({
+            id: p.userId,
+            user_id: p.userId,
+            recycler_id: user.id,
+            name: p.name,
+            avatar_url: p.avatar_url,
+            lastMessage: p.lastMessage,
+            unreadCount: p.unreadCount
+          })));
+        } catch {
+          setChatPreviews([]);
+        }
+      });
+    // Suscribirse a cambios donde el usuario es receiver
+    const channelReceiver = supabase.channel('recycler-messages-badge-receiver')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${user.id}`,
+      }, async () => {
+        try {
+          const { data: messages, error } = await supabase
+            .from('messages')
+            .select('sender_id, receiver_id')
+            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+          if (error) throw error;
+          const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
+          const previews = await getChatPreviews(user.id, otherUserIds);
+          setChatPreviews(previews.map(p => ({
+            id: p.userId,
+            user_id: p.userId,
+            recycler_id: user.id,
+            name: p.name,
+            avatar_url: p.avatar_url,
+            lastMessage: p.lastMessage,
+            unreadCount: p.unreadCount
+          })));
+        } catch {
+          setChatPreviews([]);
+        }
+      });
+    channelSender.subscribe();
+    channelReceiver.subscribe();
+    return () => {
+      supabase.removeChannel(channelSender);
+      supabase.removeChannel(channelReceiver);
+    };
+  }, [user]);
+
   const getAvatarUrl = (url: string | undefined) =>
     url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
 
@@ -796,40 +894,43 @@ const DashboardRecycler: React.FC = () => {
               {user?.bio && (
                 <div className="mt-3 text-gray-600 text-sm italic max-w-2xl">{user.bio}</div>
               )}
-              {/* Botones de acción del header: responsive/carrusel */}
-              <div
-                className="mt-4 w-full"
-              >
-                <div
-                  className="flex flex-nowrap gap-3 md:gap-4 overflow-x-auto md:overflow-visible snap-x snap-mandatory scrollbar-hide md:flex-wrap md:justify-start"
-                  style={{ WebkitOverflowScrolling: 'touch' }}
-                >
+              {/* Botones de acción del header: sin carrusel, solo fila responsiva */}
+              <div className="mt-4 w-full">
+                <div className="flex flex-wrap gap-3 md:gap-4 justify-start">
                   <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
                     onClick={() => setShowEditProfileModal(true)}
                   >
                     Editar Perfil
                   </button>
                   <button
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
                     onClick={() => setShowStatsModal(true)}
                   >
                     Ver Estadísticas
                   </button>
                   <button
-                    className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-semibold shadow flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-semibold shadow"
                     onClick={() => setShowPointsStatsModal(true)}
                   >
                     Mis calificaciones
                   </button>
                   <button
-                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2 flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2 relative"
                     onClick={() => setShowChatModal(true)}
                     disabled={!canChatWithResident}
                     title={canChatWithResident ? "Abrir chat con residente" : "Solo disponible si el residente habilita el chat"}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4.28 1.07A1 1 0 013 19.13V17.6c0-.29.13-.56.35-.74A7.97 7.97 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     Mensajes
+                    {(() => {
+                      const unreadTotal = chatPreviews.reduce((acc, chat) => acc + (typeof chat.unreadCount === 'number' ? chat.unreadCount : 0), 0);
+                      return unreadTotal > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
+                          {unreadTotal}
+                        </span>
+                      );
+                    })()}
                   </button>
                 </div>
               </div>

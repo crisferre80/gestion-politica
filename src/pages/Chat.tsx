@@ -48,6 +48,15 @@ const Chat = () => {
       fetchConversation(myUserId, otherUserId)
         .catch(() => setError('Error al cargar mensajes'))
         .finally(() => setLoading(false));
+      // Marcar como leídos los mensajes recibidos por el usuario actual
+      (async () => {
+        await supabase
+          .from('messages')
+          .update({ read: true })
+          .eq('receiver_id', myUserId)
+          .eq('sender_id', otherUserId)
+          .eq('read', false);
+      })();
     }
     // eslint-disable-next-line
   }, [myUserId, otherUserId]);

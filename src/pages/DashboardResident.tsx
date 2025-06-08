@@ -647,8 +647,8 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
                                   <button
                                     className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
                                     onClick={() => {
-                                      // Usa el setter de ratingsModalTarget aquí
-                                      // Asegúrate de tener: const [ratingsModalTarget, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
+                                      console.log('Click Calificar reciclador', { recyclerId, recyclerName, avatar: point.claim?.recycler?.avatar_url });
+                                      toast('Click Calificar reciclador: ' + recyclerName);
                                       setRatingTarget({ recyclerId, recyclerName, avatarUrl: point.claim?.recycler?.avatar_url });
                                       setShowRatingsModal(true);
                                     }}
@@ -785,16 +785,6 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
               ))}
             </div>
           )}
-          {/* Modal de calificación de reciclador, SIEMPRE disponible */}
-      {showRatingsModal && ratingsModalTarget && (
-        <RecyclerRatingsModal
-          recyclerId={ratingsModalTarget.recyclerId}
-          recyclerName={ratingsModalTarget.recyclerName}
-          avatarUrl={ratingsModalTarget.avatarUrl}
-          open={showRatingsModal}
-          onClose={() => setShowRatingsModal(false)}
-        />
-      )}
         </div>
       )}
       {activeTab === 'perfil' && (
@@ -941,6 +931,16 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
             </div>
           </form>
         </div>
+      )}
+      {/* Modal de calificación de reciclador, SIEMPRE disponible */}
+      {showRatingsModal && ratingsModalTarget && (
+        <RecyclerRatingsModal
+          recyclerId={ratingsModalTarget.recyclerId}
+          recyclerName={ratingsModalTarget.recyclerName}
+          avatarUrl={ratingsModalTarget.avatarUrl}
+          open={showRatingsModal}
+          onClose={() => setShowRatingsModal(false)}
+        />
       )}
     </div>
   );

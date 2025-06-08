@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, ensureUserProfile } from '../lib/supabase';
 import { Star } from 'lucide-react';
+import { useUser } from '../context/UserContext';
 
 interface RecyclerRatingsModalProps {
   recyclerId: string;
@@ -11,10 +12,12 @@ interface RecyclerRatingsModalProps {
 }
 
 interface Rating {
+  rater_id: string;
   id: string;
   rating: number;
   comment: string;
   created_at: string;
+  resident_id?: string;
   resident: {
     name?: string;
     avatar_url?: string;
@@ -22,20 +25,29 @@ interface Rating {
 }
 
 const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId, recyclerName, avatarUrl, open, onClose }) => {
+  const { user } = useUser();
+  const userId = user?.id;
+  const userProfileId = user?.profileId; // ID interno de profiles
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [average, setAverage] = useState<number | null>(null);
+  const [myRating, setMyRating] = useState<number>(0);
+  const [myComment, setMyComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [alreadyRated, setAlreadyRated] = useState(false);
+  const [myExistingRating, setMyExistingRating] = useState<Rating | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     setError(null);
+    setSuccessMsg(null);
     (async () => {
-      // 1. Obtener ratings con resident_id
       const { data, error } = await supabase
         .from('recycler_ratings')
-        .select('id, rating, comment, created_at, resident_id')
+        .select('id, rating, comment, created_at, rater_id') // CAMBIO: rater_id
         .eq('recycler_id', recyclerId)
         .order('created_at', { ascending: false });
       if (error) {
@@ -45,14 +57,13 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
         setLoading(false);
         return;
       }
-      // 2. Obtener perfiles de residentes únicos
-      const residentIds = (data || []).map(r => r.resident_id).filter(Boolean);
+      const raterIds = (data || []).map(r => r.rater_id).filter(Boolean); // CAMBIO: rater_id
       let profilesById: Record<string, { name?: string; avatar_url?: string }> = {};
-      if (residentIds.length > 0) {
+      if (raterIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id, name, avatar_url')
-          .in('id', residentIds);
+          .in('id', raterIds);
         if (!profilesError && profilesData) {
           profilesById = profilesData.reduce((acc, p) => {
             acc[p.id] = { name: p.name, avatar_url: p.avatar_url };
@@ -60,10 +71,9 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
           }, {} as Record<string, { name?: string; avatar_url?: string }>);
         }
       }
-      // 3. Mapear datos de perfil a cada rating
       const fixedData: Rating[] = (data || []).map((r) => ({
         ...r,
-        resident: profilesById[r.resident_id] || {},
+        resident: profilesById[r.rater_id] || {}, // CAMBIO: rater_id
       }));
       setRatings(fixedData);
       if (fixedData.length > 0) {
@@ -72,9 +82,74 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
       } else {
         setAverage(null);
       }
+      if (userProfileId) {
+        const found = fixedData.find(r => r.rater_id === userProfileId);
+        if (found) {
+          setAlreadyRated(true);
+          setMyExistingRating(found);
+        } else {
+          setAlreadyRated(false);
+          setMyExistingRating(null);
+        }
+      }
       setLoading(false);
     })();
-  }, [open, recyclerId]);
+  }, [open, recyclerId, userProfileId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myRating) {
+      setError('Por favor selecciona una calificación.');
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      // Asegura que el perfil existe antes de insertar (importante para RLS)
+      let profileId = userProfileId;
+      if (!profileId && userId && user?.email && user?.name) {
+        await ensureUserProfile({ id: userId, email: user.email, name: user.name });
+        // Buscar el id interno de profiles
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (profileError || !profileData) {
+          setError('No se pudo obtener el perfil interno del usuario.');
+          setSubmitting(false);
+          return;
+        }
+        profileId = profileData.id;
+      }
+      const { error } = await supabase.from('recycler_ratings').insert({
+        recycler_id: recyclerId,
+        rater_id: profileId, // Debe ser el id interno de profiles
+        rating: myRating,
+        comment: myComment,
+        created_at: new Date().toISOString(),
+      });
+      if (error) {
+        setError('Error al enviar la calificación: ' + error.message);
+      } else {
+        setSuccessMsg('¡Calificación enviada!');
+        setAlreadyRated(true);
+        setMyExistingRating({
+                  id: '',
+                  rater_id: userProfileId || userId || '', // Asegura que rater_id esté presente
+                  rating: myRating,
+                  comment: myComment,
+                  created_at: new Date().toISOString(),
+                  resident: { name: 'Tú', avatar_url: user?.avatar_url },
+                });
+        setMyRating(0);
+        setMyComment('');
+      }
+    } catch {
+      setError('Error inesperado al enviar la calificación.');
+    }
+    setSubmitting(false);
+  };
 
   if (!open) return null;
 
@@ -95,6 +170,60 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
             <Star className="h-5 w-5 text-yellow-400 mr-1" />
             <span className="font-medium text-lg">{average.toFixed(1)}</span>
             <span className="ml-2 text-gray-400 text-sm">({ratings.length})</span>
+          </div>
+        )}
+        {/* Bloque para calificar si no ha calificado */}
+        {!alreadyRated && userId && (
+          <form className="w-full mb-4" onSubmit={handleSubmit}>
+            <div className="flex items-center justify-center mb-2">
+              {[1,2,3,4,5].map(star => (
+                <button
+                  type="button"
+                  key={star}
+                  onClick={() => setMyRating(star)}
+                  className="focus:outline-none"
+                  aria-label={`Calificar ${star} estrellas`}
+                >
+                  <Star
+                    className={`h-8 w-8 ${myRating >= star ? 'text-yellow-400' : 'text-gray-300'}`}
+                    fill={myRating >= star ? '#facc15' : 'none'}
+                  />
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="w-full border rounded-md p-2 mb-2 focus:ring-2 focus:ring-green-400 focus:outline-none resize-none"
+              rows={3}
+              placeholder="Escribe un comentario (opcional)"
+              value={myComment}
+              onChange={e => setMyComment(e.target.value)}
+              maxLength={300}
+            />
+            <button
+              type="submit"
+              className="w-full bg-green-600 text-white rounded-md py-2 font-semibold hover:bg-green-700 transition-all disabled:opacity-60"
+              disabled={submitting}
+            >
+              {submitting ? 'Enviando...' : 'Enviar calificación'}
+            </button>
+            {error && <div className="text-red-600 text-sm mt-1">{error}</div>}
+            {successMsg && <div className="text-green-600 text-sm mt-1">{successMsg}</div>}
+          </form>
+        )}
+        {/* Si ya calificó, mostrar su calificación */}
+        {alreadyRated && myExistingRating && (
+          <div className="w-full mb-4 bg-green-50 border border-green-200 rounded p-3 flex flex-col items-center">
+            <div className="flex items-center mb-1">
+              {[1,2,3,4,5].map(star => (
+                <Star
+                  key={star}
+                  className={`h-6 w-6 ${myExistingRating.rating >= star ? 'text-yellow-400' : 'text-gray-300'}`}
+                  fill={myExistingRating.rating >= star ? '#facc15' : 'none'}
+                />
+              ))}
+            </div>
+            <div className="text-gray-700 text-sm text-center">{myExistingRating.comment || <span className="italic text-gray-400">Sin comentario</span>}</div>
+            <div className="text-xs text-gray-400 mt-1">Tu calificación</div>
           </div>
         )}
         <div className="w-full mt-2 max-h-72 overflow-y-auto">

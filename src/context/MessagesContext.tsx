@@ -24,33 +24,12 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
 
     // Cargar mensajes entre dos usuarios (usando user_id de Auth)
     const fetchConversation = async (userId1: string, userId2: string) => {
-        // Buscar los id reales de profiles
-        const { data: profile1 } = await supabase
-            .from('profiles')
-            .select('id, user_id')
-            .eq('user_id', userId1)
-            .single();
-        const { data: profile2 } = await supabase
-            .from('profiles')
-            .select('id, user_id')
-            .eq('user_id', userId2)
-            .single();
-        if (!profile1 || !profile2) {
-            setMessages([]);
-            return;
-        }
-        const id1 = profile1.id;
-        const id2 = profile2.id;
-        // Map de id interno a user_id
-        const idToUserId: Record<string, string> = {
-            [id1]: profile1.user_id,
-            [id2]: profile2.user_id
-        };
+        // Buscar mensajes usando directamente los user_id (UUID de Auth)
         const { data, error } = await supabase
             .from('messages')
             .select('*')
             .or(
-                `and(sender_id.eq.${id1},receiver_id.eq.${id2}),and(sender_id.eq.${id2},receiver_id.eq.${id1})`
+                `and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`
             )
             .order('sent_at', { ascending: true });
         if (error) {
@@ -58,7 +37,6 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
             setMessages([]);
             return;
         }
-        // Adaptar los datos a tu tipo Message, usando user_id para el frontend
         type SupabaseMessage = {
             id: string | number;
             sender_id: string;
@@ -71,12 +49,11 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
         setMessages(
             (data ?? []).map((msg: SupabaseMessage) => ({
                 id: msg.id.toString(),
-                senderId: idToUserId[msg.sender_id] || msg.sender_id,
-                receiverId: idToUserId[msg.receiver_id] || msg.receiver_id,
+                senderId: msg.sender_id,
+                receiverId: msg.receiver_id,
                 content: msg.content,
                 timestamp: new Date(msg.sent_at),
                 createdAt: msg.sent_at
-                // No incluir read ni readAt en el objeto Message
             }))
         );
     };

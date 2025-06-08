@@ -10,9 +10,12 @@ import { uploadAvatar } from '../lib/uploadAvatar';
 import PhotoCapture from '../components/PhotoCapture';
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import ChatList from '../components/ChatList';
+import { getChatPreviews } from '../lib/chatUtils';
+import { useNavigate } from 'react-router-dom';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
+  const navigate = useNavigate();
   // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +41,7 @@ const DashboardRecycler: React.FC = () => {
     name: unknown;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     unreadCount: any;
-    avatar_url: never;
+    avatar_url: string | undefined;
     lastMessage: unknown;
     id: string;
     user_id: string;
@@ -55,17 +58,28 @@ const DashboardRecycler: React.FC = () => {
   useEffect(() => {
     if (!showChatModal || !user) return;
     setLoadingChats(true);
-    // Example: fetch chat previews for the recycler
-    // Replace this with your actual chat fetching logic
     (async () => {
       try {
-        // Example: fetch chats where recycler is involved
-        const { data, error } = await supabase
-          .from('chats')
-          .select('*')
-          .or(`recycler_id.eq.${user.id},user_id.eq.${user.id}`);
+        // Buscar todos los mensajes donde el reciclador es sender o receiver
+        const { data: messages, error } = await supabase
+          .from('messages')
+          .select('sender_id, receiver_id')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
         if (error) throw error;
-        setChatPreviews(data || []);
+        // Extraer los user_id de los otros participantes
+        const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
+        // Obtener los previews usando la función utilitaria
+        const previews = await getChatPreviews(user.id, otherUserIds);
+        // Adaptar previews al tipo local de ChatPreview
+        setChatPreviews(previews.map(p => ({
+          id: p.userId,
+          user_id: p.userId,
+          recycler_id: user.id,
+          name: p.name,
+          avatar_url: p.avatar_url,
+          lastMessage: p.lastMessage,
+          unreadCount: p.unreadCount
+        })));
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         setChatPreviews([]);
@@ -1501,13 +1515,13 @@ const DashboardRecycler: React.FC = () => {
                       })}
                       onChatSelect={userId => {
                         setShowChatModal(false);
-                        window.location.href = `/chat/${userId}`;
+                        navigate(`/chat/${userId}`);
                       }}
                     />
                   )}
                   <div className="flex justify-end mt-4">
                     <button onClick={() => setShowChatModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
-                  </div>
+                                   </div>
                 </div>
               </div>
             )}

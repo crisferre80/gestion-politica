@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { enviarMensajeSeguro } from '../lib/chatUtils';
 
 export type Message = {
     createdAt: string;
@@ -82,40 +83,13 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
 
     // Enviar mensaje y recargar la conversación
     const sendMessage = async (senderUserId: string, receiverUserId: string, content: string) => {
-        // Buscar el id real de profiles a partir de user_id
-        const { data: senderProfile, error: senderProfileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', senderUserId)
-            .single();
-        const { data: receiverProfile, error: receiverProfileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', receiverUserId)
-            .single();
-        if (senderProfileError || !senderProfile) {
-            console.error('[sendMessage] El remitente no tiene perfil válido.', senderProfileError);
-            return;
+        // Usa la función centralizada para robustez
+        try {
+            await enviarMensajeSeguro(senderUserId, receiverUserId, content);
+            await fetchConversation(senderUserId, receiverUserId);
+        } catch (err) {
+            console.error('[sendMessage] Error al enviar mensaje:', err);
         }
-        if (receiverProfileError || !receiverProfile) {
-            console.error('[sendMessage] El destinatario no tiene perfil válido.', receiverProfileError);
-            return;
-        }
-        // Insertar mensaje usando los id reales y sent_at explícito
-        const insertObj = {
-            sender_id: senderProfile.id,
-            receiver_id: receiverProfile.id,
-            content: content,
-            sent_at: new Date().toISOString()
-        };
-        console.log('[sendMessage] Insertando mensaje:', insertObj);
-        const { error } = await supabase.from('messages').insert([insertObj]);
-        if (error) {
-            console.error('[sendMessage] Error al insertar mensaje:', error);
-            return;
-        }
-        // Opcional: recargar mensajes después de enviar
-        await fetchConversation(senderUserId, receiverUserId);
     };
 
     return (

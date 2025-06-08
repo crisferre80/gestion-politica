@@ -64,3 +64,39 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
   }
   return previews;
 }
+
+/**
+ * Envía un mensaje robusto entre dos usuarios usando sus user_id (UUID de Auth),
+ * buscando los id reales de profiles y haciendo el insert seguro.
+ */
+export async function enviarMensajeSeguro(senderUserId: string, receiverUserId: string, content: string) {
+  // Buscar el id real de profiles para sender
+  const { data: senderProfile, error: senderProfileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', senderUserId)
+    .single();
+  if (senderProfileError || !senderProfile) {
+    throw new Error('El remitente no tiene perfil válido.');
+  }
+  // Buscar el id real de profiles para receiver
+  const { data: receiverProfile, error: receiverProfileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', receiverUserId)
+    .single();
+  if (receiverProfileError || !receiverProfile) {
+    throw new Error('El destinatario no tiene perfil válido.');
+  }
+  // Insertar mensaje usando los id reales y sent_at explícito
+  const insertObj = {
+    sender_id: senderProfile.id,
+    receiver_id: receiverProfile.id,
+    content: content,
+    sent_at: new Date().toISOString()
+  };
+  const { error } = await supabase.from('messages').insert([insertObj]);
+  if (error) {
+    throw error;
+  }
+}

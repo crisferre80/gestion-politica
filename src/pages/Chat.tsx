@@ -4,42 +4,7 @@ import { useUser } from '../context/UserContext';
 import { useMessages } from '../context/MessagesContext';
 import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
-
-// Función utilitaria para validar IDs y enviar mensaje
-async function enviarMensajeSeguro(senderId: string, receiverId: string, content: string) {
-  console.log('[enviarMensajeSeguro] senderId:', senderId, 'receiverId:', receiverId, 'content:', content);
-  // Buscar el id real de profiles para sender
-  const { data: senderProfile, error: senderProfileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', senderId)
-    .single();
-  if (senderProfileError || !senderProfile) {
-    throw new Error('El remitente no tiene perfil válido.');
-  }
-  // Buscar el id real de profiles para receiver
-  const { data: receiverProfile, error: receiverProfileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', receiverId)
-    .single();
-  if (receiverProfileError || !receiverProfile) {
-    throw new Error('El destinatario no tiene perfil válido.');
-  }
-  // Insertar mensaje usando los id reales y sent_at explícito
-  const insertObj = {
-    sender_id: senderProfile.id,
-    receiver_id: receiverProfile.id,
-    content: content,
-    sent_at: new Date().toISOString()
-  };
-  console.log('[enviarMensajeSeguro] Insertando mensaje:', insertObj);
-  const { error } = await supabase.from('messages').insert([insertObj]);
-  if (error) {
-    console.error('[enviarMensajeSeguro] Error al insertar mensaje:', error);
-    throw error;
-  }
-}
+import { enviarMensajeSeguro } from '../lib/chatUtils';
 
 const Chat = () => {
   // El parámetro debe ser el user_id (UUID de Supabase Auth)
@@ -107,7 +72,7 @@ const Chat = () => {
             user_name: user?.name,
             user_email: user?.email
           });
-        } catch (notifErr) {
+        } catch {
           setError('El mensaje fue enviado, pero no se pudo notificar al usuario destinatario.');
         }
       } catch (err: unknown) {

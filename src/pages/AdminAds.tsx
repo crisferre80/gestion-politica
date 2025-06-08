@@ -104,6 +104,14 @@ const AdminAds: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
+      // 1. Limpiar referencias en ads_grid (solo campo ad_id)
+      const { error: gridError } = await supabase
+        .from('ads_grid')
+        .update({ ad_id: null })
+        .match({ ad_id: id }); // match es más robusto para nullables
+      if (gridError) throw gridError;
+
+      // 2. Eliminar el anuncio
       const { error } = await supabase
         .from('advertisements')
         .delete()
@@ -111,17 +119,30 @@ const AdminAds: React.FC = () => {
 
       if (error) throw error;
       setAds(ads.filter(ad => ad.id !== id));
-    } catch (err) {
+    } catch (err: unknown) {
+      // Mostrar el mensaje real de error de Supabase
+      let msg = 'Error al eliminar la publicidad';
+      if (typeof err === 'object' && err !== null) {
+        if ('message' in err && typeof (err as { message?: string }).message === 'string') msg += `: ${(err as { message?: string }).message}`;
+        else if ('error_description' in err && typeof (err as { error_description?: string }).error_description === 'string') msg += `: ${(err as { error_description?: string }).error_description}`;
+        else msg += `: Error desconocido: ' + ${JSON.stringify(err)}`;
+      }
+      setError(msg);
       console.error('Error deleting ad:', err);
-      setError('Error al eliminar la publicidad');
     }
   };
+
+  // Mostrar el UID del usuario admin para depuración de RLS
+  const adminUID = user?.id;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Gestionar Publicidades</h1>
+
+          {/* Mostrar UID admin para depuración de RLS */}
+          <div className="mb-4 text-xs text-gray-500">UID admin actual: <span className="font-mono">{adminUID}</span></div>
 
           {error && (
             <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">

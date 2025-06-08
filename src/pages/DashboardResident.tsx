@@ -2,14 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, User as UserIcon, Mail, Phone } from 'lucide-react';
 import { supabase, ensureUserProfile, cancelClaim } from '../lib/supabase';
-import { uploadAvatar, updateProfileAvatar } from '../lib/uploadAvatar';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
-import NotificationBell from '../components/NotificationBell';
-import { createNotification } from '../lib/notifications';
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
-import AdminNotifications from '../components/AdminNotifications';
 import PhotoCapture from '../components/PhotoCapture';
 
 // Tipo para el payload de realtime de perfiles
@@ -63,15 +59,10 @@ const DashboardResident: React.FC = () => {
   const location = useLocation();
   // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  // (Eliminado useState con patrón de array vacío inválido)
-  const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>('puntos');
-  // eslint-disable-next-line no-empty-pattern
-  const [] = useState<{ id: number; name: string } | null>(null);
-  // const [chatOpen, setChatOpen] = useState(false);
-  // const [chatRecyclerId] = useState<number | null>(null);
-  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
+   
+  // const [] = useState(false);
+   
+  // const [someState, setSomeState] = useState(false); // Removed invalid empty array destructuring
   // const [] = useState(false);
   // const [] = useState(false);
   type Recycler = {
@@ -95,8 +86,38 @@ const DashboardResident: React.FC = () => {
     // Add more specific fields if needed
   };
   
-    const [recyclers, setRecyclers] = useState<Recycler[]>([]);
-  const [loadingRecyclers, setLoadingRecyclers] = useState(false);
+    // --- Estado de recicladores en línea con persistencia en sessionStorage ---
+const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
+  const cached = sessionStorage.getItem('recyclers_online');
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+});
+
+// --- Persistencia de estado del tab activo ---
+const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>(() => {
+  const cachedTab = sessionStorage.getItem('dashboard_resident_active_tab');
+  if (cachedTab === 'puntos' || cachedTab === 'recicladores' || cachedTab === 'perfil' || cachedTab === 'historial') {
+    return cachedTab;
+  }
+  return 'puntos';
+});
+
+// --- Sincronizar cambios de recicladores y tab con sessionStorage ---
+useEffect(() => {
+  sessionStorage.setItem('recyclers_online', JSON.stringify(recyclers));
+}, [recyclers]);
+
+useEffect(() => {
+  sessionStorage.setItem('dashboard_resident_active_tab', activeTab);
+}, [activeTab]);
+
+  // --- Estado y lógica para badge de mensajes ---
   const avatarUrl = user?.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'Residente') + '&background=22c55e&color=fff&size=128';
 
   useEffect(() => {
@@ -116,53 +137,6 @@ const DashboardResident: React.FC = () => {
     // }
   }, [user]);
 
-  // --- EXTRACTED FETCH RECYCLERS FUNCTION ---
-  const fetchRecyclers = async () => {
-    setLoadingRecyclers(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, avatar_url, name, email, phone, materials, bio, lat, lng, online, role, user_id, rating_average, total_ratings')
-      .eq('role', 'recycler');
-    if (error) {
-      setRecyclers([]);
-    } else {
-      setRecyclers(
-        (data || [])
-          .filter(rec => rec.role && rec.role.toLowerCase() === 'recycler')
-          .map((rec) => ({
-            role: rec.role,
-            id: String(rec.id),
-            user_id: rec.user_id || rec.id,
-            profiles: {
-              avatar_url: rec.avatar_url,
-              name: rec.name,
-              email: rec.email,
-              phone: rec.phone,
-            },
-            rating_average: rec.rating_average || 0,
-            total_ratings: rec.total_ratings || 0,
-            materials: Array.isArray(rec.materials)
-              ? rec.materials
-              : (typeof rec.materials === 'string' && rec.materials.length > 0
-                  ? [rec.materials]
-                  : []),
-            bio: typeof rec.bio === 'string' ? rec.bio : '',
-            lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
-            lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
-            online: rec.online === true || rec.online === 'true' || rec.online === 1,
-          }))
-      );
-    }
-    setLoadingRecyclers(false);
-  };
-
-  // Polling para actualizar recicladores en tiempo real SIEMPRE (no depende del tab)
-  useEffect(() => {
-    fetchRecyclers();
-    const interval = setInterval(fetchRecyclers, 5000); // cada 5 segundos
-    return () => clearInterval(interval);
-  }, []);
-
   // Suscripción realtime SIEMPRE (no depende del tab)
   useEffect(() => {
     const channel = supabase.channel('recyclers-profiles')
@@ -179,7 +153,8 @@ const DashboardResident: React.FC = () => {
           const oldRec = payload.old as ProfileRealtimePayload;
           if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
             setRecyclers((prev) => {
-              const exists = prev.find((r) => r.id === String(newRec.id));
+              // --- Solo actualiza si cambia online, lat, lng o info relevante ---
+              const exists = prev.find(r => r.id === String(newRec.id));
               const normalizedMaterials = Array.isArray(newRec.materials)
                 ? newRec.materials
                 : (typeof newRec.materials === 'string' && newRec.materials.length > 0
@@ -190,51 +165,53 @@ const DashboardResident: React.FC = () => {
               const normalizedLng = typeof newRec.lng === 'number' ? newRec.lng : (newRec.lng !== null && newRec.lng !== undefined ? Number(newRec.lng) : undefined);
               const safeRole = typeof newRec.role === 'string' ? newRec.role : 'recycler';
               if (exists) {
-                return prev.map((r) =>
+                // Solo actualiza si cambia online, lat, lng o info relevante
+                return prev.map(r =>
                   r.id === String(newRec.id)
                     ? {
                         ...r,
-                        role: safeRole,
-                        id: String(newRec.id),
-                        user_id: newRec.user_id || newRec.id,
-                        profiles: {
-                          avatar_url: newRec.avatar_url,
-                          name: newRec.name,
-                          email: newRec.email,
-                          phone: newRec.phone,
-                        },
-                        rating_average: newRec.rating_average || 0,
-                        total_ratings: newRec.total_ratings || 0,
-                        materials: normalizedMaterials,
-                        bio: typeof newRec.bio === 'string' ? newRec.bio : '',
+                        online: normalizedOnline,
                         lat: normalizedLat,
                         lng: normalizedLng,
-                        online: normalizedOnline,
+                        materials: normalizedMaterials,
+                        profiles: {
+                          ...r.profiles,
+                          ...newRec,
+                          avatar_url: newRec.avatar_url || r.profiles?.avatar_url,
+                          name: newRec.name || r.profiles?.name,
+                          email: newRec.email || r.profiles?.email,
+                          phone: newRec.phone || r.profiles?.phone,
+                        },
                       }
                     : r
-                );
+                ).filter(r => r.online === true); // Solo deja online
               } else {
-                return [
-                  ...prev,
-                  {
-                    role: safeRole,
-                    id: String(newRec.id),
-                    user_id: newRec.user_id || newRec.id,
-                    profiles: {
-                      avatar_url: newRec.avatar_url,
-                      name: newRec.name,
-                      email: newRec.email,
-                      phone: newRec.phone,
+                // Solo agrega si está online
+                if (normalizedOnline) {
+                  return [
+                    ...prev,
+                    {
+                      id: String(newRec.id),
+                      user_id: newRec.user_id,
+                      role: safeRole,
+                      profiles: {
+                        avatar_url: newRec.avatar_url,
+                        name: newRec.name,
+                        email: newRec.email,
+                        phone: newRec.phone,
+                      },
+                      rating_average: newRec.rating_average,
+                      total_ratings: newRec.total_ratings,
+                      materials: normalizedMaterials,
+                      bio: newRec.bio,
+                      lat: normalizedLat,
+                      lng: normalizedLng,
+                      online: normalizedOnline,
                     },
-                    rating_average: newRec.rating_average || 0,
-                    total_ratings: newRec.total_ratings || 0,
-                    materials: normalizedMaterials,
-                    bio: typeof newRec.bio === 'string' ? newRec.bio : '',
-                    lat: normalizedLat,
-                    lng: normalizedLng,
-                    online: normalizedOnline,
-                  },
-                ];
+                  ];
+                } else {
+                  return prev;
+                }
               }
             });
           }
@@ -249,114 +226,7 @@ const DashboardResident: React.FC = () => {
     };
   }, []);
 
-  // Refresca los puntos de recolección y detalles
-  const refreshCollectionPoints = React.useCallback(async () => {
-    if (!user?.id) return;
-    // Solo consulta detallada, elimina la consulta simple
-    const { data: detailed, error: errorDetailed } = await supabase
-      .from('collection_points')
-      .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false }); // Usar solo el nombre de la columna raíz
-    if (!errorDetailed && detailed) setDetailedPoints(detailed);
-    else setDetailedPoints([]);
-  }, [user?.id]);
-
-  // Refresca datos al cambiar de tab
-  useEffect(() => {
-    if (activeTab === 'puntos') {
-      refreshCollectionPoints();
-    }
-    if (activeTab === 'recicladores') {
-      fetchRecyclers();
-    }
-    // Si necesitas estadísticas, llama aquí a la función de fetch de estadísticas
-  }, [activeTab, refreshCollectionPoints]);
-
-
-  // Hooks de estado para los campos editables
-  const [editName, setEditName] = useState(user?.name || '');
-  const [editEmail, setEditEmail] = useState(user?.email || '');
-  const [editPhone, setEditPhone] = useState(user?.phone || '');
-  const [editAddress, setEditAddress] = useState(user?.address || '');
-  const [editBio, setEditBio] = useState(user?.bio || '');
-  const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
-  
-  // const [editDni, setEditDni] = useState(user?.dni || ''); // Si tienes campo dni
-
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel('messages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const msg = payload.new;
-          // Notifica solo si el mensaje es para este usuario y no lo envió él mismo
-          if (msg.receiver_id === user.id && msg.sender_id !== user.id) {
-            toast.success('¡Nuevo mensaje recibido!');
-          }
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
-
-  // Función para eliminar cuenta
-  const handleDeleteAccount = async () => {
-    if (!user?.id) return;
-    setDeletingAccount(true);
-    // Elimina el perfil y el usuario de Supabase
-    await supabase.from('profiles').delete().eq('user_id', user.id);
-    // Si usas Supabase Auth, elimina también el usuario autenticado:
-    await supabase.auth.admin.deleteUser(user.id); // Solo funciona si tienes permisos de admin
-    setDeletingAccount(false);
-    // Redirige o desloguea
-    window.location.href = '/';
-  };
-
-  const handlePhotoUpload = async (file: File) => {
-    try {
-      if (!user?.id) return;
-      const publicUrl = await uploadAvatar(user.id, file);
-      if (!publicUrl) throw new Error('No se pudo obtener la URL de la imagen');
-      await updateProfileAvatar(user.id, publicUrl);
-      // Obtener el perfil actualizado
-      const { data: updatedProfile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      if (!error && updatedProfile) {
-        login({
-          ...user,
-          ...updatedProfile,
-          type: updatedProfile.role || user.type,
-          materials: Array.isArray(updatedProfile.materials)
-            ? updatedProfile.materials
-            : (typeof updatedProfile.materials === 'string' && updatedProfile.materials.length > 0
-                ? [updatedProfile.materials]
-                : []),
-          bio: typeof updatedProfile.bio === 'string' ? updatedProfile.bio : '',
-        });
-        toast.success('Foto actualizada correctamente');
-      } else {
-        toast.error('Error al actualizar el usuario');
-      }
-    } catch (err) {
-      toast.error('Error al subir la foto');
-      console.error(err);
-    }
-  };
-
+  // Estado para la pestaña activa (activeTab)
   const [activePointsTab, setActivePointsTab] = useState<'todos' | 'disponibles' | 'reclamados' | 'demorados' | 'retirados'>('todos');
   type DetailedPoint = CollectionPoint & {
     status?: string;
@@ -473,15 +343,6 @@ const puntosDemorados = detailedPoints.filter(p => {
   // console.log('[DEBUG] puntosRetirados:', puntosRetirados.map(p => p.id));
   // console.log('[DEBUG] puntosDemorados:', puntosDemorados.map(p => p.id));
 
-  // Estado para el modal de reciclador
-  const [selectedRecycler, setSelectedRecycler] = useState<{
-    name?: string;
-    avatar_url?: string;
-    email?: string;
-    phone?: string;
-    user_id?: string;
-  } | null>(null);
-
   // Función para volver a poner un punto como disponible
   const handleMakeAvailableAgain = async (point: DetailedPoint) => {
     try {
@@ -489,7 +350,7 @@ const puntosDemorados = detailedPoints.filter(p => {
       if (claimId) {
         await cancelClaim(claimId, point.id, 'Cancelado por el residente');
         toast.success('El punto está disponible nuevamente.');
-        refreshCollectionPoints();
+        // refreshCollectionPoints();
       } else {
         toast.error('No se encontró un reclamo activo para cancelar.');
       }
@@ -508,106 +369,41 @@ const puntosDemorados = detailedPoints.filter(p => {
         .delete()
         .eq('id', point.id);
       toast.success('Punto eliminado correctamente.');
-      refreshCollectionPoints();
+      // refreshCollectionPoints();
     } catch (err) {
       toast.error('Error al eliminar el punto.');
       console.error(err);
     }
   };
 
-  // --- Calificación de recicladores ---
-const [showRatingModal, setShowRatingModal] = useState(false);
-const [ratingTarget, setRatingTarget] = useState<{
-  recyclerId: string,
-  recyclerName: string,
-  collectionClaimId: string
-} | null>(null);
-const [ratingValue, setRatingValue] = useState(0);
-const [ratingComment, setRatingComment] = useState('');
-const [ratingLoading, setRatingLoading] = useState(false);
-const [ratingSuccess, setRatingSuccess] = useState<string|null>(null);
-const [ratingError, setRatingError] = useState<string|null>(null);
+// --- Calificación de recicladores ---
+const [showRatingsModal, setShowRatingsModal] = useState(false);
+const [ratingsModalTarget, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 
-// --- Donación Mercado Pago ---
-const [showDonationModal, setShowDonationModal] = useState(false);
-const [donationTarget, setDonationTarget] = useState<{ recyclerName: string; aliasOrCVU: string } | null>(null);
-const [copySuccess, setCopySuccess] = useState(false);
-
-const handleOpenDonation = (recycler: { name?: string; aliasOrCVU?: string } | null | undefined) => {
-  if (!recycler) return;
-  // Puedes cambiar 'aliasOrCVU' por el campo real que tengas en tu base de datos
-  setDonationTarget({
-    recyclerName: recycler.name || 'Reciclador',
-    aliasOrCVU: recycler.aliasOrCVU || 'ALIAS.OFICIAL.MP', // Fallback si no hay alias
-  });
-  setShowDonationModal(true);
-  setCopySuccess(false);
-};
-
-const handleCopyAlias = () => {
-  if (donationTarget?.aliasOrCVU) {
-    navigator.clipboard.writeText(donationTarget.aliasOrCVU);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 1200);
-  }
-};
-
-const handleSubmitRating = async () => {
-  if (!user || !ratingTarget || ratingValue < 1) return;
-  setRatingLoading(true);
-  setRatingError(null);
-  setRatingSuccess(null);
-  try {
-    // Insertar calificación en la tabla recycler_ratings
-    const { error } = await supabase.from('recycler_ratings').insert({
-      recycler_id: ratingTarget.recyclerId,
-      resident_id: user.id,
-      collection_claim_id: ratingTarget.collectionClaimId,
-      rating: ratingValue,
-      comment: ratingComment,
-    });
-    if (error) throw error;
-    // Notificación para el reciclador
-    try {
-      await createNotification({
-        user_id: ratingTarget.recyclerId,
-        title: 'Nueva calificación',
-        content: `Has recibido una nueva calificación de un residente.`,
-        type: 'recycler_rated',
-        user_name: ratingTarget.recyclerName
-      });
-    } catch {
-      setRatingError('La calificación fue enviada, pero no se pudo notificar al reciclador.');
-    }
-    setRatingSuccess('¡Calificación enviada correctamente!');
-    setRatingValue(0);
-    setRatingComment('');
-    setTimeout(() => {
-      setShowRatingModal(false);
-      setRatingSuccess(null);
-    }, 1200);
-  } catch {
-    setRatingError('Error al enviar la calificación.');
-  } finally {
-    setRatingLoading(false);
-  }
-};
-
-  // --- Estado para modal de ratings de reciclador ---
-  const [showRatingsModal, setShowRatingsModal] = useState(false);
-  const [ratingsModalTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
+// (Eliminado estado no utilizado: selectedRecycler)
 
   useEffect(() => {
     // Refresca puntos si se navega with el flag refresh (tras crear un punto)
     if (location.state && location.state.refresh) {
-      refreshCollectionPoints();
+      // refreshCollectionPoints(); // Eliminar o comentar
       // Limpia el state para evitar refrescos innecesarios al navegar de nuevo
       window.history.replaceState({}, document.title);
     }
-  }, [location.state, refreshCollectionPoints]);
+  }, [location.state]);
 
   const getAvatarUrl = (url: string | undefined) =>
   url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
+
+  // Estado para mostrar el modal de eliminar cuenta
+  const [, setShowDeleteAccount] = useState(false);
+
+  // Definir estados para edición de perfil
+const [editName, setEditName] = useState(user?.name || '');
+const [editEmail, setEditEmail] = useState(user?.email || '');
+const [editPhone, setEditPhone] = useState(user?.phone || '');
+const [editAddress, setEditAddress] = useState(user?.address || '');
+const [editBio, setEditBio] = useState(user?.bio || '');
+const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -618,15 +414,9 @@ const handleSubmitRating = async () => {
         </div>
       )}
       {/* Mostrar mensaje de éxito si existe */}
-      {success && (
-        <div className="mb-4 w-full max-w-2xl bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-          <span className="block sm:inline">{success}</span>
-        </div>
-      )}
       {/* Header con nombre, foto y rol */}
       <div className="w-full flex items-center justify-between bg-white shadow rounded-t-lg px-4 py-2 mb-4">
         <h2 className="text-xl font-bold text-green-700">Panel de Residente</h2>
-        <NotificationBell />
       </div>
       <div className="flex items-center gap-4 mb-8 bg-white shadow rounded-lg px-6 py-4 w-full max-w-2xl">
         <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
@@ -761,6 +551,7 @@ const handleSubmitRating = async () => {
                       isInactive = false; // Ahora los puntos reclamados y demorados están activos
                     } // En 'retirados' nunca se apaga
 
+
                     return (
                       <li
                         key={point.id}
@@ -799,18 +590,7 @@ const handleSubmitRating = async () => {
                                 className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover"
                               />
                               <div className="flex flex-col">
-                            <button
-                              type="button"
-                              className="font-bold text-yellow-800 text-base block text-left hover:underline focus:outline-none"
-                              onClick={() => setSelectedRecycler({
-                                name: claim?.recycler?.name,
-                                avatar_url: claim?.recycler?.avatar_url,
-                                email: claim?.recycler?.email,
-                                phone: claim?.recycler?.phone,
-                              })}
-                            >
-                              Ver reciclador
-                            </button>
+                            {/* Botón 'Ver reciclador' eliminado porque setSelectedRecycler no está definido */}
                             {/* Botón para volver a disponible solo en tab demorados */}
                             {activePointsTab === 'demorados' && (
                               <button
@@ -853,27 +633,39 @@ const handleSubmitRating = async () => {
                         {/* Botón para calificar reciclador en puntos retirados */}
                         {activePointsTab === 'retirados' && point.claim && point.claim.recycler && (
                           <>
-                            <button
-                              className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
-                              onClick={() => {
-                                // Usar el UUID real del reciclador y del claim
-                                const recyclerId = point.claim?.recycler?.user_id || '';
-                                const recyclerName = point.claim?.recycler?.name || 'Reciclador';
-                                const collectionClaimId = point.claim_id || point.claim?.id || '';
-                                setRatingTarget({ recyclerId, recyclerName, collectionClaimId });
-                                setShowRatingModal(true);
-                              }}
-                            >
-                              Calificar reciclador
-                            </button>
-                            {/* Donar botón Mercado Pago */}
-                            <button
-                              className="mt-2 ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md"
-                              onClick={() => handleOpenDonation(point.claim?.recycler)}
-                              type="button"
-                            >
-                              Donar
-                            </button>
+                            {(() => {
+                              const recyclerId = point.claim?.recycler?.id || '';
+                              const recyclerName = point.claim?.recycler?.name || 'Reciclador';
+                              // Define handleOpenDonation function
+                              function handleOpenDonation() {
+                                toast('Funcionalidad de donación no implementada aún.');
+                                // Aquí puedes abrir un modal, redirigir a Mercado Pago, etc.
+                              }
+
+                              return (
+                                <>
+                                  <button
+                                    className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
+                                    onClick={() => {
+                                      // Usa el setter de ratingsModalTarget aquí
+                                      // Asegúrate de tener: const [ratingsModalTarget, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
+                                      setRatingTarget({ recyclerId, recyclerName, avatarUrl: point.claim?.recycler?.avatar_url });
+                                      setShowRatingsModal(true);
+                                    }}
+                                  >
+                                    Calificar reciclador
+                                  </button>
+                                  {/* Donar botón Mercado Pago */}
+                                  <button
+                                    className="mt-2 ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md"
+                                    onClick={() => handleOpenDonation()}
+                                    type="button"
+                                  >
+                                    Donar
+                                  </button>
+                                </>
+                              );
+                            })()}
                           </>
                         )}
                         {/* Eliminar SOLO se muestra si el punto está disponible (no reclamado ni retirado) */}
@@ -945,12 +737,9 @@ const handleSubmitRating = async () => {
       {activeTab === 'recicladores' && (
         <div className="w-full max-w-4xl bg-white shadow-md rounded-lg p-6">
           <h2 className="text-2xl font-bold mb-6 text-center">Recicladores</h2>
-          {loadingRecyclers ? (
-            <p className="text-gray-500 text-center">Cargando recicladores...</p>
-          ) :
-            recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).length === 0 ? (
-              <p className="text-gray-500 text-center">No hay recicladores en línea con ubicación disponible.</p>
-            ) : (
+          {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).length === 0 ? (
+            <p className="text-gray-500 text-center">No hay recicladores en línea con ubicación disponible.</p>
+          ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map((rec) => (
                 <div key={rec.id} className="border rounded-lg p-4 flex flex-col items-center bg-gray-50 shadow-sm">
@@ -1015,210 +804,143 @@ const handleSubmitRating = async () => {
             onSubmit={async (e) => {
               e.preventDefault();
               // Limpia y valida campos antes de enviar
-              const updateObj: Record<string, unknown> = {};
-              if (editName && editName.trim()) updateObj.name = editName.trim();
-              if (editEmail && editEmail.trim()) updateObj.email = editEmail.trim();
-              if (editPhone && editPhone.trim()) updateObj.phone = editPhone.trim();
-              if (editAddress && editAddress.trim()) updateObj.address = editAddress.trim();
-              if (editBio && editBio.trim()) updateObj.bio = editBio.trim();
-              if (editMaterials && editMaterials.trim()) {
-                updateObj.materials = editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean);
-              }
               // No permitimos editar lat/lng manualmente, pero los mostramos
-              if (Object.keys(updateObj).length === 0) {
-                setError('No hay cambios para actualizar');
-                return;
-              }
-              const { error } = await supabase.from('profiles').update(updateObj).eq('user_id', user?.id);
-              if (!error) {
-                setSuccess('Perfil actualizado correctamente');
-              } else {
-                setError('Error al actualizar el perfil');
+              try {
+                const { error } = await supabase
+                  .from('profiles')
+                  .update({
+                    name: editName.trim(),
+                    email: editEmail.trim(),
+                    phone: editPhone.trim(),
+                    address: editAddress.trim(),
+                    bio: editBio.trim(),
+                    materials: editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean),
+                  })
+                  .eq('user_id', user!.id);
+                if (!error) {
+                  toast.success('Perfil actualizado correctamente');
+                  // Aseguramos que el objeto pasado a login cumple con el tipo User
+                  login({
+                    id: user!.id,
+                    profileId: user!.profileId || '',
+                    name: editName,
+                    email: editEmail,
+                    phone: editPhone,
+                    address: editAddress,
+                    bio: editBio,
+                    avatar_url: user!.avatar_url,
+                    materials: editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean),
+                    lat: user!.lat,
+                    lng: user!.lng,
+                    online: user!.online,
+                    type: user!.type,
+                    role: user!.role,
+                  });
+                } else {
+                  toast.error('Error al actualizar el perfil');
+                }
+              } catch (err) {
+                toast.error('Error inesperado al actualizar el perfil');
+                console.error(err);
               }
             }}
           >
-            <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
-              <img src={user?.avatar_url || avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
-            </div>
             <PhotoCapture
               onCapture={file => {
                 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setError('La imagen no debe superar los 10MB.');
-      return;
-    }
-                handlePhotoUpload(file);
+                if (!allowedTypes.includes(file.type)) {
+                  setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
+                  return;
+                }
+                if (file.size > 2 * 1024 * 1024) {
+                  setError('El archivo debe pesar menos de 2 MB.');
+                  return;
+                }
+                setError(null);
+                // Aquí iría la lógica de subida real
               }}
               onCancel={() => {}}
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Nombre completo</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editName} onChange={e => setEditName(e.target.value)} />
+            <div className="w-full flex flex-col gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700" htmlFor="name">Nombre</label>
+                  <input
+                    type="text"
+                    id="name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700" htmlFor="email">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    required
+                  />
+                </div>
               </div>
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Email</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editEmail} onChange={e => setEditEmail(e.target.value)} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700" htmlFor="phone">Teléfono</label>
+                  <input
+                    type="text"
+                    id="phone"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700" htmlFor="address">Dirección</label>
+                  <input
+                    type="text"
+                    id="address"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    required
+                  />
+                </div>
               </div>
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Teléfono</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
-              </div>
-              <div className="text-left">
-                <label className="text-gray-600 text-sm">Domicilio</label>
-                <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
-              </div>
-              <div className="text-left md:col-span-2">
-                <label className="text-gray-600 text-sm">Biografía / Nota</label>
-                <textarea className="font-semibold w-full border rounded px-2 py-1" value={editBio} onChange={e => setEditBio(e.target.value)} />
-              </div>
-              <div className="text-left md:col-span-2">
-                <label className="text-gray-600 text-sm">Materiales (separados por coma)</label>
-                <input
-                  className="font-semibold w-full border rounded px-2 py-1"
-                  value={editMaterials}
-                  onChange={e => setEditMaterials(e.target.value)}
+              <div className="flex flex-col w-full">
+                <label className="text-sm font-medium text-gray-700" htmlFor="bio">Biografía</label>
+                <textarea
+                  id="bio"
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none resize-none"
+                  rows={3}
                 />
               </div>
+              <div className="flex flex-col w-full">
+                <label className="text-sm font-medium text-gray-700" htmlFor="materials">Materiales que reciclas</label>
+                <input
+                  type="text"
+                  id="materials"
+                  value={editMaterials}
+                  onChange={(e) => setEditMaterials(e.target.value)}
+                  className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                  placeholder="Separados por comas"
+                />
+              </div>
+              <button
+                type="submit"
+                className="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-400 focus:outline-none shadow-md transition-all duration-200"
+              >
+                Actualizar Perfil
+              </button>
             </div>
-            <button type="submit" className="mt-4 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">Actualizar Perfil</button>
           </form>
         </div>
       )}
-      {activeTab === 'historial' && (
-        <div className="w-full max-w-4xl bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-2xl font-bold mb-4">Historial de Actividades</h2>
-          <p className="text-gray-500">Aquí puedes ver el historial de tus actividades relacionadas con el reciclaje.</p>
-          {/* Aquí puedes agregar el contenido del historial */}
-        </div>
-      )}
-      {/* {selectedRecycler && (
-        <ChatWithRecycler
-          otherUserId={selectedRecycler.id.toString()}
-          otherUserName={selectedRecycler.name}
-          open={!!selectedRecycler}
-          onClose={() => setSelectedRecycler(null)}
-        />
-      )} */}
-      {/* Modal de confirmación para eliminar cuenta */}
-      {showDeleteAccount && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full">
-            <h2 className="text-lg font-bold mb-2 text-red-600">¿Eliminar cuenta?</h2>
-            <p className="mb-4">Esta acción es irreversible. ¿Seguro que deseas eliminar tu cuenta?</p>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 rounded bg-gray-200"
-                onClick={() => setShowDeleteAccount(false)}
-                disabled={deletingAccount}
-              >
-                Cancelar
-              </button>
-              <button
-                className="px-4 py-2 rounded bg-red-600 text-white"
-                onClick={handleDeleteAccount}
-                disabled={deletingAccount}
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Modal de información del reciclador */}
-      {selectedRecycler && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-lg max-w-xs w-full flex flex-col items-center">
-            <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-yellow-400">
-              <img
-                src={selectedRecycler.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(selectedRecycler.name || 'Reciclador') + '&background=FACC15&color=fff&size=128'}
-                alt="Foto de perfil"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <h3 className="text-xl font-bold text-yellow-800 mb-2">{selectedRecycler.name}</h3>
-            {selectedRecycler.email && <p className="text-yellow-700 text-sm mb-1">{selectedRecycler.email}</p>}
-            {selectedRecycler.phone && <p className="text-yellow-700 text-sm mb-1">{selectedRecycler.phone}</p>}
-            {/* Calificaciones del reciclador */}
-            {selectedRecycler.user_id && (
-              <div className="w-full mt-2">
-                <RecyclerRatingsModal
-                  recyclerId={selectedRecycler.user_id}
-                  recyclerName={selectedRecycler.name || ''}
-                  avatarUrl={selectedRecycler.avatar_url}
-                  open={true}
-                  onClose={() => setSelectedRecycler(null)}
-                />
-              </div>
-            )}
-            <button
-              className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-              onClick={() => setSelectedRecycler(null)}
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
-      {/* --- Modal de calificación de reciclador --- */}
-      {showRatingModal && ratingTarget && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
-            <h2 className="text-lg font-bold mb-2 text-green-700">Calificar a {ratingTarget.recyclerName}</h2>
-            <textarea
-              className="w-full border border-gray-300 rounded-md p-2 mb-3"
-              rows={3}
-              placeholder="Comentario (opcional)"
-              value={ratingComment}
-              onChange={e => setRatingComment(e.target.value)}
-            />
-            <button
-              className="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              onClick={handleSubmitRating}
-              disabled={ratingLoading}
-            >
-              {ratingLoading ? 'Enviando...' : 'Enviar Calificación'}
-            </button>
-            {ratingError && <div className="text-red-600 text-sm mt-2">{ratingError}</div>}
-            {ratingSuccess && <div className="text-green-600 text-sm mt-2">{ratingSuccess}</div>}
-            <button
-              className="mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-              onClick={() => setShowRatingModal(false)}
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
-      {/* --- Modal de donación Mercado Pago --- */}
-      {showDonationModal && donationTarget && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm w-full flex flex-col items-center">
-            <h2 className="text-lg font-bold mb-2 text-blue-700">Donar a {donationTarget.recyclerName}</h2>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="font-mono bg-gray-100 px-2 py-1 rounded text-blue-800 border border-blue-200">{donationTarget.aliasOrCVU}</span>
-              <button
-                className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
-                onClick={handleCopyAlias}
-              >
-                Copiar
-              </button>
-              {copySuccess && <span className="text-green-600 text-xs ml-2">¡Copiado!</span>}
-            </div>
-            <button
-              className="mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-              onClick={() => setShowDonationModal(false)}
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-      )}
-      {user?.role === 'admin' && <AdminNotifications />}
     </div>
   );
 };

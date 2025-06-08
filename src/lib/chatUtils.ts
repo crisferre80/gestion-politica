@@ -35,13 +35,13 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
   for (const residentUserId of residentUserIds) {
     const residentProfile = profileMap[residentUserId];
     if (!residentProfile) continue;
-    // Buscar mensajes entre reciclador y residente
+    // Buscar mensajes entre reciclador y residente (usando user_id, no id interno)
     const { data: messages } = await supabase
       .from('messages')
       .select('content, sent_at, sender_id, receiver_id, read')
-      .or(`and(sender_id.eq.${residentProfile.id},receiver_id.eq.${recyclerUserId}),and(sender_id.eq.${recyclerUserId},receiver_id.eq.${residentProfile.id})`)
+      .or(`and(sender_id.eq.${residentUserId},receiver_id.eq.${recyclerUserId}),and(sender_id.eq.${recyclerUserId},receiver_id.eq.${residentUserId})`)
       .order('sent_at', { ascending: false })
-      .limit(20); // Trae los últimos 20
+      .limit(20);
     let lastMessage = undefined;
     let unreadCount = 0;
     if (messages && messages.length > 0) {
@@ -49,9 +49,9 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
         content: messages[0].content,
         created_at: messages[0].sent_at,
       };
-      // Mensajes no leídos enviados por el residente al reciclador
+      // Mensajes no leídos enviados por el residente al reciclador (usando user_id)
       unreadCount = messages.filter(
-        m => m.sender_id === residentProfile.id && m.receiver_id === recyclerUserId && m.read === false
+        m => m.sender_id === residentUserId && m.receiver_id === recyclerUserId && m.read === false
       ).length;
     }
     previews.push({

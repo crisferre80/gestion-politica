@@ -925,6 +925,8 @@ const DashboardRecycler: React.FC = () => {
                     Mensajes
                     {(() => {
                       const unreadTotal = chatPreviews.reduce((acc, chat) => acc + (typeof chat.unreadCount === 'number' ? chat.unreadCount : 0), 0);
+                      console.log('[BADGE DEBUG] chatPreviews:', chatPreviews);
+                      console.log('[BADGE DEBUG] unreadTotal:', unreadTotal);
                       return unreadTotal > 0 && (
                         <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
                           {unreadTotal}

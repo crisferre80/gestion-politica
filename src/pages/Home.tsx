@@ -48,9 +48,10 @@ const Home: React.FC = () => {
 
   // Carrusel automático solo en mobile
   useEffect(() => {
-    if (window.innerWidth < 640 && gridAds.length > 1) {
+    const activeAds = gridAds.filter(cell => cell.advertisement && cell.advertisement.active);
+    if (window.innerWidth < 640 && activeAds.length > 1) {
       intervalRef.current = setInterval(() => {
-        setCurrentAd((prev) => (prev + 1) % gridAds.length);
+        setCurrentAd((prev) => (prev + 1) % activeAds.length);
       }, 4000);
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -60,7 +61,7 @@ const Home: React.FC = () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
     return undefined;
-  }, [gridAds.length]);
+  }, [gridAds]);
 
   // Swipe manual (opcional, solo mobile)
   const touchStartX = useRef<number | null>(null);
@@ -68,14 +69,23 @@ const Home: React.FC = () => {
     touchStartX.current = e.touches[0].clientX;
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
+    const activeAds = gridAds.filter(cell => cell.advertisement && cell.advertisement.active);
+    if (touchStartX.current === null || activeAds.length === 0) return;
     const diff = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(diff) > 50) {
-      if (diff < 0) setCurrentAd((prev) => (prev + 1) % gridAds.length);
-      else setCurrentAd((prev) => (prev - 1 + gridAds.length) % gridAds.length);
+      if (diff < 0) setCurrentAd((prev) => (prev + 1) % activeAds.length);
+      else setCurrentAd((prev) => (prev - 1 + activeAds.length) % activeAds.length);
     }
     touchStartX.current = null;
   };
+
+  // Sponsors Section
+  const activeAds = gridAds.filter(cell => cell.advertisement && cell.advertisement.active);
+
+  // Sincroniza currentAd si cambia la cantidad de publicidades activas
+  useEffect(() => {
+    if (currentAd >= activeAds.length) setCurrentAd(0);
+  }, [activeAds.length, currentAd]);
 
   return (
     <div>
@@ -228,7 +238,7 @@ const Home: React.FC = () => {
       </section>
 
       {/* Sponsors Section */}
-      {gridAds.length > 0 && (
+      {activeAds.length > 0 && (
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center mb-12">
@@ -246,51 +256,49 @@ const Home: React.FC = () => {
             </div>
             {/* Mobile: Carrusel */}
             <div className="block sm:hidden">
-              {gridAds.length > 0 && (
+              {activeAds.length > 0 && (
                 <div
                   className="relative overflow-hidden"
                   onTouchStart={handleTouchStart}
                   onTouchEnd={handleTouchEnd}
                   style={{ minHeight: 320 }}
                 >
-                  {gridAds.map((cell, idx) => (
-                    cell.advertisement && cell.advertisement.active ? (
-                      <div
-                        key={cell.id}
-                        className={`absolute top-0 left-0 w-full transition-transform duration-700 ease-in-out ${idx === currentAd ? 'translate-x-0 opacity-100 z-10' : idx < currentAd ? '-translate-x-full opacity-0 z-0' : 'translate-x-full opacity-0 z-0'}`}
-                        style={{ pointerEvents: idx === currentAd ? 'auto' : 'none' }}
-                      >
-                        <div className="group bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-lg border border-green-100 overflow-hidden flex flex-col mx-auto max-w-xs">
-                          <div className="flex-1 flex items-center justify-center bg-gray-50 p-6" style={{ minHeight: '180px' }}>
-                            <img
-                              src={cell.advertisement.image_url}
-                              alt={cell.advertisement.title}
-                              className="object-contain max-h-40 w-full rounded-lg shadow-sm bg-white"
-                              style={{
-                                height: cell.size === '2x2' ? '220px' : cell.size === '2x1' ? '160px' : cell.size === '1x2' ? '120px' : '100px',
-                              }}
-                            />
-                          </div>
-                          <div className="p-5 flex flex-col items-center">
-                            <h3 className="font-semibold text-lg text-green-800 mb-2 text-center group-hover:text-green-600 transition">{cell.custom_label || cell.advertisement.title}</h3>
-                            {cell.advertisement.link && (
-                              <a
-                                href={cell.advertisement.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-2 inline-block px-4 py-2 rounded-full bg-green-600 text-white font-medium shadow hover:bg-green-700 transition"
-                              >
-                                Más información
-                              </a>
-                            )}
-                          </div>
+                  {activeAds.map((cell, idx) => (
+                    <div
+                      key={cell.id}
+                      className={`absolute top-0 left-0 w-full transition-transform duration-700 ease-in-out ${idx === currentAd ? 'translate-x-0 opacity-100 z-10' : idx < currentAd ? '-translate-x-full opacity-0 z-0' : 'translate-x-full opacity-0 z-0'}`}
+                      style={{ pointerEvents: idx === currentAd ? 'auto' : 'none' }}
+                    >
+                      <div className="group bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-lg border border-green-100 overflow-hidden flex flex-col mx-auto max-w-xs">
+                        <div className="flex-1 flex items-center justify-center bg-gray-50 p-6" style={{ minHeight: '180px' }}>
+                          <img
+                            src={cell.advertisement!.image_url}
+                            alt={cell.advertisement!.title}
+                            className="object-contain max-h-40 w-full rounded-lg shadow-sm bg-white"
+                            style={{
+                              height: cell.size === '2x2' ? '220px' : cell.size === '2x1' ? '160px' : cell.size === '1x2' ? '120px' : '100px',
+                            }}
+                          />
+                        </div>
+                        <div className="p-5 flex flex-col items-center">
+                          <h3 className="font-semibold text-lg text-green-800 mb-2 text-center group-hover:text-green-600 transition">{cell.custom_label || cell.advertisement!.title}</h3>
+                          {cell.advertisement!.link && (
+                            <a
+                              href={cell.advertisement!.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-block px-4 py-2 rounded-full bg-green-600 text-white font-medium shadow hover:bg-green-700 transition"
+                            >
+                              Más información
+                            </a>
+                          )}
                         </div>
                       </div>
-                    ) : null
+                    </div>
                   ))}
                   {/* Indicadores */}
                   <div className="flex justify-center gap-2 mt-4">
-                    {gridAds.filter(cell => cell.advertisement && cell.advertisement.active).map((_, idx) => (
+                    {activeAds.map((_, idx) => (
                       <button
                         key={idx}
                         className={`w-3 h-3 rounded-full ${idx === currentAd ? 'bg-green-600' : 'bg-green-200'}`}
@@ -304,38 +312,36 @@ const Home: React.FC = () => {
             </div>
             {/* Desktop: grilla */}
             <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
-              {gridAds.map((cell) => (
-                cell.advertisement && cell.advertisement.active ? (
-                  <div
-                    key={cell.id}
-                    className="group bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-lg border border-green-100 overflow-hidden flex flex-col transition-transform duration-200 hover:scale-105 hover:shadow-2xl"
-                    style={{ backgroundColor: cell.bg_color || undefined }}
-                  >
-                    <div className="flex-1 flex items-center justify-center bg-gray-50 p-6" style={{ minHeight: '180px' }}>
-                      <img
-                        src={cell.advertisement.image_url}
-                        alt={cell.advertisement.title}
-                        className="object-contain max-h-40 w-full rounded-lg shadow-sm bg-white"
-                        style={{
-                          height: cell.size === '2x2' ? '220px' : cell.size === '2x1' ? '160px' : cell.size === '1x2' ? '120px' : '100px',
-                        }}
-                      />
-                    </div>
-                    <div className="p-5 flex flex-col items-center">
-                      <h3 className="font-semibold text-lg text-green-800 mb-2 text-center group-hover:text-green-600 transition">{cell.custom_label || cell.advertisement.title}</h3>
-                      {cell.advertisement.link && (
-                        <a
-                          href={cell.advertisement.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-block px-4 py-2 rounded-full bg-green-600 text-white font-medium shadow hover:bg-green-700 transition"
-                        >
-                          Más información
-                        </a>
-                      )}
-                    </div>
+              {activeAds.map((cell) => (
+                <div
+                  key={cell.id}
+                  className="group bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-lg border border-green-100 overflow-hidden flex flex-col transition-transform duration-200 hover:scale-105 hover:shadow-2xl"
+                  style={{ backgroundColor: cell.bg_color || undefined }}
+                >
+                  <div className="flex-1 flex items-center justify-center bg-gray-50 p-6" style={{ minHeight: '180px' }}>
+                    <img
+                      src={cell.advertisement!.image_url}
+                      alt={cell.advertisement!.title}
+                      className="object-contain max-h-40 w-full rounded-lg shadow-sm bg-white"
+                      style={{
+                        height: cell.size === '2x2' ? '220px' : cell.size === '2x1' ? '160px' : cell.size === '1x2' ? '120px' : '100px',
+                      }}
+                    />
                   </div>
-                ) : null
+                  <div className="p-5 flex flex-col items-center">
+                    <h3 className="font-semibold text-lg text-green-800 mb-2 text-center group-hover:text-green-600 transition">{cell.custom_label || cell.advertisement!.title}</h3>
+                    {cell.advertisement!.link && (
+                      <a
+                        href={cell.advertisement!.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-block px-4 py-2 rounded-full bg-green-600 text-white font-medium shadow hover:bg-green-700 transition"
+                      >
+                        Más información
+                      </a>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

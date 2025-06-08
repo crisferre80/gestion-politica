@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { useMessages } from '../context/MessagesContext';
 import { supabase } from '../lib/supabase';
@@ -14,6 +14,7 @@ const Chat = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // El user_id real es user.id (UUID de Supabase Auth)
   const myUserId = user?.id;
@@ -104,6 +105,23 @@ const Chat = () => {
 
   return (
     <div className="max-w-3xl mx-auto p-0 md:p-6 bg-white rounded-2xl shadow-xl flex flex-col md:flex-row gap-0 md:gap-6 border border-gray-200">
+      {/* Botón para volver al panel del residente */}
+      <div className="w-full flex items-center mb-2">
+        <button
+          className="flex items-center gap-2 px-3 py-1 bg-green-100 hover:bg-green-200 text-green-800 rounded-md font-semibold shadow-sm border border-green-300 mt-2 mb-2 ml-2"
+          onClick={() => {
+            if (window.history.length > 2) {
+              navigate(-1);
+            } else {
+              navigate('/dashboard-resident');
+            }
+          }}
+          type="button"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Volver al Panel
+        </button>
+      </div>
       {/* Conversación principal */}
       <div className="flex flex-col w-full md:w-2/3 border-b md:border-b-0 md:border-r border-gray-200 px-4 py-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none">
         <div className="flex items-center gap-3 mb-6">

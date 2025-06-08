@@ -785,15 +785,16 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
               ))}
             </div>
           )}
-          {showRatingsModal && ratingsModalTarget && (
-      <RecyclerRatingsModal
-        recyclerId={ratingsModalTarget.recyclerId}
-        recyclerName={ratingsModalTarget.recyclerName}
-        avatarUrl={ratingsModalTarget.avatarUrl}
-        open={showRatingsModal}
-        onClose={() => setShowRatingsModal(false)}
-      />
-    )}
+          {/* Modal de calificación de reciclador, SIEMPRE disponible */}
+      {showRatingsModal && ratingsModalTarget && (
+        <RecyclerRatingsModal
+          recyclerId={ratingsModalTarget.recyclerId}
+          recyclerName={ratingsModalTarget.recyclerName}
+          avatarUrl={ratingsModalTarget.avatarUrl}
+          open={showRatingsModal}
+          onClose={() => setShowRatingsModal(false)}
+        />
+      )}
         </div>
       )}
       {activeTab === 'perfil' && (

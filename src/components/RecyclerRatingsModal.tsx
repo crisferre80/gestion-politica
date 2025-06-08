@@ -32,28 +32,45 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
     setLoading(true);
     setError(null);
     (async () => {
+      // 1. Obtener ratings con resident_id
       const { data, error } = await supabase
         .from('recycler_ratings')
-        .select('id, rating, comment, created_at, resident:profiles!rater_id(name, avatar_url)')
+        .select('id, rating, comment, created_at, resident_id')
         .eq('recycler_id', recyclerId)
-        .order('created_at', { ascending: false }); // OK: solo columna raíz
+        .order('created_at', { ascending: false });
       if (error) {
-        setError('Error al cargar las calificaciones');
+        setError('Error al cargar las calificaciones: ' + error.message);
         setRatings([]);
         setAverage(null);
-      } else {
-        // Corrige el tipado sin usar any
-        const fixedData: Rating[] = (data || []).map((r) => ({
-          ...r,
-          resident: Array.isArray(r.resident) ? (r.resident[0] || {}) : (r.resident || {}),
-        }));
-        setRatings(fixedData);
-        if (fixedData.length > 0) {
-          const avg = fixedData.reduce((acc, r) => acc + (typeof r.rating === 'number' ? r.rating : 0), 0) / fixedData.length;
-          setAverage(avg);
-        } else {
-          setAverage(null);
+        setLoading(false);
+        return;
+      }
+      // 2. Obtener perfiles de residentes únicos
+      const residentIds = (data || []).map(r => r.resident_id).filter(Boolean);
+      let profilesById: Record<string, { name?: string; avatar_url?: string }> = {};
+      if (residentIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .in('id', residentIds);
+        if (!profilesError && profilesData) {
+          profilesById = profilesData.reduce((acc, p) => {
+            acc[p.id] = { name: p.name, avatar_url: p.avatar_url };
+            return acc;
+          }, {} as Record<string, { name?: string; avatar_url?: string }>);
         }
+      }
+      // 3. Mapear datos de perfil a cada rating
+      const fixedData: Rating[] = (data || []).map((r) => ({
+        ...r,
+        resident: profilesById[r.resident_id] || {},
+      }));
+      setRatings(fixedData);
+      if (fixedData.length > 0) {
+        const avg = fixedData.reduce((acc, r) => acc + (typeof r.rating === 'number' ? r.rating : 0), 0) / fixedData.length;
+        setAverage(avg);
+      } else {
+        setAverage(null);
       }
       setLoading(false);
     })();

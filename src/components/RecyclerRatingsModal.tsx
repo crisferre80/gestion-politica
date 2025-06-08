@@ -34,7 +34,7 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
     (async () => {
       const { data, error } = await supabase
         .from('recycler_ratings')
-        .select('id, rating, comment, created_at, resident:profiles!recycler_ratings_resident_id_fkey(name, avatar_url)')
+        .select('id, rating, comment, created_at, resident:profiles!rater_id(name, avatar_url)')
         .eq('recycler_id', recyclerId)
         .order('created_at', { ascending: false }); // OK: solo columna raíz
       if (error) {

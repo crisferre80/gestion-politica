@@ -8,6 +8,8 @@ import NotificationBell from '../components/NotificationBell';
 import HeaderRecycler from '../components/HeaderRecycler';
 import { uploadAvatar } from '../lib/uploadAvatar';
 import PhotoCapture from '../components/PhotoCapture';
+import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
+import ChatList from '../components/ChatList';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -30,6 +32,48 @@ const DashboardRecycler: React.FC = () => {
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
+
+  // --- Chat state for ChatList modal ---
+  interface ChatPreview {
+    name: unknown;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    unreadCount: any;
+    avatar_url: never;
+    lastMessage: unknown;
+    id: string;
+    user_id: string;
+    recycler_id: string;
+    last_message?: string;
+    updated_at?: string;
+    // Add other fields as needed based on your 'chats' table structure
+  }
+  const [chatPreviews, setChatPreviews] = useState<ChatPreview[]>([]);
+  const [loadingChats, setLoadingChats] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false); // <-- Move this line up before useEffect
+
+  // Fetch chat previews when chat modal is opened
+  useEffect(() => {
+    if (!showChatModal || !user) return;
+    setLoadingChats(true);
+    // Example: fetch chat previews for the recycler
+    // Replace this with your actual chat fetching logic
+    (async () => {
+      try {
+        // Example: fetch chats where recycler is involved
+        const { data, error } = await supabase
+          .from('chats')
+          .select('*')
+          .or(`recycler_id.eq.${user.id},user_id.eq.${user.id}`);
+        if (error) throw error;
+        setChatPreviews(data || []);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (err) {
+        setChatPreviews([]);
+      } finally {
+        setLoadingChats(false);
+      }
+    })();
+  }, [showChatModal, user]);
 
   // NOTIFICACIONES DE MENSAJES NUEVOS
 
@@ -481,7 +525,6 @@ const DashboardRecycler: React.FC = () => {
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [showPointsStatsModal, setShowPointsStatsModal] = useState(false);
-  const [showChatModal, setShowChatModal] = useState(false);
   // Simulación de permiso para chat (ajusta según tu lógica real)
   const canChatWithResident = true; // Cambia a false para probar el deshabilitado
 
@@ -739,34 +782,42 @@ const DashboardRecycler: React.FC = () => {
               {user?.bio && (
                 <div className="mt-3 text-gray-600 text-sm italic max-w-2xl">{user.bio}</div>
               )}
-              <div className="flex gap-4 mt-4">
-                <button
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
-                  onClick={() => setShowEditProfileModal(true)}
+              {/* Botones de acción del header: responsive/carrusel */}
+              <div
+                className="mt-4 w-full"
+              >
+                <div
+                  className="flex flex-nowrap gap-3 md:gap-4 overflow-x-auto md:overflow-visible snap-x snap-mandatory scrollbar-hide md:flex-wrap md:justify-start"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
                 >
-                  Editar Perfil
-                </button>
-                <button
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
-                  onClick={() => setShowStatsModal(true)}
-                >
-                  Ver Estadísticas
-                </button>
-                <button
-                  className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-semibold shadow"
-                  onClick={() => setShowPointsStatsModal(true)}
-                >
-                  Mis calificaciones
-                </button>
-                <button
-                  className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2"
-                  onClick={() => setShowChatModal(true)}
-                  disabled={!canChatWithResident}
-                  title={canChatWithResident ? "Abrir chat con residente" : "Solo disponible si el residente habilita el chat"}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4.28 1.07A1 1 0 013 19.13V17.6c0-.29.13-.56.35-.74A7.97 7.97 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                  Mensajes
-                </button>
+                  <button
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    onClick={() => setShowEditProfileModal(true)}
+                  >
+                    Editar Perfil
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    onClick={() => setShowStatsModal(true)}
+                  >
+                    Ver Estadísticas
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-semibold shadow flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    onClick={() => setShowPointsStatsModal(true)}
+                  >
+                    Mis calificaciones
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2 flex-shrink-0 snap-center min-w-[150px] md:min-w-0"
+                    onClick={() => setShowChatModal(true)}
+                    disabled={!canChatWithResident}
+                    title={canChatWithResident ? "Abrir chat con residente" : "Solo disponible si el residente habilita el chat"}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4.28 1.07A1 1 0 013 19.13V17.6c0-.29.13-.56.35-.74A7.97 7.97 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    Mensajes
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1210,13 +1261,15 @@ const DashboardRecycler: React.FC = () => {
                   </div>
                   <div className="h-96">
                     <Map
-                      points={[{
-                        id: selectedPoint.id,
-                        lat: Number(selectedPoint.lat),
-                        lng: Number(selectedPoint.lng),
-                        title: selectedPoint.address,
-                        avatar_url: selectedPoint.creator_avatar
-                      }]}
+                      points={[
+                        {
+                          id: selectedPoint.id,
+                          lat: Number(selectedPoint.lat),
+                          lng: Number(selectedPoint.lng),
+                          title: selectedPoint.address,
+                          avatar_url: selectedPoint.creator_avatar
+                        }
+                      ]}
                       showUserLocation={true}
                       showRoute={true}
                       routeDestination={{ lat: Number(selectedPoint.lat), lng: Number(selectedPoint.lng) }}
@@ -1405,20 +1458,15 @@ const DashboardRecycler: React.FC = () => {
                 </div>
               </div>
             )}
+            {/* MODAL REAL DE CALIFICACIONES DEL RECICLADOR */}
             {showPointsStatsModal && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">Estadísticas de Puntos</h3>
-                    <button onClick={() => setShowPointsStatsModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
-                  </div>
-                  {/* Aquí irían las estadísticas de puntos */}
-                  <div className="mb-4 text-gray-700">Visualización de estadísticas de puntos próximamente.</div>
-                  <div className="flex justify-end">
-                    <button onClick={() => setShowPointsStatsModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
-                  </div>
-                </div>
-              </div>
+              <RecyclerRatingsModal
+                recyclerId={user.id}
+                recyclerName={user.name || 'Reciclador'}
+                avatarUrl={user.avatar_url}
+                open={showPointsStatsModal}
+                onClose={() => setShowPointsStatsModal(false)}
+              />
             )}
             {showChatModal && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1427,9 +1475,37 @@ const DashboardRecycler: React.FC = () => {
                     <h3 className="text-lg font-medium text-gray-900">Mensajes con Residentes</h3>
                     <button onClick={() => setShowChatModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
                   </div>
-                  {/* Aquí iría el componente real de chat */}
-                  <div className="mb-4 text-gray-700">Funcionalidad de chat próximamente.</div>
-                  <div className="flex justify-end">
+                  {/* Lista de residentes con los que el reciclador tiene puntos reclamados o historial de mensajes */}
+                  {loadingChats ? (
+                    <div className="p-4 text-center text-gray-500">Cargando chats...</div>
+                  ) : (
+                    <ChatList
+                      chats={chatPreviews.map(chat => {
+                        let lastMessage: { content: string; created_at: string } | undefined = undefined;
+                        if (
+                          chat.lastMessage &&
+                          typeof chat.lastMessage === 'object' &&
+                          'created_at' in chat.lastMessage
+                        ) {
+                          const content = (chat.lastMessage as { content?: string }).content ?? '';
+                          const created_at = (chat.lastMessage as { created_at?: string }).created_at ?? '';
+                          lastMessage = { content, created_at };
+                        }
+                        return {
+                          userId: String(chat.user_id),
+                          name: typeof chat.name === 'string' ? chat.name : '',
+                          avatar_url: typeof chat.avatar_url === 'string' ? chat.avatar_url : undefined,
+                          lastMessage,
+                          unreadCount: typeof chat.unreadCount === 'number' ? chat.unreadCount : 0,
+                        };
+                      })}
+                      onChatSelect={userId => {
+                        setShowChatModal(false);
+                        window.location.href = `/chat/${userId}`;
+                      }}
+                    />
+                  )}
+                  <div className="flex justify-end mt-4">
                     <button onClick={() => setShowChatModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
                   </div>
                 </div>

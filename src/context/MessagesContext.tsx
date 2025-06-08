@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { enviarMensajeSeguro } from '../lib/chatUtils';
 
@@ -21,9 +21,12 @@ const MessagesContext = createContext<MessagesContextType | undefined>(undefined
 
 export const MessagesProvider = ({ children }: { children: ReactNode }) => {
     const [messages, setMessages] = useState<Message[]>([]);
+    // Guardar los userId activos para la conversación
+    const activeUserIds = useRef<{ userId1?: string; userId2?: string }>({});
 
     // Cargar mensajes entre dos usuarios (usando user_id de Auth)
     const fetchConversation = async (userId1: string, userId2: string) => {
+        activeUserIds.current = { userId1, userId2 };
         // Buscar mensajes usando directamente los user_id (UUID de Auth)
         const { data, error } = await supabase
             .from('messages')
@@ -68,6 +71,27 @@ export const MessagesProvider = ({ children }: { children: ReactNode }) => {
             console.error('[sendMessage] Error al enviar mensaje:', err);
         }
     };
+
+    // Suscripción realtime a nuevos mensajes entre los dos usuarios activos
+    useEffect(() => {
+        if (!activeUserIds.current.userId1 || !activeUserIds.current.userId2) return;
+        const { userId1, userId2 } = activeUserIds.current;
+        // Canal único para la conversación
+        const channel = supabase.channel(`messages-realtime-${userId1}-${userId2}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `or(and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1}))`,
+            }, () => {
+                // Solo recargar si el mensaje es entre los dos usuarios activos
+                fetchConversation(userId1, userId2);
+            })
+            .subscribe();
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [messages.length]); // Se re-crea la suscripción si cambia la conversación
 
     return (
         <MessagesContext.Provider value={{ messages, fetchConversation, sendMessage }}>

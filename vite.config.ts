@@ -7,4 +7,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    // Fallback para SPA: Vite maneja esto automáticamente para proyectos SPA.
+    // No es necesario agregar historyApiFallback.
+  },
 });

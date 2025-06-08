@@ -1,1 +1,12 @@
 /*    /index.html   200
+/login    /index.html   200
+/register    /index.html   200
+/dashboard    /index.html   200
+/dashboard-recycler    /index.html   200
+/dashboard-resident    /index.html   200
+/admin/ads    /index.html   200
+/admin-panel    /index.html   200
+/collection-points    /index.html   200
+/add-collection-point    /index.html   200
+/recycler-profile/*    /index.html   200
+/chat/*    /index.html   200

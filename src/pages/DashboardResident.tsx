@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, User as UserIcon, Star, Mail, Phone } from 'lucide-react';
-import { supabase, ensureUserProfile, cancelClaim } from '../lib/supabase';
+import { supabase, cancelClaim } from '../lib/supabase';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
@@ -252,7 +252,7 @@ useEffect(() => {
   useEffect(() => {
     if (!user?.id) return;
     // Asegura que el perfil existe antes de cargar puntos
-    ensureUserProfile({ id: user.id, email: user.email, name: user.name });
+    // ensureUserProfile({ id: user.id, email: user.email, name: user.name });
     const fetchDetailedPoints = async () => {
       // CORREGIDO: select anidado con el nombre correcto de la foreign key y orden explícito
       if (!user) return;
@@ -422,6 +422,53 @@ const [editPhone, setEditPhone] = useState(user?.phone || '');
 const [editAddress, setEditAddress] = useState(user?.address || '');
 const [editBio, setEditBio] = useState(user?.bio || '');
 const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') || '');
+
+// --- Estado para EcoCreditos y recompensas ---
+const [ecoCreditos, setEcoCreditos] = useState<number>(0);
+const [ecoReward, setEcoReward] = useState<string | null>(null);
+
+// Cargar EcoCreditos al cargar el usuario
+useEffect(() => {
+  async function fetchEcoCreditos() {
+    if (!user?.id) return;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('eco_creditos')
+      .eq('user_id', user.id)
+      .single();
+    if (!error && data) {
+      setEcoCreditos(data.eco_creditos || 0);
+      if ((data.eco_creditos || 0) >= 50) {
+        setEcoReward('¡Felicidades! Has ganado un eco canje (planta o árbol).');
+      } else {
+        setEcoReward(null);
+      }
+    }
+  }
+  fetchEcoCreditos();
+  // Suscripción en tiempo real a cambios de eco_creditos
+  const channel = supabase.channel('eco-creditos-resident')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'profiles',
+      filter: `user_id=eq.${user?.id}`,
+    }, (payload) => {
+      const newData = payload.new as { eco_creditos?: number };
+      if (newData && typeof newData.eco_creditos === 'number') {
+        setEcoCreditos(newData.eco_creditos);
+        if (newData.eco_creditos >= 50) {
+          setEcoReward('¡Felicidades! Has ganado un eco canje (planta o árbol).');
+        } else {
+          setEcoReward(null);
+        }
+      }
+    })
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -828,6 +875,52 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
           )}
         </div>
       )}
+      {/* Sección Mi EcoCuenta (solo una vez, antes del formulario de perfil) */}
+      {activeTab === 'perfil' && (
+        <div className="w-full max-w-2xl bg-gradient-to-br from-green-50 via-emerald-100 to-green-200 shadow-xl rounded-3xl p-8 flex flex-col items-center mb-8 relative overflow-hidden animate-fade-in">
+          {/* Animación de confeti al ganar recompensa */}
+          {ecoReward && (
+            <img src="https://cdn.pixabay.com/animation/2022/10/05/09/41/09-41-36-627_512.gif" alt="Confeti" className="absolute top-0 left-0 w-full h-32 object-cover pointer-events-none animate-bounce-in" style={{zIndex:1}} />
+          )}
+          <h2 className="text-3xl font-extrabold mb-4 text-green-700 drop-shadow-lg flex items-center gap-2 animate-bounce-in">
+            <svg className="w-8 h-8 text-emerald-500 animate-spin-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="2" stroke="currentColor" fill="none" /><path d="M12 6v6l4 2" strokeWidth="2" stroke="currentColor" fill="none" /></svg>
+            Mi EcoCuenta
+          </h2>
+          <div className="flex flex-col items-center gap-2 w-full">
+            <span className="text-6xl font-extrabold text-green-600 drop-shadow-lg animate-grow">{ecoCreditos}</span>
+            <span className="text-gray-700 font-semibold text-lg tracking-wide">EcoCreditos acumulados</span>
+            {/* Barra de progreso visual */}
+            <div className="w-full max-w-xs mt-4 mb-2">
+              <div className="h-4 bg-green-200 rounded-full overflow-hidden shadow-inner">
+                <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-700" style={{ width: `${Math.min(ecoCreditos, 50) * 2}%` }}></div>
+              </div>
+              <div className="flex justify-between text-xs text-green-700 font-bold mt-1">
+                <span>0</span>
+                <span>50</span>
+              </div>
+            </div>
+            {/* Mensaje de recompensa o motivación */}
+            {ecoReward ? (
+              <div className="mt-4 px-6 py-3 bg-emerald-100 border-2 border-emerald-400 text-emerald-800 rounded-xl shadow-lg animate-bounce-in text-center text-lg font-bold flex items-center gap-2">
+                <svg className="w-7 h-7 text-emerald-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" /></svg>
+                {ecoReward}
+              </div>
+            ) : (
+              <div className="mt-4 text-gray-500 text-base animate-fade-in">¡Sigue reciclando! Acumula 50 EcoCreditos para tu recompensa.</div>
+            )}
+            {/* Gráfico circular simple */}
+            <div className="mt-6 flex flex-col items-center">
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="54" fill="#f0fdf4" stroke="#bbf7d0" strokeWidth="6" />
+                <circle cx="60" cy="60" r="54" fill="none" stroke="#22c55e" strokeWidth="8" strokeDasharray="339.292" strokeDashoffset="{339.292 - (ecoCreditos/50)*339.292}" style={{transition:'stroke-dashoffset 0.7s'}} />
+                <text x="60" y="68" textAnchor="middle" fontSize="2.2em" fill="#16a34a" fontWeight="bold">{ecoCreditos}</text>
+              </svg>
+              <span className="text-green-700 font-semibold mt-2">Progreso hacia tu recompensa</span>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Sección Mi Perfil (sin duplicar Mi EcoCuenta) */}
       {activeTab === 'perfil' && (
         <div className="w-full max-w-2xl bg-white shadow-md rounded-lg p-6 flex flex-col items-center">
           <h2 className="text-2xl font-bold mb-4">Mi Perfil</h2>
@@ -998,4 +1091,5 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
 };
 
 export default DashboardResident;
+
 

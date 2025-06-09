@@ -364,19 +364,40 @@ export async function completeCollection(
 
     if (pointFetchError) throw pointFetchError;
 
-    // Create notification for resident
+    // DEBUG: Mostrar el user_id del residente
+    console.log('[DEBUG completeCollection] user_id del residente:', point.user_id);
+
+    // Sumar 10 EcoCreditos al residente
+    const { data: currentProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('eco_creditos, user_id')
+      .eq('user_id', point.user_id)
+      .single();
+    if (profileError) throw profileError;
+    console.log('[DEBUG completeCollection] eco_creditos actuales:', currentProfile?.eco_creditos, 'user_id:', currentProfile?.user_id);
+    const nuevosCreditos = (currentProfile?.eco_creditos || 0) + 10;
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ eco_creditos: nuevosCreditos })
+      .eq('user_id', point.user_id);
+    if (updateError) throw updateError;
+    console.log('[DEBUG completeCollection] eco_creditos nuevos:', nuevosCreditos);
+
+    // Crear notificación para el residente
     const { error: notificationError } = await supabase
       .from('notifications')
       .insert([{
         user_id: point.user_id,
         title: 'Recolección Completada',
-        content: 'Tu punto de recolección ha sido completado exitosamente.',
+        content: 'Tu punto de recolección ha sido completado exitosamente. Has ganado 10 EcoCreditos.',
         type: 'collection_completed',
         related_id: pointId
       }]);
 
     if (notificationError) throw notificationError;
 
+    // Fin de función
+    return;
   } catch (error) {
     console.error('Error completing collection:', error);
     throw error;
@@ -398,83 +419,19 @@ export async function deleteCollectionPoint(pointId: string, userId: string): Pr
   }
 }
 
-export async function updateOnlineStatus(userId: string, online: boolean): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ online })
-      .eq('user_id', userId);
-
-    if (error) throw error;
-  } catch (error) {
-    console.error('Error updating online status:', error);
-    throw error;
-  }
-}
-
-/**
- * Asegura que el usuario tenga un perfil en la tabla profiles con el user_id correcto.
- * Si no existe, lo crea automáticamente con los datos mínimos.
- */
-export async function ensureUserProfile(user: { id: string; email?: string; name?: string }) {
-  if (!user?.id) return;
-  try {
-    // Verifica si existe el perfil
-    const { data, error: selectError } = await supabase
-      .from('profiles')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (selectError) {
-      console.error('Error checking user profile:', selectError);
-      return;
-    }
-
-    if (!data) {
-      // Si no existe, crea el perfil mínimo con role por defecto
-      const { error: insertError } = await supabase.from('profiles').insert([
-        {
-          user_id: user.id,
-          email: user.email || '',
-          name: user.name || '',
-          role: 'resident', // valor por defecto
-        }
-      ]);
-      if (insertError) {
-        console.error('Error creating user profile:', insertError);
-      }
-    }
-  } catch (err) {
-    console.error('ensureUserProfile error:', err);
-  }
-}
-
-/**
- * Obtiene los mensajes entre dos usuarios (ordenados por fecha ascendente)
- */
-export async function fetchMessages(userId1: string, userId2: string) {
+// Copia local de ensureUserProfile (solo si no existe en supabase.ts)
+export async function ensureUserProfile({ id, email, name }: { id: string; email?: string; name?: string }) {
+  if (!id) return;
   const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Envía un mensaje de un usuario a otro
- */
-export async function sendMessage(senderId: string, receiverId: string, content: string) {
-  const { error } = await supabase
-    .from('messages')
-    .insert([
-      {
-        sender_id: senderId,
-        receiver_id: receiverId,
-        content,
-      }
-    ]);
-  if (error) throw error;
+    .from('profiles')
+    .select('id')
+    .eq('user_id', id)
+    .maybeSingle();
+  if (!data && !error) {
+    await supabase.from('profiles').insert({
+      user_id: id,
+      email: email || '',
+      name: name || ''
+    });
+  }
 }

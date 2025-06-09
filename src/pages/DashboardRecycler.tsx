@@ -408,9 +408,10 @@ const DashboardRecycler: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      setError(null);
+      console.log('[DEBUG handleCompleteCollection] claim_id:', pointToComplete.claim_id, 'point_id:', pointToComplete.id);
       await completeCollection(pointToComplete.claim_id, pointToComplete.id); // Solo 2 argumentos
       setShowCompleteModal(false);
-      setPointToComplete(null);
       await fetchData();
     } catch (err: unknown) {
       let message = 'Error al marcar como retirado';
@@ -418,6 +419,7 @@ const DashboardRecycler: React.FC = () => {
         message = err.message;
       }
       setError(message);
+      console.error('[DEBUG handleCompleteCollection] error:', err);
     } finally {
       setLoading(false);
     }
@@ -1540,6 +1542,7 @@ const DashboardRecycler: React.FC = () => {
               </div>
             )}
             {/* --- MODAL EDITAR PERFIL COMPLETO --- */}
+           
             {showEditProfileModal && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 relative">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase, ensureUserProfile } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Star } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 
@@ -267,3 +267,22 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
 };
 
 export default RecyclerRatingsModal;
+async function ensureUserProfile({ id, email, name }: { id: string; email: string; name: string; }) {
+  // Verifica si el perfil ya existe
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', id)
+    .maybeSingle();
+
+  if (!data && !error) {
+    // Si no existe, lo crea
+    await supabase.from('profiles').insert({
+      user_id: id,
+      email,
+      name,
+    });
+  }
+  // Si hay error, lo ignora aquí porque se maneja en el llamador
+}
+

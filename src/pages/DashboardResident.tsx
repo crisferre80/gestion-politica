@@ -434,6 +434,8 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
 // --- Estado para EcoCreditos y recompensas ---
 const [ecoCreditos, setEcoCreditos] = useState<number>(0);
 const [ecoReward, setEcoReward] = useState<string | null>(null);
+const [ecoRewardVisible, setEcoRewardVisible] = useState(false);
+const [lastEcoRewardStep, setLastEcoRewardStep] = useState<number>(0);
 
 // Cargar EcoCreditos al cargar el usuario
 useEffect(() => {
@@ -446,11 +448,6 @@ useEffect(() => {
       .single();
     if (!error && data) {
       setEcoCreditos(data.eco_creditos || 0);
-      if ((data.eco_creditos || 0) >= 50) {
-        setEcoReward('¡Felicidades! Has ganado un eco canje (planta o árbol).');
-      } else {
-        setEcoReward(null);
-      }
     }
   }
   fetchEcoCreditos();
@@ -465,11 +462,6 @@ useEffect(() => {
       const newData = payload.new as { eco_creditos?: number };
       if (newData && typeof newData.eco_creditos === 'number') {
         setEcoCreditos(newData.eco_creditos);
-        if (newData.eco_creditos >= 50) {
-          setEcoReward('¡Felicidades! Has ganado un eco canje (planta o árbol).');
-        } else {
-          setEcoReward(null);
-        }
       }
     })
     .subscribe();
@@ -477,6 +469,22 @@ useEffect(() => {
     supabase.removeChannel(channel);
   };
 }, [user]);
+
+// Mostrar ecoReward solo durante 60s al alcanzar múltiplos de 50
+useEffect(() => {
+  if (ecoCreditos >= 50 && ecoCreditos % 50 === 0 && ecoCreditos !== lastEcoRewardStep) {
+    setEcoReward('¡Felicidades! Has ganado un eco canje (planta o árbol).');
+    setEcoRewardVisible(true);
+    setLastEcoRewardStep(ecoCreditos);
+    const timeout = setTimeout(() => {
+      setEcoRewardVisible(false);
+    }, 60000);
+    return () => clearTimeout(timeout);
+  } else if (ecoCreditos < 50 || ecoCreditos % 50 !== 0) {
+    setEcoRewardVisible(false);
+    setEcoReward(null);
+  }
+}, [ecoCreditos, lastEcoRewardStep]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
@@ -839,7 +847,7 @@ useEffect(() => {
                     className="flex items-center gap-2 mb-2 focus:outline-none hover:bg-yellow-50 rounded px-2 py-1 transition"
                     title="Ver calificaciones de este reciclador"
                     onClick={() => setShowMyRecyclerRatingsModal({
-                      recyclerId: rec.id,
+                      recyclerId: rec.id, // id interno de profiles
                       recyclerName: rec.profiles?.name || 'Reciclador',
                       avatarUrl: rec.profiles?.avatar_url
                     })}
@@ -887,8 +895,8 @@ useEffect(() => {
       {activeTab === 'perfil' && (
         <div className="w-full max-w-2xl bg-gradient-to-br from-green-50 via-emerald-100 to-green-200 shadow-xl rounded-3xl p-8 flex flex-col items-center mb-8 relative overflow-hidden animate-fade-in">
           {/* Animación de confeti al ganar recompensa */}
-          {ecoReward && (
-            <img src="https://cdn.pixabay.com/animation/2022/10/05/09/41/09-41-36-627_512.gif" alt="Confeti" className="absolute top-0 left-0 w-full h-32 object-cover pointer-events-none animate-bounce-in" style={{zIndex:1}} />
+          {ecoRewardVisible && ecoReward && (
+            <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1749495577/6ob_mwjq0t.gif" alt="Confeti" className="absolute top-0 left-0 w-full h-32 object-cover pointer-events-none animate-bounce-in" style={{zIndex:1}} />
           )}
           <h2 className="text-3xl font-extrabold mb-4 text-green-700 drop-shadow-lg flex items-center gap-2 animate-bounce-in">
             <svg className="w-8 h-8 text-emerald-500 animate-spin-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="2" stroke="currentColor" fill="none" /><path d="M12 6v6l4 2" strokeWidth="2" stroke="currentColor" fill="none" /></svg>
@@ -908,13 +916,13 @@ useEffect(() => {
               </div>
             </div>
             {/* Mensaje de recompensa o motivación */}
-            {ecoReward ? (
+            {ecoRewardVisible && ecoReward ? (
               <div className="mt-4 px-6 py-3 bg-emerald-100 border-2 border-emerald-400 text-emerald-800 rounded-xl shadow-lg animate-bounce-in text-center text-lg font-bold flex items-center gap-2">
                 <svg className="w-7 h-7 text-emerald-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" /></svg>
                 {ecoReward}
               </div>
             ) : (
-              <div className="mt-4 text-gray-500 text-base animate-fade-in">¡Sigue reciclando! Acumula 50 EcoCreditos para tu recompensa.</div>
+              <div className="mt-4 text-gray-500 text-base animate-fade-in">¡Sigue reciclando! Acumula {50 * (Math.floor(ecoCreditos / 50) + 1)} EcoCreditos para tu recompensa.</div>
             )}
             {/* Gráfico circular simple */}
             <div className="mt-6 flex flex-col items-center">

@@ -33,20 +33,22 @@ const MyRecyclerRatingsModal: React.FC<MyRecyclerRatingsModalProps> = ({ open, o
     if (!open || !recyclerId) return;
     setLoading(true);
     setError(null);
+    console.log('[MyRecyclerRatingsModal] Buscando calificaciones SOLO para recyclerId:', recyclerId);
     (async () => {
       const profileId = recyclerId;
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('recycler_ratings')
-        .select('id, rating, comment, created_at, rater_id')
+        .select('id, rating, comment, created_at, rater_id, recycler_id')
         .eq('recycler_id', profileId)
         .order('created_at', { ascending: false });
-      if (error) {
-        setError('Error al cargar las calificaciones: ' + error.message);
+      if (fetchError) {
+        setError('Error al cargar calificaciones.');
         setRatings([]);
         setAverage(null);
         setLoading(false);
         return;
       }
+      console.log('[MyRecyclerRatingsModal] Resultados fetch por recycler_id:', data);
       const raterIds = (data || []).map(r => r.rater_id).filter(Boolean);
       let profilesById: Record<string, { name?: string; avatar_url?: string }> = {};
       if (raterIds.length > 0) {
@@ -66,7 +68,6 @@ const MyRecyclerRatingsModal: React.FC<MyRecyclerRatingsModalProps> = ({ open, o
         rating: typeof r.rating === 'string' ? parseFloat(r.rating) : r.rating,
         resident: profilesById[r.rater_id] || {},
       }));
-      // No filtrar por resident_id, mostrar todos los ratings recibidos
       setRatings(fixedData);
       if (fixedData.length > 0) {
         const avg = fixedData.reduce((acc, r) => acc + (typeof r.rating === 'number' ? r.rating : 0), 0) / fixedData.length;
@@ -84,6 +85,7 @@ const MyRecyclerRatingsModal: React.FC<MyRecyclerRatingsModalProps> = ({ open, o
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 shadow-lg max-w-md w-full flex flex-col items-center relative">
         <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-2xl font-bold" onClick={onClose} aria-label="Cerrar modal">×</button>
+        {/* Avatar y nombre */}
         <div className="w-20 h-20 rounded-full overflow-hidden mb-2 flex items-center justify-center bg-gray-200 border-2 border-green-600">
           {avatarUrl ? (
             <img src={avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />

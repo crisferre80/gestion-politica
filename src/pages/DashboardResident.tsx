@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Calendar, Plus, User as UserIcon, Mail, Phone } from 'lucide-react';
+import { MapPin, Calendar, Plus, User as UserIcon, Star, Mail, Phone } from 'lucide-react';
 import { supabase, ensureUserProfile, cancelClaim } from '../lib/supabase';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import PhotoCapture from '../components/PhotoCapture';
+import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -397,8 +398,7 @@ const puntosDemorados = detailedPoints.filter(p => {
 // --- Calificación de recicladores ---
 const [showRatingsModal, setShowRatingsModal] = useState(false);
 const [ratingsModalTarget, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
-
-// (Eliminado estado no utilizado: selectedRecycler)
+const [showMyRecyclerRatingsModal, setShowMyRecyclerRatingsModal] = useState<{ recyclerId: string; recyclerName?: string; avatarUrl?: string } | false>(false);
 
   useEffect(() => {
     // Refresca puntos si se navega with el flag refresh (tras crear un punto)
@@ -777,17 +777,33 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
                   </div>
                   <h3 className="text-lg font-semibold text-green-700 mb-1 flex items-center gap-2">
                     {rec.profiles?.name || 'Reciclador'}
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold animate-pulse ml-2">
-                      <span className="w-2 h-2 bg-white rounded-full mr-1"></span>En línea
-                    </span>
                   </h3>
-                  <p className="text-gray-500 text-sm mb-1 flex items-center"><Mail className="h-4 w-4 mr-1" />{rec.profiles?.email}</p>
-                  {rec.profiles?.phone && <p className="text-gray-500 text-sm mb-1 flex items-center"><Phone className="h-4 w-4 mr-1" />{rec.profiles.phone}</p>}
-                  <div className="flex flex-wrap gap-2 mt-2 justify-center">
-                    {rec.materials?.map((mat: string, idx: number) => (
-                      <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">{mat}</span>
-                    ))}
-                  </div>
+                  {/* Mostrar promedio de calificaciones y cantidad, ahora clickable para abrir el modal de calificaciones del reciclador */}
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 mb-2 focus:outline-none hover:bg-yellow-50 rounded px-2 py-1 transition"
+                    title="Ver calificaciones de este reciclador"
+                    onClick={() => setShowMyRecyclerRatingsModal({
+                      recyclerId: rec.id,
+                      recyclerName: rec.profiles?.name || 'Reciclador',
+                      avatarUrl: rec.profiles?.avatar_url
+                    })}
+                  >
+                    <span className="flex items-center">
+                      <Star className="h-5 w-5 text-yellow-400 mr-1" />
+                      <span className="font-semibold text-gray-700 text-base">
+                        {typeof rec.rating_average === 'number' ? rec.rating_average.toFixed(1) : 'N/A'}
+                      </span>
+                    </span>
+                    <span className="text-gray-500 text-sm">({rec.total_ratings || 0})</span>
+                  </button>
+                  {/* Mostrar email y teléfono si existen */}
+                  {rec.profiles?.email && (
+                    <p className="text-gray-500 text-sm mb-1 flex items-center"><Mail className="h-4 w-4 mr-1" />{rec.profiles.email}</p>
+                  )}
+                  {rec.profiles?.phone && (
+                    <p className="text-gray-500 text-sm mb-1 flex items-center"><Phone className="h-4 w-4 mr-1" />{rec.profiles.phone}</p>
+                  )}
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
                   {/* Validación de UUID para el chat */}
                   {rec.user_id && /^[0-9a-fA-F-]{36}$/.test(rec.user_id) ? (
@@ -851,6 +867,7 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
                     online: user!.online,
                     type: user!.type,
                     role: user!.role,
+                    user_id: ''
                   });
                 } else {
                   toast.error('Error al actualizar el perfil');
@@ -965,6 +982,15 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
           avatarUrl={ratingsModalTarget.avatarUrl}
           open={showRatingsModal}
           onClose={() => setShowRatingsModal(false)}
+        />
+      )}
+      {showMyRecyclerRatingsModal && (
+        <MyRecyclerRatingsModal
+          open={!!showMyRecyclerRatingsModal}
+          onClose={() => setShowMyRecyclerRatingsModal(false)}
+          recyclerId={showMyRecyclerRatingsModal.recyclerId}
+          recyclerName={showMyRecyclerRatingsModal.recyclerName}
+          avatarUrl={showMyRecyclerRatingsModal.avatarUrl}
         />
       )}
     </div>

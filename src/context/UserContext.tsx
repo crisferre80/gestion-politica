@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 export type User = {
+  user_id: string; // or number, depending on your actual user_id type
   id: string; // UUID de Auth
   profileId: string; // ID interno de profiles (PK)
   name: string;

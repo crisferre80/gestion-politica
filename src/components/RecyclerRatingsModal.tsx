@@ -47,7 +47,7 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
     (async () => {
       const { data, error } = await supabase
         .from('recycler_ratings')
-        .select('id, rating, comment, created_at, rater_id') // CAMBIO: rater_id
+        .select('id, rating, comment, created_at, rater_id')
         .eq('recycler_id', recyclerId)
         .order('created_at', { ascending: false });
       if (error) {
@@ -57,7 +57,7 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
         setLoading(false);
         return;
       }
-      const raterIds = (data || []).map(r => r.rater_id).filter(Boolean); // CAMBIO: rater_id
+      const raterIds = (data || []).map(r => r.rater_id).filter(Boolean);
       let profilesById: Record<string, { name?: string; avatar_url?: string }> = {};
       if (raterIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
@@ -71,19 +71,20 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
           }, {} as Record<string, { name?: string; avatar_url?: string }>);
         }
       }
-      const fixedData: Rating[] = (data || []).map((r) => ({
+      // Filtrar ratings para excluir autocalificación
+      const filteredData: Rating[] = (data || []).filter(r => r.rater_id !== recyclerId).map((r) => ({
         ...r,
-        resident: profilesById[r.rater_id] || {}, // CAMBIO: rater_id
+        resident: profilesById[r.rater_id] || {},
       }));
-      setRatings(fixedData);
-      if (fixedData.length > 0) {
-        const avg = fixedData.reduce((acc, r) => acc + (typeof r.rating === 'number' ? r.rating : 0), 0) / fixedData.length;
+      setRatings(filteredData);
+      if (filteredData.length > 0) {
+        const avg = filteredData.reduce((acc, r) => acc + (typeof r.rating === 'number' ? r.rating : 0), 0) / filteredData.length;
         setAverage(avg);
       } else {
         setAverage(null);
       }
-      if (userProfileId) {
-        const found = fixedData.find(r => r.rater_id === userProfileId);
+      if (userProfileId && userProfileId !== recyclerId) {
+        const found = filteredData.find(r => r.rater_id === userProfileId);
         if (found) {
           setAlreadyRated(true);
           setMyExistingRating(found);
@@ -91,6 +92,9 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
           setAlreadyRated(false);
           setMyExistingRating(null);
         }
+      } else {
+        setAlreadyRated(false);
+        setMyExistingRating(null);
       }
       setLoading(false);
     })();
@@ -172,8 +176,8 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
             <span className="ml-2 text-gray-400 text-sm">({ratings.length})</span>
           </div>
         )}
-        {/* Bloque para calificar si no ha calificado */}
-        {!alreadyRated && userId && (
+        {/* Bloque para calificar si no ha calificado y no es el propio reciclador */}
+        {!alreadyRated && userId && userProfileId !== recyclerId && (
           <form className="w-full mb-4" onSubmit={handleSubmit}>
             <div className="flex items-center justify-center mb-2">
               {[1,2,3,4,5].map(star => (
@@ -210,8 +214,8 @@ const RecyclerRatingsModal: React.FC<RecyclerRatingsModalProps> = ({ recyclerId,
             {successMsg && <div className="text-green-600 text-sm mt-1">{successMsg}</div>}
           </form>
         )}
-        {/* Si ya calificó, mostrar su calificación */}
-        {alreadyRated && myExistingRating && (
+        {/* Si ya calificó, mostrar su calificación (solo si no es el propio reciclador) */}
+        {alreadyRated && myExistingRating && userProfileId !== recyclerId && (
           <div className="w-full mb-4 bg-green-50 border border-green-200 rounded p-3 flex flex-col items-center">
             <div className="flex items-center mb-1">
               {[1,2,3,4,5].map(star => (

@@ -8,10 +8,10 @@ import NotificationBell from '../components/NotificationBell';
 import HeaderRecycler from '../components/HeaderRecycler';
 import { uploadAvatar } from '../lib/uploadAvatar';
 import PhotoCapture from '../components/PhotoCapture';
-import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import ChatList from '../components/ChatList';
 import { getChatPreviews } from '../lib/chatUtils';
 import { useNavigate } from 'react-router-dom';
+import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -1584,12 +1584,12 @@ const DashboardRecycler: React.FC = () => {
             )}
             {/* MODAL REAL DE CALIFICACIONES DEL RECICLADOR */}
             {showPointsStatsModal && (
-              <RecyclerRatingsModal
-                recyclerId={user.id}
-                recyclerName={user.name || 'Reciclador'}
-                avatarUrl={user.avatar_url}
+              <MyRecyclerRatingsModal
                 open={showPointsStatsModal}
                 onClose={() => setShowPointsStatsModal(false)}
+                recyclerId={user.id}
+                recyclerName={user.name}
+                avatarUrl={user.avatar_url}
               />
             )}
             {showChatModal && (

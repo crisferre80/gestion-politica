@@ -346,9 +346,9 @@ const DashboardRecycler: React.FC = () => {
       setError('Por favor, selecciona una fecha y hora para la recolección.');
       return;
     }
+    setLoading(true);
+    setError(null);
     try {
-      setError(null);
-      setLoading(true);
       await claimCollectionPoint(
         pointToClaim.id, // collection_point_id
         user.id, // recycler_user_id
@@ -358,6 +358,7 @@ const DashboardRecycler: React.FC = () => {
       await fetchData();
       setShowPickupModal(false);
       setPointToClaim(null);
+      setPickupDateTimeInput('');
       setViewState('reclamados'); // Redirigir a la pestaña de Puntos Reclamados
       setClaimSuccess(true); // Mostrar mensaje de éxito
       setTimeout(() => setClaimSuccess(false), 2500); // Ocultar tras 2.5s
@@ -368,6 +369,12 @@ const DashboardRecycler: React.FC = () => {
       } else if (err instanceof Error) {
         message = err.message;
       }
+      // Si el punto fue reclamado exitosamente, cerrar el modal aunque haya warning
+      setShowPickupModal(false);
+      setPointToClaim(null);
+      setPickupDateTimeInput('');
+      setClaimSuccess(true);
+      setTimeout(() => setClaimSuccess(false), 2500);
       setError(message || 'Error al reclamar el punto');
     } finally {
       setLoading(false);

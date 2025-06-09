@@ -254,10 +254,11 @@ useEffect(() => {
     ensureUserProfile({ id: user.id, email: user.email, name: user.name });
     const fetchDetailedPoints = async () => {
       // CORREGIDO: select anidado con el nombre correcto de la foreign key y orden explícito
+      if (!user) return;
       const { data, error } = await supabase
         .from('collection_points')
         .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id ?? '')
         .order('created_at', { ascending: false });
       if (!error && data) {
         setDetailedPoints(data);
@@ -349,19 +350,22 @@ const puntosDemorados = detailedPoints.filter(p => {
       const claimId = point.claim_id || point.claim?.id;
       if (claimId) {
         await cancelClaim(claimId, point.id, 'Cancelado por el residente');
+        // Además, aseguramos que el punto se actualiza en la base de datos (por si el trigger no lo hace)
+        await supabase
+          .from('collection_points')
+          .update({ status: 'available', claim_id: null, pickup_time: null, recycler_id: null })
+          .eq('id', point.id);
         toast.success('El punto está disponible nuevamente.');
-        // Actualiza el estado local para UX instantánea
-        setDetailedPoints(prev => prev.map(p => {
-                  if (p.id === point.id) {
-                    return {
-                      ...p,
-                      status: 'available',
-                      claim: undefined,
-                      claim_id: null
-                    };
-                  }
-                  return p;
-                }));
+        // Refresca los puntos para reflejar el cambio en tiempo real
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('collection_points')
+          .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          setDetailedPoints(data);
+        }
       } else {
         toast.error('No se encontró un reclamo activo para cancelar.');
       }
@@ -380,12 +384,15 @@ const puntosDemorados = detailedPoints.filter(p => {
         .delete()
         .eq('id', point.id);
       toast.success('Punto eliminado correctamente.');
-      // refreshCollectionPoints();
+      // Elimina el punto del estado local inmediatamente
+      setDetailedPoints(prev => prev.filter(p => p.id !== point.id));
     } catch (err) {
       toast.error('Error al eliminar el punto.');
       console.error(err);
     }
   };
+
+  // (Eliminada función handleClaimPoint porque no se utiliza)
 
 // --- Calificación de recicladores ---
 const [showRatingsModal, setShowRatingsModal] = useState(false);

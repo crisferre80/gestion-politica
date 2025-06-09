@@ -12,6 +12,7 @@ import ChatList from '../components/ChatList';
 import { getChatPreviews } from '../lib/chatUtils';
 import { useNavigate } from 'react-router-dom';
 import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
+import MapComponent from '../components/Map';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -801,6 +802,86 @@ const DashboardRecycler: React.FC = () => {
     );
   };
 
+  // --- Estado para rutas de recolección ---
+  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [routes, setRoutes] = useState<any[]>([]); // Rutas guardadas
+  const [activeRoute, setActiveRoute] = useState<any | null>(null); // Ruta seleccionada para mostrar en el mapa
+  const [creatingRoute, setCreatingRoute] = useState(false);
+  const [newRouteName, setNewRouteName] = useState('');
+  const [selectedRoutePoints, setSelectedRoutePoints] = useState<string[]>([]); // IDs de puntos seleccionados para nueva ruta
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeSuccess, setRouteSuccess] = useState<string | null>(null);
+
+  // Cargar rutas guardadas al abrir el modal
+  useEffect(() => {
+    if (!showRouteModal || !user) return;
+    setRouteLoading(true);
+    setRouteError(null);
+    supabase
+      .from('recycler_routes')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setRouteError('Error al cargar rutas');
+        setRoutes(data || []);
+        setRouteLoading(false);
+      });
+  }, [showRouteModal, user]);
+
+  // Guardar nueva ruta
+  const handleSaveRoute = async () => {
+    if (!user) return;
+    if (!newRouteName.trim() || selectedRoutePoints.length < 2) {
+      setRouteError('Selecciona al menos 2 puntos y un nombre para la ruta');
+      return;
+    }
+    setRouteLoading(true);
+    setRouteError(null);
+    setRouteSuccess(null);
+    // Obtener los puntos seleccionados en orden
+    const points = claimedPoints.filter(p => selectedRoutePoints.includes(p.id));
+    // Mantener el orden de selección
+    const orderedPoints = selectedRoutePoints.map(id => points.find(p => p.id === id)).filter(Boolean);
+    const routePoints = orderedPoints.map(p => ({ lat: p!.lat, lng: p!.lng }));
+    const { error } = await supabase.from('recycler_routes').insert({
+      user_id: user.id,
+      name: newRouteName.trim(),
+      points: routePoints,
+    });
+    if (error) {
+      setRouteError('Error al guardar la ruta');
+    } else {
+      setRouteSuccess('Ruta guardada correctamente');
+      setCreatingRoute(false);
+      setNewRouteName('');
+      setSelectedRoutePoints([]);
+      // Refrescar rutas
+      const { data } = await supabase.from('recycler_routes').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+      setRoutes(data || []);
+    }
+    setRouteLoading(false);
+  };
+
+  // Eliminar ruta
+  const handleDeleteRoute = async (routeId: string) => {
+    if (!user) return;
+    setRouteLoading(true);
+    setRouteError(null);
+    await supabase.from('recycler_routes').delete().eq('id', routeId);
+    setRoutes(routes.filter(r => r.id !== routeId));
+    if (activeRoute && activeRoute.id === routeId) setActiveRoute(null);
+    setRouteLoading(false);
+  };
+
+  // Selección de puntos para nueva ruta
+  const toggleSelectPoint = (pointId: string) => {
+    setSelectedRoutePoints(prev => prev.includes(pointId) ? prev.filter(id => id !== pointId) : [...prev, pointId]);
+  };
+
+  // Si necesitas rutas en el futuro, descomenta y usa estas líneas.
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -942,6 +1023,13 @@ const DashboardRecycler: React.FC = () => {
                         </span>
                       );
                     })()}
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 font-semibold shadow flex items-center gap-2"
+                    onClick={() => setShowRouteModal(true)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v4a1 1 0 001 1h3m10 0h3a1 1 0 001-1V7m-1-4H5a2 2 0 00-2 2v16a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z" /></svg>
+                    Mis Rutas
                   </button>
                 </div>
               </div>
@@ -1635,6 +1723,118 @@ const DashboardRecycler: React.FC = () => {
                   <div className="flex justify-end mt-4">
                     <button onClick={() => setShowChatModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
                                    </div>
+                </div>
+              </div>
+            )}
+            {/* Modal de rutas (estructura básica, puedes mejorar el contenido y lógica luego): */}
+            {showRouteModal && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg w-full max-w-3xl mx-4 p-6 relative">
+                  <button
+                    className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl"
+                    onClick={() => { setShowRouteModal(false); setActiveRoute(null); setCreatingRoute(false); setRouteError(null); setRouteSuccess(null); }}
+                    title="Cerrar"
+                  >
+                    ×
+                  </button>
+                  <h2 className="text-2xl font-bold text-cyan-700 mb-4">Mis Rutas</h2>
+                  {routeError && <div className="text-red-600 mb-2">{routeError}</div>}
+                  {routeSuccess && <div className="text-green-600 mb-2">{routeSuccess}</div>}
+                  {creatingRoute ? (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">Crear nueva ruta</h3>
+                      <input
+                        className="border px-3 py-2 rounded w-full mb-2"
+                        placeholder="Nombre de la ruta"
+                        value={newRouteName}
+                        onChange={e => setNewRouteName(e.target.value)}
+                      />
+                      <div className="mb-2 text-sm text-gray-600">Selecciona los puntos reclamados (mínimo 2):</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+                        {claimedPoints.length === 0 && <div className="col-span-2 text-gray-400">No tienes puntos reclamados.</div>}
+                        {claimedPoints.map(point => (
+                          <label key={point.id} className={`flex items-center gap-2 border rounded px-2 py-1 cursor-pointer ${selectedRoutePoints.includes(point.id) ? 'bg-green-100 border-green-400' : 'bg-white'}`}>
+                            <input
+                              type="checkbox"
+                              checked={selectedRoutePoints.includes(point.id)}
+                              onChange={() => toggleSelectPoint(point.id)}
+                              className="accent-green-600"
+                            />
+                            <span>{String(point.creator_name || 'Punto')} ({point.lat?.toFixed(4)}, {point.lng?.toFixed(4)})</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                          onClick={() => { setCreatingRoute(false); setNewRouteName(''); setSelectedRoutePoints([]); }}
+                          disabled={routeLoading}
+                        >Cancelar</button>
+                        <button
+                          className="px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 font-semibold"
+                          onClick={handleSaveRoute}
+                          disabled={routeLoading}
+                        >Guardar ruta</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center mb-4">
+                        <button
+                          className="px-3 py-1 bg-cyan-100 text-cyan-800 rounded hover:bg-cyan-200 font-semibold"
+                          onClick={() => { setCreatingRoute(true); setNewRouteName(''); setSelectedRoutePoints([]); setRouteError(null); setRouteSuccess(null); }}
+                        >+ Nueva ruta</button>
+                      </div>
+                      {routeLoading ? (
+                        <div className="text-gray-500">Cargando rutas...</div>
+                      ) : routes.length === 0 ? (
+                        <div className="text-gray-400">No tienes rutas guardadas.</div>
+                      ) : (
+                        <div className="mb-4">
+                          <ul className="divide-y">
+                            {routes.map(route => (
+                              <li key={route.id} className="py-2 flex items-center justify-between gap-2">
+                                <div className="flex-1 cursor-pointer" onClick={() => setActiveRoute(route)}>
+                                  <span className="font-semibold text-cyan-700">{route.name}</span>
+                                  <span className="ml-2 text-xs text-gray-500">{route.points?.length} puntos</span>
+                                </div>
+                                <button
+                                  className="text-red-500 hover:text-red-700 text-sm ml-2"
+                                  onClick={() => handleDeleteRoute(route.id)}
+                                  title="Eliminar ruta"
+                                >Eliminar</button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {activeRoute && (
+                        <div className="mb-4">
+                          <h4 className="font-semibold mb-2">Ruta seleccionada: {activeRoute.name}</h4>
+                          <div className="w-full h-80 rounded overflow-hidden border">
+                            <MapComponent
+                              points={claimedPoints.map(p => ({
+                                id: p.id,
+                                lat: p.lat,
+                                lng: p.lng,
+                                title: String(p.creator_name || 'Punto'),
+                                avatar_url: p.creator_avatar,
+                                role: 'recycler',
+                                online: true,
+                              }))}
+                              routePoints={activeRoute.points}
+                              showUserLocation={false}
+                              showRoute={false}
+                            />
+                          </div>
+                          <button
+                            className="mt-2 px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                            onClick={() => setActiveRoute(null)}
+                          >Ocultar ruta</button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}

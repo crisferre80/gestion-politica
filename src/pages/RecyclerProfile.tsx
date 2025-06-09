@@ -16,6 +16,7 @@ const RecyclerProfile: React.FC = () => {
   const [editAddress, setEditAddress] = useState('');
   const [editBio, setEditBio] = useState('');
   const [editMaterials, setEditMaterials] = useState('');
+  const [editAlias, setEditAlias] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   type Review = {
@@ -55,6 +56,7 @@ const RecyclerProfile: React.FC = () => {
     setEditAddress(data.address || '');
     setEditBio(data.bio || '');
     setEditMaterials(Array.isArray(data.materials) ? data.materials.join(', ') : '');
+    setEditAlias(data.alias || '');
     setAvatarUrl(data.avatar_url || '');
     setLoading(false);
   }, [id]);
@@ -265,6 +267,7 @@ const RecyclerProfile: React.FC = () => {
                     if (editMaterials && editMaterials.trim()) {
                       updateObj.materials = editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean);
                     }
+                    if (editAlias && editAlias.trim()) updateObj.alias = editAlias.trim();
                     await supabase.from('profiles').update(updateObj).eq('user_id', id);
                     await fetchProfile(); // <-- Refresca el perfil tras actualizar
                   }}>
@@ -283,6 +286,10 @@ const RecyclerProfile: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Domicilio</label>
                       <input className="font-semibold w-full border rounded px-2 py-1" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Alias</label>
+                      <input className="font-semibold w-full border rounded px-2 py-1" value={editAlias} onChange={e => setEditAlias(e.target.value)} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700">Biografía / Nota</label>

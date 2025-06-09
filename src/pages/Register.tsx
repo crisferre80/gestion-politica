@@ -19,6 +19,7 @@ const Register: React.FC = () => {
   const [bio, setBio] = useState('');
   const [materials, setMaterials] = useState('');
   const [experienceYears, setExperienceYears] = useState(0);
+  const [alias, setAlias] = useState('');
   
   const { login } = useUser();
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ const Register: React.FC = () => {
         bio,
         materials: materials.split(',').map((m) => m.trim()).filter(Boolean),
         experience_years: userType === 'recycler' ? experienceYears : undefined,
+        // alias se actualizará después si es reciclador
       });
       if (error) {
         // Manejo robusto de errores de usuario ya registrado
@@ -70,6 +72,13 @@ const Register: React.FC = () => {
           console.error('Error subiendo avatar:', err);
         }
       }
+      // Si es reciclador y hay alias, actualizar el perfil con alias
+      if (data?.user && userType === 'recycler' && alias.trim()) {
+        await supabase
+          .from('profiles')
+          .update({ alias: alias.trim() })
+          .eq('user_id', data.user.id);
+      }
       // Notificación para el nuevo usuario
       if (data?.user) {
         try {
@@ -97,15 +106,16 @@ const Register: React.FC = () => {
           // Error al obtener el perfil actualizado, se ignora intencionalmente
         }
         login({
-          id: data.user.id,
-          profileId: updatedProfile?.id || '',
-          name,
-          email: data.user.email!,
-          type: userType,
-          lng: 0,
-          lat: 0,
-          avatar_url: updatedProfile?.avatar_url || avatarUrl,
-        });
+                  id: data.user.id,
+                  user_id: data.user.id,
+                  profileId: updatedProfile?.id || '',
+                  name,
+                  email: data.user.email!,
+                  type: userType,
+                  lng: 0,
+                  lat: 0,
+                  avatar_url: updatedProfile?.avatar_url || avatarUrl,
+                });
         navigate('/dashboard');
       } else {
         setError('Error al crear el usuario. Por favor, intenta nuevamente.');
@@ -297,19 +307,32 @@ const Register: React.FC = () => {
               />
             </div>
             {userType === 'recycler' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Años de experiencia
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                  value={experienceYears}
-                  onChange={e => setExperienceYears(Number(e.target.value))}
-                  placeholder="Ej: 5"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Años de experiencia
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    value={experienceYears}
+                    onChange={e => setExperienceYears(Number(e.target.value))}
+                    placeholder="Ej: 5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Alias público (opcional)
+                  </label>
+                  <input
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    value={alias}
+                    onChange={e => setAlias(e.target.value)}
+                    placeholder="Ej: El Reciclador Verde"
+                  />
+                </div>
+              </>
             )}
 
             <div>

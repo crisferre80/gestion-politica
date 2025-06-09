@@ -20,8 +20,8 @@ interface MapComponentProps {
     lng: number;
     title: string;
     avatar_url?: string;
-    role?: string; // <-- ahora usamos role
-    online?: boolean; // <-- aseguramos que online esté disponible
+    role?: string;
+    online?: boolean;
   }>;
   onMarkerClick?: (id: string) => void;
   onMapClick?: (event: { lng: number; lat: number }) => void;
@@ -31,6 +31,8 @@ interface MapComponentProps {
   showRoute?: boolean;
   routeDestination?: { lat: number; lng: number } | null;
   onDeletePoint?: (id: string) => void;
+  // NUEVO: para rutas multipunto
+  routePoints?: Array<{ lat: number; lng: number }>;
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({ 
@@ -42,7 +44,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
   showUserLocation = false,
   showRoute = false,
   routeDestination,
-  onDeletePoint
+  onDeletePoint,
+  routePoints // NUEVO
 }) => {
   const [userLocation, setUserLocation] = useState<{
     lat: number;
@@ -215,6 +218,54 @@ const MapComponent: React.FC<MapComponentProps> = ({
       map.off('zoomstart', onMove);
     };
   }, [mapRef]);
+
+  // --- DIBUJAR POLILÍNEA MULTIPUNTO SI routePoints ESTÁ PRESENTE ---
+  useEffect(() => {
+    if (!mapRef.current) return;
+    // Limpiar capa de ruta previa si existe
+    if (mapRef.current.getLayer('route')) {
+      mapRef.current.removeLayer('route');
+    }
+    if (mapRef.current.getSource('route')) {
+      mapRef.current.removeSource('route');
+    }
+    if (routePoints && routePoints.length > 1) {
+      // Construir GeoJSON de la polilínea
+      const coordinates = routePoints.map(p => [p.lng, p.lat]);
+      mapRef.current.addSource('route', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates,
+          },
+        },
+      });
+      mapRef.current.addLayer({
+        id: 'route',
+        type: 'line',
+        source: 'route',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': '#22c55e',
+          'line-width': 4,
+          'line-opacity': 0.75,
+        },
+      });
+      // Ajustar el mapa para mostrar toda la ruta
+      const bounds = new mapboxgl.LngLatBounds(
+        coordinates[0] as [number, number],
+        coordinates[0] as [number, number]
+      );
+      coordinates.forEach(coord => bounds.extend(coord as [number, number]));
+      mapRef.current.fitBounds(bounds, { padding: 50 });
+    }
+  }, [routePoints]);
 
   return (
     <div className="relative">

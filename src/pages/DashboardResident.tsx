@@ -408,6 +408,78 @@ const [showRatingsModal, setShowRatingsModal] = useState(false);
 const [ratingsModalTarget, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 const [showMyRecyclerRatingsModal, setShowMyRecyclerRatingsModal] = useState<{ recyclerId: string; recyclerName?: string; avatarUrl?: string } | false>(false);
 
+// --- Estado para mensajes no leídos por reciclador ---
+const [unreadMessagesByRecycler, setUnreadMessagesByRecycler] = useState<Record<string, number>>({});
+
+// --- Efecto para cargar y suscribirse a mensajes no leídos ---
+useEffect(() => {
+  if (!user?.id || recyclers.length === 0) return;
+  let isMounted = true;
+  // Función para cargar los mensajes no leídos por reciclador
+  const fetchUnread = async () => {
+    const recyclerUserIds = recyclers.map(r => r.user_id).filter(Boolean);
+    if (recyclerUserIds.length === 0) return;
+    // Buscar mensajes no leídos enviados por cada reciclador al residente
+    const { data, error } = await supabase
+      .from('messages')
+      .select('sender_id, receiver_id, read')
+      .in('sender_id', recyclerUserIds)
+      .eq('receiver_id', user.id)
+      .eq('read', false);
+    if (error) return;
+    // Agrupar por sender_id
+    const counts: Record<string, number> = {};
+    (data || []).forEach(msg => {
+      counts[msg.sender_id] = (counts[msg.sender_id] || 0) + 1;
+    });
+    if (isMounted) setUnreadMessagesByRecycler(counts);
+  };
+  fetchUnread();
+  // Suscripción realtime a nuevos mensajes
+  const channel = supabase.channel('resident-messages-badge')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'messages',
+      filter: `receiver_id=eq.${user.id}`,
+    }, fetchUnread)
+    .subscribe();
+  return () => {
+    isMounted = false;
+    supabase.removeChannel(channel);
+  };
+}, [user, recyclers]);
+
+// Limpiar badge de un reciclador al abrir el chat
+const clearUnreadForRecycler = async (recyclerUserId: string) => {
+  if (!user?.id) return;
+  await supabase
+    .from('messages')
+    .update({ read: true })
+    .eq('receiver_id', user.id)
+    .eq('sender_id', recyclerUserId)
+    .eq('read', false);
+  setUnreadMessagesByRecycler(prev => ({ ...prev, [recyclerUserId]: 0 }));
+};
+
+// Limpiar todos los badges al abrir la pestaña de recicladores
+useEffect(() => {
+  if (activeTab === 'recicladores') {
+    (async () => {
+      if (!user?.id) return;
+      const recyclerUserIds = recyclers.map(r => r.user_id).filter(Boolean);
+      if (recyclerUserIds.length === 0) return;
+      await supabase
+        .from('messages')
+        .update({ read: true })
+        .eq('receiver_id', user.id)
+        .in('sender_id', recyclerUserIds)
+        .eq('read', false);
+      setUnreadMessagesByRecycler({});
+    })();
+  }
+}, [activeTab, user, recyclers]);
+
   useEffect(() => {
     // Refresca puntos si se navega with el flag refresh (tras crear un punto)
     if (location.state && location.state.refresh) {
@@ -478,7 +550,7 @@ useEffect(() => {
     setLastEcoRewardStep(ecoCreditos);
     const timeout = setTimeout(() => {
       setEcoRewardVisible(false);
-    }, 60000);
+    }, 6000);
     return () => clearTimeout(timeout);
   } else if (ecoCreditos < 50 || ecoCreditos % 50 !== 0) {
     setEcoRewardVisible(false);
@@ -572,6 +644,12 @@ useEffect(() => {
           onClick={() => setActiveTab('recicladores')}
         >
           Recicladores
+          {/* Badge rojo si hay mensajes no leídos */}
+          {Object.values(unreadMessagesByRecycler).some(count => count > 0) && (
+            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
+              ●
+            </span>
+          )}
         </button>
         <button
           className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
@@ -830,7 +908,13 @@ useEffect(() => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map((rec) => (
-                <div key={rec.id} className="border rounded-lg p-4 flex flex-col items-center bg-gray-50 shadow-sm">
+                <div key={rec.id} className="border rounded-lg p-4 flex flex-col items-center bg-gray-50 shadow-sm relative">
+                  {/* Badge rojo en la tarjeta si hay mensajes no leídos de este reciclador */}
+                  {rec.user_id && unreadMessagesByRecycler[rec.user_id] > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
+                      ●
+                    </span>
+                  )}
                   <div className="w-20 h-20 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
                     {rec.profiles?.avatar_url ? (
                       <img src={rec.profiles.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
@@ -840,6 +924,12 @@ useEffect(() => {
                   </div>
                   <h3 className="text-lg font-semibold text-green-700 mb-1 flex items-center gap-2">
                     {rec.profiles?.name || 'Reciclador'}
+                    {/* Badge de mensajes no leídos */}
+                    {unreadMessagesByRecycler[rec.user_id || ''] > 0 && (
+                      <span className="inline-flex items-center justify-center w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full">
+                        {unreadMessagesByRecycler[rec.user_id || '']}
+                      </span>
+                    )}
                   </h3>
                   {/* Mostrar promedio de calificaciones y cantidad, ahora clickable para abrir el modal de calificaciones del reciclador */}
                   <button
@@ -872,9 +962,16 @@ useEffect(() => {
                   {rec.user_id && /^[0-9a-fA-F-]{36}$/.test(rec.user_id) ? (
                     <Link
                       to={`/chat/${rec.user_id}`}
-                      className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none"
+                      className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none relative"
+                      onClick={() => clearUnreadForRecycler(rec.user_id!)}
                     >
                       Enviar mensaje
+                      {/* Badge rojo SOLO en el botón, persiste hasta abrir el chat */}
+                      {unreadMessagesByRecycler[rec.user_id || ''] > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white animate-pulse z-10">
+                          {unreadMessagesByRecycler[rec.user_id || '']}
+                        </span>
+                      )}
                     </Link>
                   ) : (
                     <button

@@ -350,7 +350,18 @@ const puntosDemorados = detailedPoints.filter(p => {
       if (claimId) {
         await cancelClaim(claimId, point.id, 'Cancelado por el residente');
         toast.success('El punto está disponible nuevamente.');
-        // refreshCollectionPoints();
+        // Actualiza el estado local para UX instantánea
+        setDetailedPoints(prev => prev.map(p => {
+                  if (p.id === point.id) {
+                    return {
+                      ...p,
+                      status: 'available',
+                      claim: undefined,
+                      claim_id: null
+                    };
+                  }
+                  return p;
+                }));
       } else {
         toast.error('No se encontró un reclamo activo para cancelar.');
       }
@@ -558,6 +569,16 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
                         className={`border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in ${isInactive ? 'opacity-80 grayscale-[0.2] pointer-events-none' : ''}`}
                         style={{ animation: 'fadeInUp 0.7s' }}
                       >
+                        {/* Botón para volver a disponible SOLO en puntos retirados, esquina superior derecha */}
+                        {activePointsTab === 'retirados' && (
+                          <button
+                            className="absolute top-28 right-4 z-10 px-1 py-1 bg-green-600 text-white rounded shadow-md hover:bg-green-700 transition-all"
+                            onClick={() => handleMakeAvailableAgain(point)}
+                            type="button"
+                          >
+                            Volver a disponible
+                          </button>
+                        )}
                         <div className="flex-1 mb-2 md:mb-0">
                           <div className="flex items-center gap-2 mb-1">
                             <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Punto de Recolección" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
@@ -636,10 +657,8 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
                             {(() => {
                               const recyclerId = point.claim?.recycler?.id || '';
                               const recyclerName = point.claim?.recycler?.name || 'Reciclador';
-                              // Define handleOpenDonation function
                               function handleOpenDonation() {
                                 toast('Funcionalidad de donación no implementada aún.');
-                                // Aquí puedes abrir un modal, redirigir a Mercado Pago, etc.
                               }
 
                               return (
@@ -647,15 +666,12 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
                                   <button
                                     className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
                                     onClick={() => {
-                                      console.log('Click Calificar reciclador', { recyclerId, recyclerName, avatar: point.claim?.recycler?.avatar_url });
-                                      toast('Click Calificar reciclador: ' + recyclerName);
                                       setRatingTarget({ recyclerId, recyclerName, avatarUrl: point.claim?.recycler?.avatar_url });
                                       setShowRatingsModal(true);
                                     }}
                                   >
                                     Calificar reciclador
                                   </button>
-                                  {/* Donar botón Mercado Pago */}
                                   <button
                                     className="mt-2 ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md"
                                     onClick={() => handleOpenDonation()}
@@ -663,6 +679,8 @@ const [editMaterials, setEditMaterials] = useState(user?.materials?.join(', ') |
                                   >
                                     Donar
                                   </button>
+                                  {/* BOTÓN PARA VOLVER A DISPONIBLE UN PUNTO RETIRADO */}
+                                
                                 </>
                               );
                             })()}

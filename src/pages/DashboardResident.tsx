@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, User as UserIcon, Star, Mail, Phone } from 'lucide-react';
-import { supabase, cancelClaim } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
@@ -228,7 +228,7 @@ useEffect(() => {
   }, []);
 
   // Estado para la pestaña activa (activeTab)
-  const [activePointsTab, setActivePointsTab] = useState<'todos' | 'disponibles' | 'reclamados' | 'demorados' | 'retirados'>('todos');
+  const [activePointsTab, setActivePointsTab] = useState<'todos' | 'disponibles' | 'reclamados' | 'demorados' | 'retirados' | 'completados'>('todos');
   type DetailedPoint = CollectionPoint & {
     status?: string;
     claim_id?: string | null; // <-- Añadido para acceso seguro
@@ -244,7 +244,7 @@ useEffect(() => {
         email?: string;
         phone?: string;
       };
-    };
+    } | null; // <-- Permitir null explícitamente
   };
   const [detailedPoints, setDetailedPoints] = useState<DetailedPoint[]>([]);
 
@@ -348,28 +348,36 @@ const puntosDemorados = detailedPoints.filter(p => {
   // Función para volver a poner un punto como disponible
   const handleMakeAvailableAgain = async (point: DetailedPoint) => {
     try {
-      const claimId = point.claim_id || point.claim?.id;
-      if (claimId) {
-        await cancelClaim(claimId, point.id, 'Cancelado por el residente');
-        // Además, aseguramos que el punto se actualiza en la base de datos (por si el trigger no lo hace)
-        await supabase
-          .from('collection_points')
-          .update({ status: 'available', claim_id: null, pickup_time: null, recycler_id: null })
-          .eq('id', point.id);
-        toast.success('El punto está disponible nuevamente.');
-        // Refresca los puntos para reflejar el cambio en tiempo real
-        if (!user) return;
-        const { data, error } = await supabase
-          .from('collection_points')
-          .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-        if (!error && data) {
-          setDetailedPoints(data);
-        }
-      } else {
-        toast.error('No se encontró un reclamo activo para cancelar.');
+      // 1. Crear un nuevo punto disponible (clonando los datos relevantes)
+      const { data: newPoint, error: createError } = await supabase
+      .from('collection_points')
+      .insert({
+        address: point.address,
+        district: point.district,
+        schedule: point.schedule,
+        user_id: point.user_id,
+        notas: point.notas,
+        additional_info: point.additional_info,
+        status: 'available',
+        // Otros campos relevantes que quieras clonar
+      })
+      .select()
+      .single();
+      if (createError || !newPoint) {
+        toast.error('Error al crear el nuevo punto disponible.');
+        return;
       }
+      // 2. Eliminar el punto retirado de la base de datos
+      await supabase
+        .from('collection_points')
+        .delete()
+        .eq('id', point.id);
+      // 3. Actualizar el estado local: quitar el retirado y agregar el nuevo disponible
+      setDetailedPoints(prev => [
+        ...prev.filter(p => p.id !== point.id),
+        { ...newPoint, claim: null, claim_id: null }
+      ]);
+      toast.success('El punto ha sido reactivado como disponible.');
     } catch (err) {
       toast.error('Error al volver a poner el punto como disponible.');
       console.error(err);

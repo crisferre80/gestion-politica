@@ -848,10 +848,11 @@ const DashboardRecycler: React.FC = () => {
     supabase
       .from('recycler_routes')
       .select('*')
-      .eq('recycler_id', user.id) // Cambiado de user_id a recycler_id
-      // .order('created_at', { ascending: false }) // Quitar ordenamiento para evitar error 400
+      .eq('recycler_id', user.id)
       .then(({ data, error }) => {
-        if (error) setRouteError('Error al cargar rutas');
+        if (error) {
+          setRouteError('Error al cargar rutas: ' + (error.message || ''));
+        }
         // Ordenar en frontend si es necesario
         const sorted = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setRoutes(sorted);
@@ -883,17 +884,20 @@ const DashboardRecycler: React.FC = () => {
       }
     ]);
     if (error) {
-      setRouteError('Error al guardar la ruta');
+      setRouteError('Error al guardar la ruta: ' + (error.message || ''));
     } else {
       setRouteSuccess('Ruta guardada correctamente');
       setCreatingRoute(false);
       setNewRouteName('');
       setSelectedRoutePoints([]);
       // Refrescar rutas
-      const { data } = await supabase.from('recycler_routes').select('*').eq('recycler_id', user.id); // Cambiado de user_id a recycler_id
-      // Ordenar en frontend
-      const sorted = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setRoutes(sorted);
+      const { data, error: fetchError } = await supabase.from('recycler_routes').select('*').eq('recycler_id', user.id);
+      if (fetchError) {
+        setRouteError('Error al recargar rutas: ' + (fetchError.message || ''));
+      } else {
+        const sorted = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setRoutes(sorted);
+      }
     }
     setRouteLoading(false);
   };

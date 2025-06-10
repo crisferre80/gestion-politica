@@ -222,31 +222,43 @@ const MapComponent: React.FC<MapComponentProps> = ({
   // --- DIBUJAR POLILÍNEA MULTIPUNTO SI routePoints ESTÁ PRESENTE ---
   useEffect(() => {
     if (!mapRef.current) return;
-    // Limpiar capa de ruta previa si existe
-    if (mapRef.current.getLayer('route')) {
-      mapRef.current.removeLayer('route');
+    // Generar un id único para la capa y source de la ruta
+    const routeId = `route-polyline-${Date.now()}`;
+    // Limpiar todas las capas y sources previas que empiecen con 'route-polyline-'
+    const map = mapRef.current;
+    const style = map.getStyle();
+    if (style && style.layers) {
+      style.layers.forEach(layer => {
+        if (layer.id.startsWith('route-polyline-')) {
+          if (map.getLayer(layer.id)) map.removeLayer(layer.id);
+        }
+      });
     }
-    if (mapRef.current.getSource('route')) {
-      mapRef.current.removeSource('route');
+    const styleObj = map.getStyle();
+    if (styleObj && styleObj.sources) {
+      Object.keys(styleObj.sources).forEach(sourceId => {
+        if (sourceId.startsWith('route-polyline-')) {
+          if (map.getSource(sourceId)) map.removeSource(sourceId);
+        }
+      });
     }
     if (routePoints && routePoints.length > 1) {
-      // Construir GeoJSON de la polilínea
       const coordinates = routePoints.map(p => [p.lng, p.lat]);
-      mapRef.current.addSource('route', {
+      map.addSource(routeId, {
         type: 'geojson',
         data: {
           type: 'Feature',
           properties: {},
           geometry: {
             type: 'LineString',
-            coordinates,
+            coordinates: [...coordinates],
           },
         },
       });
-      mapRef.current.addLayer({
-        id: 'route',
+      map.addLayer({
+        id: routeId,
         type: 'line',
-        source: 'route',
+        source: routeId,
         layout: {
           'line-join': 'round',
           'line-cap': 'round',
@@ -257,13 +269,15 @@ const MapComponent: React.FC<MapComponentProps> = ({
           'line-opacity': 0.75,
         },
       });
-      // Ajustar el mapa para mostrar toda la ruta
-      const bounds = new mapboxgl.LngLatBounds(
-        coordinates[0] as [number, number],
-        coordinates[0] as [number, number]
-      );
-      coordinates.forEach(coord => bounds.extend(coord as [number, number]));
-      mapRef.current.fitBounds(bounds, { padding: 50 });
+      // Centrar el mapa en la ruta
+      if (coordinates.length > 1) {
+        const bounds = new mapboxgl.LngLatBounds(
+          coordinates[0] as [number, number],
+          coordinates[0] as [number, number]
+        );
+        coordinates.forEach(coord => bounds.extend(coord as [number, number]));
+        map.fitBounds(bounds, { padding: 50 });
+      }
     }
   }, [routePoints]);
 

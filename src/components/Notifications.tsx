@@ -1,17 +1,25 @@
 import { useNotifications } from '../context/NotificationsContext';
-import { Sparkles } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Recycle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 function getClosedIdsFromStorage(userId: string | undefined) {
   if (!userId) return [];
   try {
     const raw = localStorage.getItem(`eco_closed_notifications_${userId}`);
-    return raw ? JSON.parse(raw) : [];
+    const arr = raw ? JSON.parse(raw) : [];
+    // Filtrar solo las que no han expirado (48h)
+    const now = Date.now();
+    const filtered = arr.filter((item: { id: string; closedAt: number }) => now - item.closedAt < 48 * 60 * 60 * 1000);
+    // Limpieza de expirados
+    if (filtered.length !== arr.length) {
+      localStorage.setItem(`eco_closed_notifications_${userId}`, JSON.stringify(filtered));
+    }
+    return filtered;
   } catch {
     return [];
   }
 }
-function saveClosedIdsToStorage(userId: string | undefined, ids: string[]) {
+function saveClosedIdsToStorage(userId: string | undefined, ids: { id: string; closedAt: number }[]) {
   if (!userId) return;
   localStorage.setItem(`eco_closed_notifications_${userId}`, JSON.stringify(ids));
 }
@@ -19,33 +27,20 @@ function saveClosedIdsToStorage(userId: string | undefined, ids: string[]) {
 export default function Notifications() {
   const { notifications, markAsRead } = useNotifications();
   const userId = notifications[0]?.user_id;
-  const [closedIds, setClosedIds] = useState<string[]>(() => getClosedIdsFromStorage(userId));
-  const [shownIds, setShownIds] = useState<string[]>([]);
-  const firstRender = useRef(true);
+  const [closedIds, setClosedIds] = useState<{ id: string; closedAt: number }[]>(() => getClosedIdsFromStorage(userId));
 
   useEffect(() => {
     // Cargar cerradas de storage al cambiar de usuario
     setClosedIds(getClosedIdsFromStorage(userId));
   }, [userId]);
 
-  useEffect(() => {
-    if (firstRender.current) {
-      setShownIds(
-        notifications
-          .filter(n => !n.read && !closedIds.includes(n.id))
-          .map(n => n.id)
-      );
-      firstRender.current = false;
-    }
-  }, [notifications, closedIds]);
-
-  // Solo mostrar las no leídas y que estén en shownIds
-  const unread = notifications.filter(n => !n.read && shownIds.includes(n.id));
+  // Solo mostrar las no leídas y que no estén cerradas en los últimos 48h
+  const closedIdSet = new Set(closedIds.map(c => c.id));
+  const unread = notifications.filter(n => !n.read && !closedIdSet.has(n.id));
 
   const handleClose = (id: string) => {
     markAsRead(id);
-    setShownIds(ids => ids.filter(i => i !== id));
-    const updatedClosed = [...closedIds, id];
+    const updatedClosed = [...closedIds, { id, closedAt: Date.now() }];
     setClosedIds(updatedClosed);
     saveClosedIdsToStorage(userId, updatedClosed);
   };
@@ -62,7 +57,8 @@ export default function Notifications() {
         >
           <div className="flex flex-col items-center justify-center mr-2">
             <span className="bg-green-500 text-white rounded-full p-2 shadow-lg flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-yellow-300 animate-pulse" />
+              {/* Cambiado Sparkles por Recycle */}
+              <Recycle className="w-6 h-6 text-green-100 animate-spin-slow" />
             </span>
           </div>
           <div className="flex-1">
@@ -88,6 +84,12 @@ export default function Notifications() {
         @keyframes slide-in {
           from { opacity: 0; transform: translateY(-20px) scale(0.95); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-spin-slow {
+          animation: spin 2.5s linear infinite;
+        }
+        @keyframes spin {
+          100% { transform: rotate(360deg); }
         }
       `}</style>
     </div>

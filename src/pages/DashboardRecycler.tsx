@@ -347,35 +347,45 @@ const DashboardRecycler: React.FC = () => {
       setError('Por favor, selecciona una fecha y hora para la recolección.');
       return;
     }
-    setLoading(true);
+    // --- Cerrar modal y limpiar estado ANTES de la llamada asíncrona ---
+    setShowPickupModal(false);
+    setPointToClaim(null);
+    setPickupDateTimeInput('');
+    setClaimSuccess(false); // Reinicia mensaje de éxito
     setError(null);
+    setLoading(true);
+    // Actualizar estado local para evitar parpadeo
+    setClaimedPoints(prev => [
+      ...prev,
+      {
+        ...pointToClaim,
+        claim_status: 'claimed',
+        status: 'claimed',
+        pickup_time: new Date(pickupDateTimeInput).toISOString(),
+        claim_id: '', // Se actualizará con fetchData, pero así la UI no parpadea
+      }
+    ]);
+    setAvailablePoints(prev => prev.filter(p => p.id !== pointToClaim.id));
+    setViewState('reclamados');
+    // --- Lógica asíncrona en segundo plano ---
     try {
       await claimCollectionPoint(
-        pointToClaim.id, // collection_point_id
-        user.id, // recycler_user_id
+        pointToClaim.id, // collection_point_id (UUID string)
+        user.id, // recycler_user_id (UUID string)
         new Date(pickupDateTimeInput).toISOString(),
-        pointToClaim.user_id // user_id del residente dueño del punto
+        pointToClaim.user_id // user_id del residente dueño del punto (UUID string)
       );
-      await fetchData();
-      setShowPickupModal(false);
-      setPointToClaim(null);
-      setPickupDateTimeInput('');
-      setViewState('reclamados'); // Redirigir a la pestaña de Puntos Reclamados
-      setClaimSuccess(true); // Mostrar mensaje de éxito
-      setTimeout(() => setClaimSuccess(false), 2500); // Ocultar tras 2.5s
+      setClaimSuccess(true);
+      // Sincronizar con la base real en segundo plano
+      fetchData();
+      setTimeout(() => setClaimSuccess(false), 2500);
     } catch (err: unknown) {
       let message = 'Error desconocido al reclamar el punto';
       if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
-        message = (err as { message: string }).message;
+        message = (err as { message: string }).message + '\n' + JSON.stringify(err);
       } else if (err instanceof Error) {
         message = err.message;
       }
-      // Si el punto fue reclamado exitosamente, cerrar el modal aunque haya warning
-      setShowPickupModal(false);
-      setPointToClaim(null);
-      setPickupDateTimeInput('');
-      setClaimSuccess(true);
-      setTimeout(() => setClaimSuccess(false), 2500);
       setError(message || 'Error al reclamar el punto');
     } finally {
       setLoading(false);
@@ -804,14 +814,31 @@ const DashboardRecycler: React.FC = () => {
 
   // --- Estado para rutas de recolección ---
   const [showRouteModal, setShowRouteModal] = useState(false);
-  const [routes, setRoutes] = useState<any[]>([]); // Rutas guardadas
-  const [activeRoute, setActiveRoute] = useState<any | null>(null); // Ruta seleccionada para mostrar en el mapa
+  interface Route {
+    point_ids: never[];
+    id: string;
+    user_id: string;
+    name: string;
+    points: Array<{ lat: number; lng: number }>;
+    created_at?: string;
+    // Add other fields if needed
+  }
+  const [routes, setRoutes] = useState<Route[]>([]); // Rutas guardadas
+  const [activeRoute, setActiveRoute] = useState<Route | null>(null); // Ruta seleccionada para mostrar en el mapa
   const [creatingRoute, setCreatingRoute] = useState(false);
   const [newRouteName, setNewRouteName] = useState('');
   const [selectedRoutePoints, setSelectedRoutePoints] = useState<string[]>([]); // IDs de puntos seleccionados para nueva ruta
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeSuccess, setRouteSuccess] = useState<string | null>(null);
+
+  // --- Estado para edición de rutas ---
+  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+  const [editRouteName, setEditRouteName] = useState('');
+  const [editSelectedPoints, setEditSelectedPoints] = useState<string[]>([]);
+  const [editRouteLoading, setEditRouteLoading] = useState(false);
+  const [editRouteError, setEditRouteError] = useState<string | null>(null);
+  const [editRouteSuccess, setEditRouteSuccess] = useState<string | null>(null);
 
   // Cargar rutas guardadas al abrir el modal
   useEffect(() => {
@@ -821,11 +848,13 @@ const DashboardRecycler: React.FC = () => {
     supabase
       .from('recycler_routes')
       .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .eq('recycler_id', user.id) // Cambiado de user_id a recycler_id
+      // .order('created_at', { ascending: false }) // Quitar ordenamiento para evitar error 400
       .then(({ data, error }) => {
         if (error) setRouteError('Error al cargar rutas');
-        setRoutes(data || []);
+        // Ordenar en frontend si es necesario
+        const sorted = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setRoutes(sorted);
         setRouteLoading(false);
       });
   }, [showRouteModal, user]);
@@ -844,12 +873,15 @@ const DashboardRecycler: React.FC = () => {
     const points = claimedPoints.filter(p => selectedRoutePoints.includes(p.id));
     // Mantener el orden de selección
     const orderedPoints = selectedRoutePoints.map(id => points.find(p => p.id === id)).filter(Boolean);
-    const routePoints = orderedPoints.map(p => ({ lat: p!.lat, lng: p!.lng }));
-    const { error } = await supabase.from('recycler_routes').insert({
-      user_id: user.id,
-      name: newRouteName.trim(),
-      points: routePoints,
-    });
+    // Asegura que todos los IDs sean strings UUID válidos
+    const routePointIds = orderedPoints.map(p => String(p!.id));
+    const { error } = await supabase.from('recycler_routes').insert([
+      {
+        recycler_id: user.id, // Cambiado de user_id a recycler_id
+        name: newRouteName.trim(),
+        point_ids: routePointIds, // Siempre un array de strings UUID
+      }
+    ]);
     if (error) {
       setRouteError('Error al guardar la ruta');
     } else {
@@ -858,8 +890,10 @@ const DashboardRecycler: React.FC = () => {
       setNewRouteName('');
       setSelectedRoutePoints([]);
       // Refrescar rutas
-      const { data } = await supabase.from('recycler_routes').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-      setRoutes(data || []);
+      const { data } = await supabase.from('recycler_routes').select('*').eq('recycler_id', user.id); // Cambiado de user_id a recycler_id
+      // Ordenar en frontend
+      const sorted = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setRoutes(sorted);
     }
     setRouteLoading(false);
   };
@@ -878,6 +912,63 @@ const DashboardRecycler: React.FC = () => {
   // Selección de puntos para nueva ruta
   const toggleSelectPoint = (pointId: string) => {
     setSelectedRoutePoints(prev => prev.includes(pointId) ? prev.filter(id => id !== pointId) : [...prev, pointId]);
+  };
+
+  // --- EDICIÓN DE RUTAS ---
+  const handleEditRoute = (route: Route) => {
+    setEditingRoute(route);
+    setEditRouteName(route.name);
+    setEditSelectedPoints(Array.isArray(route.point_ids) ? [...route.point_ids] : []);
+    setEditRouteError(null);
+    setEditRouteSuccess(null);
+  };
+
+  const handleSaveEditRoute = async () => {
+    if (!editingRoute || !user) return;
+    if (!editRouteName.trim() || editSelectedPoints.length < 2) {
+      setEditRouteError('Selecciona al menos 2 puntos y un nombre para la ruta');
+      return;
+    }
+    setEditRouteLoading(true);
+    setEditRouteError(null);
+    setEditRouteSuccess(null);
+    try {
+      // Asegura que todos los IDs sean strings UUID válidos
+      const safeEditPointIds = editSelectedPoints.map(id => String(id));
+      // Actualizar en Supabase
+      const { error } = await supabase.from('recycler_routes')
+        .update({
+          name: editRouteName.trim(),
+          point_ids: safeEditPointIds, // Siempre un array de strings UUID
+        })
+        .eq('id', editingRoute.id);
+      if (error) {
+        setEditRouteError('Error al actualizar la ruta');
+      } else {
+        setEditRouteSuccess('Ruta actualizada correctamente');
+        // Refrescar rutas
+        const { data } = await supabase.from('recycler_routes').select('*').eq('recycler_id', user.id);
+        const sorted = (data || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setRoutes(sorted);
+        setEditingRoute(null);
+        setEditRouteName('');
+        setEditSelectedPoints([]);
+      }
+    } finally {
+      setEditRouteLoading(false);
+    }
+  };
+
+  const handleCancelEditRoute = () => {
+    setEditingRoute(null);
+    setEditRouteName('');
+    setEditSelectedPoints([]);
+    setEditRouteError(null);
+    setEditRouteSuccess(null);
+  };
+
+  const toggleEditSelectPoint = (pointId: string) => {
+    setEditSelectedPoints(prev => prev.includes(pointId) ? prev.filter(id => id !== pointId) : [...prev, pointId]);
   };
 
   // Si necesitas rutas en el futuro, descomenta y usa estas líneas.
@@ -1499,14 +1590,14 @@ const DashboardRecycler: React.FC = () => {
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Cancelar Reclamación</h3>
                   <div className="mb-4">
                     <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">Motivo de la cancelación</label>
-                    <textarea
+                    <input
                       id="reason"
-                      rows={4}
+                      name="reason"
+                      type="text"
                       value={cancellationReason}
-                      onChange={(e) => setCancellationReason(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md shadow-sm p-2"
-                      placeholder="Explica por qué deseas cancelar esta reclamación..."
-                      required
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCancellationReason(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md p-2"
+                      placeholder="Motivo (opcional)"
                     />
                   </div>
                   <div className="flex justify-end space-x-3">
@@ -1732,7 +1823,7 @@ const DashboardRecycler: React.FC = () => {
                 <div className="bg-white rounded-lg w-full max-w-3xl mx-4 p-6 relative">
                   <button
                     className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl"
-                    onClick={() => { setShowRouteModal(false); setActiveRoute(null); setCreatingRoute(false); setRouteError(null); setRouteSuccess(null); }}
+                    onClick={() => { setShowRouteModal(false); setActiveRoute(null); setCreatingRoute(false); setRouteError(null); setRouteSuccess(null); setEditingRoute(null); }}
                     title="Cerrar"
                   >
                     ×
@@ -1740,7 +1831,47 @@ const DashboardRecycler: React.FC = () => {
                   <h2 className="text-2xl font-bold text-cyan-700 mb-4">Mis Rutas</h2>
                   {routeError && <div className="text-red-600 mb-2">{routeError}</div>}
                   {routeSuccess && <div className="text-green-600 mb-2">{routeSuccess}</div>}
-                  {creatingRoute ? (
+                  {/* --- FORMULARIO DE EDICIÓN DE RUTA --- */}
+                  {editingRoute ? (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">Editar ruta</h3>
+                      <input
+                        className="border px-3 py-2 rounded w-full mb-2"
+                        placeholder="Nombre de la ruta"
+                        value={editRouteName}
+                        onChange={e => setEditRouteName(e.target.value)}
+                      />
+                      <div className="mb-2 text-sm text-gray-600">Selecciona los puntos reclamados (mínimo 2):</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+                        {claimedPoints.length === 0 && <div className="col-span-2 text-gray-400">No tienes puntos reclamados.</div>}
+                        {claimedPoints.map(point => (
+                          <label key={point.id} className={`flex items-center gap-2 border rounded px-2 py-1 cursor-pointer ${editSelectedPoints.includes(point.id) ? 'bg-green-100 border-green-400' : 'bg-white'}`}>
+                            <input
+                              type="checkbox"
+                              checked={editSelectedPoints.includes(point.id)}
+                              onChange={() => toggleEditSelectPoint(point.id)}
+                              className="accent-green-600"
+                            />
+                            <span>{String(point.creator_name || 'Punto')} ({point.lat?.toFixed(4)}, {point.lng?.toFixed(4)})</span>
+                          </label>
+                        ))}
+                      </div>
+                      {editRouteError && <div className="text-red-600 mb-2">{editRouteError}</div>}
+                      {editRouteSuccess && <div className="text-green-600 mb-2">{editRouteSuccess}</div>}
+                      <div className="flex gap-2">
+                        <button
+                          className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                          onClick={handleCancelEditRoute}
+                          disabled={editRouteLoading}
+                        >Cancelar</button>
+                        <button
+                          className="px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 font-semibold"
+                          onClick={handleSaveEditRoute}
+                          disabled={editRouteLoading}
+                        >Guardar cambios</button>
+                      </div>
+                    </div>
+                  ) : creatingRoute ? (
                     <div>
                       <h3 className="text-lg font-semibold mb-2">Crear nueva ruta</h3>
                       <input
@@ -1799,6 +1930,11 @@ const DashboardRecycler: React.FC = () => {
                                   <span className="ml-2 text-xs text-gray-500">{route.points?.length} puntos</span>
                                 </div>
                                 <button
+                                  className="text-blue-500 hover:text-blue-700 text-sm ml-2"
+                                  onClick={() => handleEditRoute(route)}
+                                  title="Editar ruta"
+                                >Editar</button>
+                                <button
                                   className="text-red-500 hover:text-red-700 text-sm ml-2"
                                   onClick={() => handleDeleteRoute(route.id)}
                                   title="Eliminar ruta"
@@ -1812,20 +1948,39 @@ const DashboardRecycler: React.FC = () => {
                         <div className="mb-4">
                           <h4 className="font-semibold mb-2">Ruta seleccionada: {activeRoute.name}</h4>
                           <div className="w-full h-80 rounded overflow-hidden border">
-                            <MapComponent
-                              points={claimedPoints.map(p => ({
-                                id: p.id,
-                                lat: p.lat,
-                                lng: p.lng,
-                                title: String(p.creator_name || 'Punto'),
-                                avatar_url: p.creator_avatar,
-                                role: 'recycler',
+                            {(() => {
+                              // Obtener los puntos de la ruta en orden usando point_ids y datos completos de claimedPoints
+                              const routePoints = (activeRoute.point_ids || [])
+                                .map((pid: string) => claimedPoints.find(p => p.id === pid))
+                                .filter(Boolean);
+                              // Si falta algún punto, mostrar advertencia
+                              if (routePoints.length < (activeRoute.point_ids?.length || 0)) {
+                                return <div className="p-4 text-red-600">Algunos puntos de la ruta ya no existen.</div>;
+                              }
+                              // Marcadores con info visual
+                              const markerPoints = routePoints.map(p => ({
+                                id: p!.id,
+                                lat: Number(p!.lat),
+                                lng: Number(p!.lng),
+                                title: String(p!.address || 'Punto'),
+                                avatar_url: p!.creator_avatar || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png',
+                                role: 'point',
                                 online: true,
-                              }))}
-                              routePoints={activeRoute.points}
-                              showUserLocation={false}
-                              showRoute={false}
-                            />
+                              }));
+                              // Array de lat/lng para el trazado de la ruta
+                              const routeLine = routePoints.map(p => ({ lat: Number(p!.lat), lng: Number(p!.lng) }));
+                              if (routeLine.length < 2) {
+                                return <div className="p-4 text-gray-500">Selecciona al menos 2 puntos para ver la ruta.</div>;
+                              }
+                              return (
+                                <MapComponent
+                                  points={markerPoints}
+                                  routePoints={routeLine}
+                                  showUserLocation={false}
+                                  showRoute={true}
+                                />
+                              );
+                            })()}
                           </div>
                           <button
                             className="mt-2 px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"

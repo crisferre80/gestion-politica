@@ -349,7 +349,7 @@ const puntosDemorados = detailedPoints.filter(p => {
   // Función para volver a poner un punto como disponible
   const handleMakeAvailableAgain = async (point: DetailedPoint) => {
     try {
-      // 1. Crear un nuevo punto disponible (clonando TODOS los datos relevantes)
+      // 1. Crear un nuevo punto disponible (NO copiar campos de reclamo)
       const { data: newPoint, error: createError } = await supabase
         .from('collection_points')
         .insert({
@@ -363,7 +363,7 @@ const puntosDemorados = detailedPoints.filter(p => {
           lat: point.lat ?? null,
           lng: point.lng ?? null,
           materials: point.materials ?? [],
-          // Si tienes otros campos personalizados, agrégalos aquí
+          // Nunca copiar claim_id, pickup_time, recycler_id ni campos de reclamo
         })
         .select()
         .single();

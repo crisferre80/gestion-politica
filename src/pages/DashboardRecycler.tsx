@@ -395,6 +395,12 @@ const DashboardRecycler: React.FC = () => {
   // Cancelar reclamo
   const handleCancelClaim = async () => {
     if (!selectedClaim || !user) return;
+    // Validar que los IDs sean UUIDs válidos y no vacíos
+    const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+    if (!isValidUuid(selectedClaim.id) || !isValidUuid(selectedClaim.pointId)) {
+      setError('Error: ID de reclamo o punto inválido.');
+      return;
+    }
     try {
       setError(null);
       await cancelClaim(selectedClaim.id, selectedClaim.pointId, cancellationReason); // Solo 3 argumentos
@@ -1386,8 +1392,14 @@ const DashboardRecycler: React.FC = () => {
                             <div className="mt-4 flex gap-2">
                               <button
                                 onClick={() => {
-                                  setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
-                                  setShowCancelClaimModal(true);
+                                  // Solo abrir el modal si ambos IDs son UUIDs válidos
+                                  const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+                                  if (isValidUuid(point.claim_id) && isValidUuid(point.id)) {
+                                    setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
+                                    setShowCancelClaimModal(true);
+                                  } else {
+                                    setError('Error: No se puede cancelar, IDs inválidos.');
+                                  }
                                 }}
                                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
                               >

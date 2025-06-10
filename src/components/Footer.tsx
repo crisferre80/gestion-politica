@@ -40,6 +40,8 @@ const Footer: React.FC = () => {
               <li><a href="/collection-points" className="text-green-200 hover:text-white">Puntos de Recolección</a></li>
               <li><a href="/register" className="text-green-200 hover:text-white">Registrarse</a></li>
               <li><a href="/login" className="text-green-200 hover:text-white">Ingresar</a></li>
+              <li><a href="/dossier" className="text-green-200 hover:text-white">Dossier Institucional</a></li>
+              <li><a href="/quienes-somos" className="text-green-200 hover:text-white">¿Quiénes Somos?</a></li>
             </ul>
           </div>
           

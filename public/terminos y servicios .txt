@@ -1,290 +1,91 @@
-El presente documento "Términos del servicio para el servicio SendPulse" (en lo sucesivo, "Términos") consiste en los términos que rigen la relación entre SendPulse Inc. (en lo sucesivo, "plataforma de mensajería SendPulse", "servicio SendPulse", "SendPulse"). , "El Servicio") y el cliente del servicio (en lo sucesivo, "cliente", "usuario", "usted", "miembro").
+TÃ‰RMINOS Y CONDICIONES DE USO â€“ ASURA EcoNecta2
+1. AceptaciÃ³n de los TÃ©rminos
+El presente documento establece los TÃ©rminos y Condiciones de uso de la aplicaciÃ³n mÃ³vil Asura EcoNecta2, en adelante â€œla AplicaciÃ³nâ€ o â€œel Servicioâ€, desarrollada por el equipo de ASURA (AsociaciÃ³n Sindical Ãšnica de Recicladores Argentinos). Al acceder, instalar o usar la aplicaciÃ³n, usted (â€œel Usuarioâ€), acepta regirse por estos tÃ©rminos y condiciones. Si no estÃ¡ de acuerdo, no deberÃ¡ utilizar la AplicaciÃ³n.
 
-1. Disposiciones básicas
-SendPulse Inc. proporciona al usuario servicios para el servicio de envío de SendPulse de acuerdo con los términos establecidos en el presente documento. 
+2. DescripciÃ³n del Servicio
+Asura EcoNecta2 es una aplicaciÃ³n mÃ³vil gratuita destinada a conectar residencias, empresas y recolectores urbanos, optimizando la gestiÃ³n domiciliaria y el transporte de residuos reciclables mediante tecnologÃ­a de geolocalizaciÃ³n y funcionalidades interactivas.
 
-El uso del servicio SendPulse se rige por estos Términos del Servicio, Política de Privacidad, Política Anti-Spam. Los términos de uso de la plataforma de envío SendPulse pueden ser corregidos o complementados por la administración sin notificar a los usuarios, y los cambios entran en vigencia desde el momento en que el documento se coloca en el sitio web oficial de la compañía. 
+El Servicio permite:
 
-Al acceder o utilizar el Servicio de cualquier manera, usted acepta y acepta todos estos Términos (en nombre propio o de la entidad que usted representa), y estos Términos permanecerán en vigencia en todo momento mientras usa el Servicio o cualquier información obtenida a través del Servicio. Al acceder o utilizar el Servicio de cualquier manera, usted declara y garantiza que tiene el derecho, la autoridad y la capacidad para celebrar estos Términos (en nombre propio o de la entidad que representa). Usted declara y garantiza que es mayor de edad para formar un contrato vinculante (o si no, recibió el permiso de sus padres o tutores para utilizar el Servicio y logró que sus padres o tutores aceptaran estos Términos en su nombre). Si está aceptando estos Términos en nombre de una organización o entidad, declara y garantiza que está autorizado a aceptar estos Términos en nombre de esa organización o entidad y los vincula a estos Términos (en cuyo caso, las referencias a " usted y "su" en estos Términos, excepto en esta oración, refiérase a esa organización o entidad). En caso de que no acepte ninguno de los términos, la administración tiene derecho a denegarle el uso del servicio de lista de correo SendPulse.
+A los residentes: registrar solicitudes de recolecciÃ³n, seguir el estado de sus pedidos, calificar el servicio y acumular eco-crÃ©ditos.
 
-1.1. Servicios prestados
-SendPulse proporciona al usuario acceso a servicios especializados, incluido un servicio para correo electrónico, SMS, Viber, Web Push, distribución de campañas de chatbot en Facebook, Telegram, y WhatsApp, servicio SMTP, servicio de verificación de email, así como el servicio de Landing Pages de SendPulse para crear sitios web/páginas de aterrizaje, y un sistema CRM para gestionar procesos de ventas y canales de comunicación.
+A los recolectores: ver rutas asignadas, marcar puntos completados, gestionar su perfil y comunicarse con la administraciÃ³n.
 
-El usuario tiene acceso a las siguientes acciones y documentos:
+A las empresas recicladoras: optimizar la recepciÃ³n de materiales y promover la trazabilidad del proceso.
 
-Registro de cuenta para el servicio elegido con la posibilidad de cambiar el plan de facturación o eliminar la cuenta si es necesario.
-El derecho al soporte técnico.
-Acceso a materiales de aprendizaje (SendPulse Internet Marketing Academy).
-La posibilidad de solicitar servicios adicionales con un cargo adicional.
-Garantizar que la información personal del usuario, así como la información en listas de correo cargadas en la cuenta del cliente, se mantendrá confidencial.
-1.2. Registro de usuario
-Por "cuenta" se entiende la cuenta del usuario en su panel de control personal en la plataforma de envío de SendPulse. El registro se realiza en el sitio web oficial en https://sendpulse.com/register.
+3. Registro y Cuentas de Usuario
+Para acceder a las funcionalidades de la app, se requiere:
 
-Durante el registro, el usuario rellena los campos obligatorios con información personal (nombre, dirección de correo electrónico, número de teléfono) y especifica una contraseña que el usuario utilizará posteriormente para ingresar a su cuenta. El usuario no puede dar su nombre de usuario y contraseña a un tercero. El usuario es totalmente responsable de la seguridad de su nombre de usuario y contraseña.
+Descargar Asura EcoNecta2 desde un enlace oficial o escaneando el cÃ³digo QR.
 
-Toda la información personal está sujeta al uso del servicio SendPulse y puede ser utilizada por los empleados del servicio para contactar al usuario de acuerdo con la Política de privacidad.
+Crear una cuenta segÃºn el perfil correspondiente (vecino/empresa o recolector urbano).
 
-El usuario está obligado a proporcionar información válida durante el proceso de registro: los clientes que proporcionen información de contacto no válida se verán privados del uso del servicio. Los empleados del servicio tienen derecho a exigir que el cliente confirme su información personal para determinar su validez.
+Ingresar datos vÃ¡lidos como nombre, ubicaciÃ³n, contacto y fotografÃ­a de perfil.
 
-¡Atención! Está estrictamente prohibido registrar múltiples cuentas gratuitas. Te bastará con tener 1 cuenta gratuita para evaluar las características del servicio.
+Mantener la confidencialidad de sus credenciales de acceso.
 
-1.3. Pago por servicios
-Después de pasar por el proceso de registro, todos los clientes del servicio SendPulse se convierten en usuarios del plan gratuito proporcionado por el servicio. Puede seguir siendo un usuario del plan gratuito si acepta las condiciones y el número limitado de correos electrónicos que se pueden enviar. La transición a un plan pago o la renovación de su cuenta significa que está satisfecho con la calidad del servicio.
+El Usuario es responsable de la veracidad de la informaciÃ³n brindada y de su uso de la cuenta. No se permite el uso de identidades falsas ni compartir la cuenta con terceros.
 
- El servicio proporciona un conjunto de planes de facturación. El usuario tiene el derecho y la capacidad de cambiar su plan de facturación a otro plan más conveniente en cualquier momento. Todas las operaciones para cambiar el plan de facturación (o pagar el plan) las lleva a cabo el cliente en su cuenta.
+4. Obligaciones del Usuario
+Los usuarios se comprometen a:
 
- El pago de cualquier plan de facturación o servicio adicional tomará la forma de un prepago del 100%. El procedimiento de pago es el siguiente:
+Utilizar el servicio de manera Ã©tica, respetando a otros usuarios y al equipo administrativo.
 
-El usuario hace su pedido en el sitio web oficial de SendPulse o en su cuenta en el servicio (Tablero).
-La administración del servicio enviará al usuario una factura por el pago. En caso de que el usuario no pague la factura dentro del período designado, puede cancelarse.
-El pago debe hacerse únicamente a través de uno de los medios especificados por el servicio SendPulse (PayPal, tarjeta de crédito, factura para personas jurídicas, transferencia bancaria para personas físicas o, para Ucrania, Privat24).
-Después del pago, los fondos aparecerán en la cuenta del usuario dentro de 30 minutos (para pagos electrónicos) o dentro de 3 días hábiles en el caso de una factura para personas jurídicas o transferencia bancaria para personas físicas ". Si el pago se ha realizado para servicios adicionales , estos también estarán disponibles para el usuario después del recibo del pago.
-Dentro de los 30 (treinta) días a partir del momento en que pague por el servicio, tiene derecho a solicitar que SendPulse reembolse los fondos restantes que no se hayan gastado para el uso del servicio en el período determinado. Al realizar dicha solicitud, debe proporcionar una razón válida para el reembolso de estos fondos. Al procesar solicitudes de reembolso, el servicio SendPulse sigue su Política de reembolso.
-Si paga una suscripción mensual, se activará una renovación automática de la suscripción. Un usuario puede deshabilitarlo solo en su cuenta personal.
+No utilizar la aplicaciÃ³n para fines ilÃ­citos ni para enviar informaciÃ³n falsa.
 
-La suscripción SMTP mensual pagada con una tarjeta bancaria o PayPal puede aumentar automáticamente cuando se supera el límite de correos electrónicos en su plan. El aumento en este plan garantiza un flujo continuo de sus correos electrónicos transaccionales.
+No realizar solicitudes simuladas, ni marcar puntos como completados sin haber realizado la tarea correspondiente.
 
-SendPulse ofrece un periodo de prueba gratuito, durante el cual podrás explorar todas nuestras herramientas y servicios. Una vez que el periodo de prueba haya expirado, los usuarios quedarán suscritos automáticamente y el cargo correspondiente se realizará a su tarjeta de crédito. Si los usuarios activan la prueba gratuita y no la cancelan antes de que finalice, el pago del primer periodo de suscripción no será reembolsable.
+Mantener el respeto en todo intercambio de mensajes o denuncias dentro de la aplicaciÃ³n.
 
-2. La cuenta del usuario
-2.1. Creación de cuenta
-Después de pasar por el proceso de registro (sección 1.3), se crea automáticamente una cuenta para el usuario. Todas las acciones relacionadas con correos electrónicos, planes de facturación y pagos se realizarán a partir de este momento a través de la cuenta.
+Aceptar que todas las denuncias son confidenciales y serÃ¡n gestionadas exclusivamente por el equipo de ASURA.
 
-2.2. Información de cuenta personal
-Al registrarse, el usuario proporciona una dirección de correo electrónico personal que se utilizará como nombre de usuario y una contraseña personal para acceder al servicio. Esta información es estrictamente confidencial, se mantiene en forma cifrada y no se transmitirá a terceros.
+5. Funcionalidades de la AplicaciÃ³n
+Para Residentes y Empresas:
 
- Además, el servicio solicita que el usuario complete un formulario ampliado con datos personales que el cliente puede usar cuando trabaja con correos electrónicos ("sustitución de variables"). Los datos proporcionados al completar este formulario también están sujetos a la Política de privacidad.
+Crear puntos de recolecciÃ³n con ubicaciÃ³n, tipo de residuo y horario preferente.
 
-2.3. Administración de cuentas
-Enviar mensajes de correo electrónico, ver estadísticas, cambiar el plan de facturación, crear plantillas de campaña: el usuario realiza todas estas acciones en su cuenta. El usuario también carga las direcciones y los números de teléfono de los destinatarios de la campaña en su cuenta. para crear libretas de direcciones. Todas las direcciones de correo electrónico cargadas se consideran propiedad del usuario y son información confidencial que está protegida por la Política de privacidad del servicio SendPulse.
+Ver el estado de sus pedidos: Disponible, Reclamado, Demorado o Retirado.
 
-La administración del servicio tiene el derecho de rastrear la actividad del usuario y, en caso de que el usuario sea sospechoso de enviar correo no deseado, bloquear temporalmente la cuenta. Todas las acciones de administración se rigen por la Política Anti-Spam, que el usuario consiente durante el registro de la cuenta.
+Visualizar en tiempo real al recolector asignado en el mapa.
 
-2.4. Eliminación de cuenta
-El usuario tiene derecho a, en cualquier momento, solicitar la eliminación de su cuenta. Los fondos restantes en la cuenta no se devolverán a menos que haya motivos especiales para un reembolso (consulte "Política antispam del servicio SendPulse"). La compañía no reembolsará dinero a los usuarios bloqueados por violar la Política Anti-Spam. Al tomar su decisión, el servicio SendPulse se rige por su Política Anti-Spam.
+Calificar el servicio y recibir eco-crÃ©ditos.
 
-SendPulse puede suspender tu cuenta en cualquier momento, con o sin causa. Si tu perfil está inactivo durante 24 meses o más, podemos cancelar tu cuenta y no tendrás derecho a un reembolso de ningún servicio prepago. Una vez que se cancela cuenta, aceptas que SendPulse puede eliminar permanentemente tu suscripción y todos los datos asociados. Una vez que se lleve a cabo la cancelación no podrás usar el mismo nombre de usuario para ninguna cuenta nueva.
+Gestionar su perfil y suscripciones.
 
-3. Campañas de marketing
-SendPulse es un servicio para comunicaciones de correo electrónico y SMS, Viber, Web Push, campañas de chatbot para Facebook, Telegram, y WhatsApp, servicio de SMTP, servicio de verificación de correo electrónico, así como un servicio de Landing Pages de SendPulse para crear sitios web/páginas de aterrizaje y un sistema CRM para gestionar procesos de ventas y canales de comunicación. El usuario tiene acceso al servicio a través de su cuenta de cliente (Dashboard).
+Para Recolectores Urbanos:
 
-3.1. Creando campañas de marketing
-Las campañas incluyen comunicaciones que se han elaborado, listas de direcciones y números de teléfono, y el proceso de envío de campañas a los suscriptores. El usuario se crea la plantilla para estas comunicaciones eligiendo opciones provistas por el servicio, cargando imágenes y escribiendo textos.
+Visualizar rutas asignadas y puntos pendientes.
 
-El usuario es totalmente responsable del contexto de los correos, que a su vez deben corresponder a las reglas establecidas por la Política Anti-Spam del servicio. De lo contrario, el servicio tiene derecho a suspender la cuenta del usuario hasta que haya determinado las circunstancias.
+Confirmar recolecciones en tiempo real.
 
-3.2. Listas de correo
-Un usuario del servicio SendPulse tiene el derecho de enviar comunicaciones solo a aquellas personas que han expresado su consentimiento para recibir comunicaciones de él / ella. El usuario debe recibir el consentimiento de los destinatarios personalmente. A solicitud de la administración del servicio, el usuario debe proporcionar la prueba correspondiente del consentimiento de los destinatarios.
+Acceder a notas y datos de contacto de los vecinos.
 
-El usuario deberá garantizar a los suscriptores la posibilidad de optar por no recibir más comunicaciones (mediante la presencia de un enlace de cancelación de suscripción en el correo electrónico) y también estará obligado a ingresar en la lista de suscriptores o eliminar de la lista los datos de contacto, cuyos propietarios expresaron su deseo de optar por no recibir correos.
+Comunicar incidencias o sugerencias al administrador.
 
-El uso de bases de suscriptores obtenidas ilegalmente y la distribución de correo no deseado a través del servicio SendPulse está estrictamente prohibido.
+Gestionar su perfil y suscripciones.
 
- 3.3. Enviando campañas de marketing
-Una campaña de correo electrónico, SMS, Viber, Web Push o Facebook creada por el usuario está programada para enviar a través del Servicio. Cada campaña está en cola para enviar y pasa a través de un proceso de moderación.
+6. Eco CrÃ©ditos y Recompensas
+El sistema de eco-crÃ©ditos recompensa a los residentes que clasifican y entregan residuos correctamente. Estos crÃ©ditos pueden ser canjeados por beneficios que la entidad ASURA determine en su momento, y estÃ¡n sujetos a revisiÃ³n y validaciÃ³n.
 
-La moderación consiste en un control de los envíos realizados por los empleados del servicio para garantizar que la base de suscriptores sea real (si se sospecha que los destinatarios no aceptaron recibir correos) y que el contenido de los envíos corresponde a todas las reglas y regulaciones del Política antispam.
+7. PolÃ­tica de Privacidad y Datos
+Los datos personales ingresados en la app son confidenciales y utilizados exclusivamente para la operaciÃ³n del servicio. ASURA garantiza la protecciÃ³n de la privacidad de los usuarios de acuerdo con las normativas locales vigentes.
 
-El tiempo de moderación y envío de correos tardará un máximo de 24 horas.
+8. CancelaciÃ³n de Cuentas
+El usuario puede solicitar la eliminaciÃ³n de su cuenta en cualquier momento. ASURA se reserva el derecho de suspender o eliminar cuentas en caso de uso indebido, fraude, denuncias verificadas o inactividad prolongada (mÃ¡s de 12 meses).
 
-En el caso de que un envío de correos no supere la moderación del servicio, esto se comunicará al usuario y se tomarán medidas para eliminar los motivos para rechazar el envío, o se bloqueará la cuenta del usuario hasta que se determinen las circunstancias.
+9. LimitaciÃ³n de Responsabilidad
+ASURA no se hace responsable por:
 
-Cada envío de correo contendrá un enlace de cancelación de suscripción, es decir, una forma para que los suscriptores opten por no recibir más comunicaciones. El enlace no puede ser eliminado u ocultado. Si el usuario no inserta un enlace de cancelación de suscripción en un correo, el servicio agregará automáticamente su propio enlace estándar al correo electrónico, y las acciones del usuario se interpretarán como contrarias a las Reglas del servicio de envío de SendPulse.
+Fallos tÃ©cnicos de conexiÃ³n o errores en el GPS.
 
- 3.4. Entrega de campañas de marketing.
-El momento en que se entregan las campañas a sus destinatarios varía en función de una serie de factores y circunstancias. SendPulse no será responsable de que las campañas no se entreguen a los destinatarios, en igual medida, así como cualquier retraso en la entrega.
+Inexactitudes en las rutas generadas por herramientas externas como Google Maps o Waze.
 
-Los mensajes pueden no entregarse o retrasarse por los siguientes motivos:
+Retrasos ocasionados por causas ajenas al sistema (clima, trÃ¡fico, etc.).
 
- el teléfono móvil del suscriptor está apagado o está fuera del área de cobertura del operador de telefonía móvil
-el servicio de correo del suscriptor usa el método automático de bloqueo de spam conocido como greylisting e informa que se niega a aceptar el correo electrónico
-el servicio de correo electrónico rechaza el correo electrónico después de identificar su contenido como correo no deseado (basado en la Política Anti-Spam del servidor dado y su comprensión de la palabra "spam")
-la bandeja de entrada del suscriptor está llena o el servidor de correo electrónico del destinatario está experimentando dificultades técnicas
-el servidor de correo del destinatario rechaza el correo electrónico debido a la presencia en el correo de enlaces bloqueados (es decir, URL en una lista negra o lista de reproducción)
-no se puede enviar un correo debido a condiciones naturales adversas u otras circunstancias de fuerza mayor, que podrían tener un efecto adverso en la operación del hardware y software de SendPulse. Estas condiciones o circunstancias incluyen, pero no se limitan a, desastres naturales, cambios a la ley o regulaciones, embargos, guerra, actos terroristas, disturbios, incendios, terremotos, accidentes nucleares, inundaciones, huelgas, apagones de energía, acción volcánica, clima inusualmente severo condiciones y actos de piratas informáticos o proveedores de servicios de Internet de terceros.
-3.5. Notificaciones web push
-Puedes enviar notificaciones gratis si tu base de datos es inferior a 10,000 suscriptores.
-
-Desde ahora, si aún no has utilizado el servicio de notificaciones web push en un largo tiempo, podemos eliminar el récord sobre tu página web y suscriptores. Esto puede suceder si NO ha habido nuevas suscripciones ni notificaciones durante los últimos 6 meses.
+Incumplimientos entre usuarios (por ejemplo, ausencia del residente en la hora acordada).
 
-4. Servicios adicionales
-La variedad de servicios adicionales incluye servicios que no son provistos por la funcionalidad básica del servicio.
+10. Modificaciones de los TÃ©rminos
+ASURA se reserva el derecho a modificar estos TÃ©rminos y Condiciones en cualquier momento. Las modificaciones serÃ¡n notificadas mediante la propia aplicaciÃ³n y/o canales oficiales.
 
-Los servicios adicionales de SendPulse incluyen:
-
-Servicios de un diseñador para crear un diseño de marca para correos electrónicos
-Habilidades de aprendizaje en SendPulse Internet Marketing Academy
-Solución integral "Turnkey EMail Marketing"
-verificación de correo electrónico
-creación y publicación de sitios web/páginas de aterrizaje
-gestión de procesos de ventas y canales de comunicación con ayuda de un sistema CRM.
-Todos los servicios adicionales se pagan además del costo de activación de un plan de facturación (con la excepción del plan gratuito). Estos servicios se proporcionan sujetos a términos adicionales establecidos en el sitio web oficial de la empresa o en documentación especializada sobre servicios adicionales.
-
-5. Obligaciones de los usuarios del servicio de envío de SendPulse
-El usuario está obligado:
-
-para garantizar la confidencialidad de su nombre de usuario y contraseña para acceder a su cuenta en el servicio, y para no permitir que terceros utilicen su cuenta
-para proporcionar datos personales válidos para el servicio
-asumir la responsabilidad de la validez de toda la información que carga en su cuenta en el servicio postal
-no usar una base de suscriptores comprada u obtenida ilegalmente para envíos postales
-no usar la plataforma en línea del servicio para enviar spam
-crear correos de acuerdo con los términos de la Política Anti-Spam y los Términos del Servicio del servicio de envío SendPulse. Si el usuario viola los Términos de uso u otros requisitos del servicio, la administración tiene el derecho de suspender o eliminar por completo la cuenta del usuario hasta que se resuelva el incidente.
-proporcionar a los destinatarios la posibilidad de optar por no recibir correos en cualquier momento
-abstenerse de hablar groseramente y obsceno al comunicarse con los empleados del servicio
-El usuario tiene el derecho de no estar de acuerdo con los términos para usar el servicio. En ese caso, se le denegará al usuario el uso posterior del servicio de envío de SendPulse.
-
-Usted declara y garantiza que posee o tiene permiso para usar todo el material en sus correos electrónicos. Usted conserva la propiedad de los materiales que carga en el Servicio.
-
-Podemos utilizar o divulgar su información solo como se describe en estos Términos y nuestra Política de privacidad.
-
-Usted declara y garantiza que su uso del servicio cumplirá con todas las leyes y regulaciones aplicables. Usted es responsable de determinar si nuestros servicios son adecuados para su uso a la luz de cualquier regulación. No puede usar nuestro Servicio para actividades ilícitas o discriminatorias.
-
-Usted declara y garantiza que, al crear sus listas de correo, enviar campañas a través de cualquier canal de comunicación del Servicio y recopilar información como resultado del envío de campañas, usted:
-
-describirá claramente por escrito cómo piensa utilizar los datos recopilados, incluso para su uso del Servicio. Obtendrá el consentimiento expreso para transferir datos a SendPulse como parte de este proceso y, de lo contrario, cumplirá con la política de privacidad que haya publicado.
-ha cumplido y cumplirá con todas las regulaciones, así como las leyes de protección de datos, comunicación electrónica y privacidad que se aplican a los países a los que está enviando cualquier forma de comunicación a través del Servicio.
-ha recopilado, almacenado, utilizado y transferido todos los datos relacionados con cualquier persona que cumpla con todas las leyes y normas de protección de datos. Tiene el permiso necesario para permitirnos recibir y procesar datos y enviar comunicaciones a esa persona en su nombre.
-aceptamos indemnizarnos y eximirnos de cualquier pérdida, incluidos los honorarios de los abogados, que resulten de su incumplimiento de cualquier parte de estas garantías.
-6. Obligaciones del servicio de envío de SendPulse
-SendPulse está obligado:
-
- proporcionar al usuario, de acuerdo con los Términos del servicio, acceso a la plataforma en línea inmediatamente después de que el usuario se haya registrado para el servicio
-proporcionar al usuario la funcionalidad necesaria para crear y enviar correos electrónicos
-garantizar el acceso constante a la plataforma en línea con el nombre de usuario y la contraseña que el usuario ha elegido
-para proporcionar al usuario acceso al programa de socios RollerAds
-para proporcionar la posibilidad de probar el servicio antes del pago de los servicios
-presentar una variedad de planes de facturación sin limitar al usuario en su elección de un plan de facturación
-notificar a los usuarios de los cambios en los planes de facturación
-La administración se reserva el derecho de realizar cambios en la interfaz y la funcionalidad de la plataforma en línea SendPulse y los planes de facturación, y notificará al usuario de esto en un envío por correo.
-
-La administración se reserva el derecho de modificar unilateralmente los Términos de uso para el servicio de envío de SendPulse sin previo aviso al usuario. Los Términos de Servicio actualizados para el servicio de lista de correo SendPulse entrarán en vigencia desde el momento en que se coloquen en el sitio web oficial de la compañía.
-
-7. Restricciones
-La administración del servicio de envío de SendPulse tiene el derecho de prohibir (o limitar) al usuario cualquier acción contraria a los Términos de Servicio del servicio. Estas acciones pueden incluir cualquiera de las enumeradas a continuación, así como también acciones que, en opinión de los empleados del servicio, violan los Términos del servicio del servicio SendPulse. A SendPulse também pode parar de fornecer seus serviços unilateralmente, sob critérios exclusivos, discretos e sem explicação.
-
-El usuario tiene prohibido subir a su cuenta y usar cualquier lista de direcciones de correo electrónico o números de teléfono que hayan sido comprados u obtenido ilegalmente (incluso mediante el uso de programas especializados para buscar información de contacto).
-El usuario tiene prohibido enviar notificaciones de inserción web a través de la API si el dominio de enlace compartido difiere del envío.
-El usuario tiene prohibido almacenar, procesar o difundir mediante el servicio de envío SendPulse cualquier información contraria a la Política Anti-Spam del Servicio o que viole las leyes de los EE. UU. O las leyes del país del destinatario.
-La administración del servicio prohíbe y castigará cualquier intento de un usuario de recopilar información del servicio o del sitio web oficial de la compañía.
-El usuario tiene prohibido copiar o utilizar con fines comerciales cualquier parte del servicio o acceso a él.
-El usuario no tiene el derecho de proporcionar a un tercero sus credenciales de acceso a la cuenta, ni de registrarse con el nombre de otra persona sin su conocimiento y consentimiento.
-El usuario no tiene permitido usar ningún medio, incluidos los fraudulentos o ilegales, para tratar de obtener la información personal de otros clientes de SendPulse.
-El usuario tiene prohibido enviar correos a los destinatarios que no hayan dado su consentimiento para recibir dichos correos. El usuario también tiene prohibido enviar información que viole los derechos y libertades de una persona.
-A SendPulse não fornece seus serviços a usuários da Federação Russa. Esses usuários estão proibidos de se registrar, têm acesso limitado aos nossos serviços e não têm direito ao suporte ao cliente. Campanhas definidas como relacionadas a negócios na Rússia podem ser bloqueadas sem explicação.
-
-8. Descargo de responsabilidad de garantías y responsabilidad
-La administración del servicio no es responsable de las acciones del usuario como resultado de una falla en la comprensión o un entendimiento erróneo de los Términos del Servicio para el servicio de envío de SendPulse.
-
-En la medida máxima permitida por la ley, usted asume la responsabilidad total por cualquier pérdida que resulte del uso del Servicio, incluidas las descargas del Servicio. No seremos responsables por ningún daño indirecto, punitivo, especial o consecuente bajo ninguna circunstancia, incluso si se basan en negligencia o se nos ha avisado de la posibilidad de dichos daños. Nuestra responsabilidad total por todos los reclamos realizados sobre el servicio en cualquier mes no será mayor a lo que nos pagó por el servicio el mes anterior.
-
-En la medida máxima permitida por la ley, proporcionamos los materiales y el servicio tal como están. Eso significa que no ofrecemos garantías de ningún tipo, ya sean expresas o implícitas, incluidas, entre otras, las garantías de comerciabilidad e idoneidad para un fin determinado. Como las personas usan SendPulse por varias razones, no podemos garantizar que satisfaga sus necesidades específicas.
-
-El servicio SendPulse no garantiza a los destinatarios de las campañas, a través de su Servicio, la exactitud de la información que reciben. El Servicio solo proporciona herramientas y servicios para llevar a cabo envíos masivos de correo electrónico, SMS, Viber, Web Push y Facebook. La administración del servicio tiene el derecho de llamar al usuario para que represente sus acciones si considera que son contrarias a los Términos del servicio del servicio de envío de SendPulse.
-
-9. Política antispam
-9.1. Condiciones generales
-Creemos que el correo electrónico, SMS, Viber, Web Push y Facebook son herramientas convincentes para enviar información útil y bajo demanda y se oponen al envío de mensajes no solicitados.
-
-Cualquier usuario registrado de SendPulse puede enviar campañas a sus amigos, familiares, colegas, clientes, contactos, etc. utilizando nuestro Servicio.
-
-SendPulse prohíbe estrictamente cualquier mensaje de SPAM que se envíe desde nuestro servicio en cualquier momento.
-
-9.2. Nuestra definición de listas de correo recopiladas ilegalmente
-Una lista de correo es legítima si el destinatario acordó recibir mensajes de correo electrónico de usted.
-
-Las formas ilegales de recopilar listas de correo son:
-
-El alquiler / compra de direcciones de correo electrónico y números de teléfono de un tercero.
-Recopilación de direcciones de correo electrónico y números de teléfono de páginas amarillas, directorios en línea, etc.
-Conseguir direcciones de correo electrónico y números de teléfono con la ayuda de software de extracción de información.
-Recopilación de direcciones de correo electrónico de tarjetas de negocios y cuestionarios.
-Recopilación de direcciones de correo electrónico durante llamadas telefónicas con clientes. A menudo, los gerentes de ventas usan este método.
-Recopilar direcciones de correo electrónico que indican el rol del destinatario como info@dominio.com, faq@dominio.com y similares.
-Recopilación de direcciones de correo por medio de terceros. Es necesario que sus suscriptores hayan dado su consentimiento expreso para recibir correos de su compañía.
-Nos reservamos el derecho de solicitar el mecanismo que utiliza un usuario para suscribir contactos a su lista de correo.
-
-9.3. Nuestra definición de Spam
-Consideramos cualquier mensaje no solicitado, inesperado o no deseado enviado a los destinatarios con el fin de extorsionar sus objetos de valor o engañarlos, o cualquier mensaje enviado a alguien sin su consentimiento previo para ser SPAM.
-
-Los mensajes deben cumplir con los siguientes principios:
-
-No se debe enviar información falsa, no válida o engañosa en la línea del asunto o el cuerpo del mensaje mediante SendPulse.
-No se debe enviar ningún mensaje a los destinatarios sin haber obtenido previamente su consentimiento.
-El texto que se muestra debe indicar claramente o ilustrar el servicio que se ofrece.
-Las campañas de marketing deben identificar claramente quién proporciona el servicio (originador) e indicar claramente el costo del servicio promovido.
-Está estrictamente prohibido enviar mensajes a listas de correo recolectadas ilegalmente a través de servidores SMTP SendPulse. 
-
-También está prohibido usar una dirección de correo electrónico del remitente que esté registrada en cualquier servicio como una dirección de correo electrónico temporal.
-
-9.4. Nuestra definición de SMS spam
-Consideramos que los mensajes de texto SMS no solicitados, inesperados o no deseados se envían al suscriptor móvil para extraerles sus objetos de valor o confundirlos, o cualquier mensaje que provenga de alguien a quien no haya autorizado para que su número de teléfono móvil sea SPAM.
-
-Nuestros usuarios aceptan específicamente NO usar el servicio SendPulse para enviar SPAM. Sus mensajes SMS deben cumplir con los siguientes principios:
-
-No se debe enviar información falsa, inválida o engañosa en el asunto o el cuerpo del mensaje SMS usando el servicio SendPulse.
-No se deben enviar SMS a los suscriptores móviles sin haber obtenido previamente su consentimiento.
-El texto que se muestra debe indicar claramente o ilustrar el servicio que se ofrece.
-Las campañas de marketing deben identificar claramente quién proporciona el servicio (originador) y declarar claramente el gasto del servicio promovido.
-Está estrictamente prohibido enviar mensajes a listas de correo recopiladas ilegalmente a través de los servidores SendPulse SMS.
-
-9.5. ¿Qué contenido está prohibido?
-Nuestro Servicio no permite spam ni ningún tipo de contenido ofensivo o ilegal.
-
-No enviamos:
-
-Campañas de correo electrónico, SMS, Viber, Web Push y Facebook que no se ajustan a la legislación de su país;
-Mensajes sexualmente explícitos;
-Campañas de marketing a una lista de personas sin su permiso.
-Revisamos cada perfil para asegurarnos de que cumpla con nuestros Términos de servicio, que nos ayudan a mantener la capacidad de entrega para todos nuestros clientes.
-
- Por favor, comprenda que algunas industrias o "nichos" devuelven más quejas de abuso y spam que la media. No podemos arriesgar la reputación de nuestro servidor, lo que afecta a cada perfil de correo.
-
-Nuestro Servicio no acepta campañas y no publican sitios web, que ofrecen servicios, productos o contenido que se enumeran a continuación:
-
-servicios de acompañamiento y citas;
-Ventas farmacéuticas directas y en línea, que incluyen, entre otros, productos de salud y bienestar sexual, medicamentos recetados y falsificados;
-Trabaja desde casa, gana dinero en línea y genera oportunidades de generación ("hazte rico rápido", "crea riqueza", "independencia financiera");
-Negociación en línea, consejos de negociación diaria o contenido relacionado con el mercado bursátil, que incluye pero no se limita a la promoción de carteras de anuncios de acciones;
-Esquemas piramidales o negocios multinivel de canal, red y / o comercialización de referencia (MLM) utilizados para la prospección o el reclutamiento;
-La comercialización del afiliado;
-Cobro de deudas, reparación de crédito y ofertas de alivio de deuda;
-Hipotecas y préstamos;
-Suplementos nutricionales, a base de hierbas y vitaminas;
-Artículos o referencias de novedad para adultos;
-Enumere a los corredores o enumere los servicios de alquiler;
-Bienes ilegales, software o medios pirateados;
-Servicios de apuestas y apuestas, incluidos, entre otros, póquer en línea, juegos de casino, eventos universitarios y deportes profesionales;
-Partidos y organizaciones políticas;
-Productos de tabaco;
-Productos alcohólicos
-Cualquier contenido religioso.
-Ten en cuenta que el contenido de tu campaña de correo electrónico debe estar claramente asociado con tu dirección de correo electrónico del remitente y tu dominio.
-
-La administración del Servicio monitorea estrictamente si SendPulse está en la lista negra con algún servicio RBL popular. Las campañas de correo electrónico que hicieron que una dirección IP o dominios del Servicio se pusieran en la lista negra con cualquier lista RBL se suspenden inmediatamente.
-
-9.6. Aplicación de políticas contra el correo electrónico no deseado
-Cualquier evidencia de usuarios que no se adhieran a esta Política Anti-Spam causará la desconexión inmediata de su envío de mensajes de correo no deseado, la suspensión del servicio y también podría congelar todo el dinero para garantizar el final inmediato de la violación hasta que se eliminen los detalles arriba.
-
-9.7. Su derecho a cancelar / garantía de devolución de dinero
-Puede cancelar la suscripción a la cuenta en el servicio SendPulse solo hasta que haya enviado 200 mensajes de correo electrónico. Si se excede, se considera que la cuenta de usuario está funcionando completamente y no se permitirá ningún reembolso.
-Si su cuenta es cancelada o suspendida debido a reclamos de SPAM, no se permitirá ningún reembolso. Ver detalles en nuestra política de reembolso.
-Asegúrese de que todos los destinatarios sean correos electrónicos basados en permisos (correos electrónicos opcionales), es decir, acepte recibir sus mensajes de correo electrónico.
-Está estrictamente prohibido enviar mensajes de correo electrónico a la lista de direcciones de correo electrónico generadas automáticamente por el programa extractor de correo electrónico; Del mismo modo, no está permitido utilizar direcciones de correo electrónico comprados para envíos masivos.
-Debe asegurarse de que su mensaje de correo electrónico cumpla con los requisitos de la Ley CAN-SPAM: preste atención a la declaración de que cada mensaje de correo electrónico que envíe con fines publicitarios, comerciales e informativos debe contener su dirección física válida.
-Nos reservamos el derecho de dejar de brindar servicio y bloquear la cuenta de usuario si incluso una de sus campañas de correo electrónico presenta quejas excesivas.
-Si no usas tu cuenta durante 9 meses, se considerará inactiva. En ese caso, es posible que dejemos de proporcionar el servicio y que eliminemos tu cuenta.
-Las cuentas bloqueadas debido a reclamos excesivos se rechazan para obtener un reembolso.
-
-El límite de direcciones no existentes es 7%. Si supera el número de direcciones no válidas (direcciones inexistentes, no activas), los moderadores del servicio pueden bloquear la campaña de correo electrónico. Si desea evitar el bloqueo, verifique si las direcciones son válidas por cualquier servicio / software antes de cargar la dirección en SendPulse. SendPulse no proporciona ningún servicio de validación.
-
-Entendemos que puede haber una cierta cantidad de quejas si envías mensajes de correo electrónico masivos. De acuerdo con los términos y condiciones de nuestro Servicio, especificamos el nivel de quejas permitidas como no más del 0.4% por dominio del remitente para una sola campaña de correo electrónico. Además, tenemos en cuenta diferentes factores, como la cantidad de correos electrónicos enviados, así como la proporción de quejas y los tipos de quejas. La cantidad de bajas no debe exceder el 1% de la lista de correo. Sin embargo, si tu campaña de correo electrónico obtiene una proporción que excede el nivel permitido, nos reservamos el derecho de bloquear o cancelar tu cuenta sin un reembolso.
-
-9.8. SPAM e informes de abuso
-Infórmenos sobre cualquier abuso o mensaje no deseado / no solicitado. En su correo electrónico, incluya el correo electrónico no deseado, la fecha y la hora en que recibió el mensaje. Envíe su informe a support@sendpulse.com.
-
-Las direcciones de correo electrónico que reciban quejas de spam se suspenderán hasta que se aclare el caso.
-
-10. Elección de la ley. Arbitraje
-La relación entre la empresa y el usuario con respecto a la prestación de servicios para el servicio de lista de correo SendPulse, se rige por las leyes del Estado de Nueva Jersey sin tener en cuenta los conflictos de disposiciones legales de los mismos.
-
-Cualquier disputa que surja de o esté relacionada con el tema de estos Términos será decidida por los tribunales estatales y federales en el Condado de Sussex, Nueva Jersey, y cada parte estará sujeta a la jurisdicción de dichos tribunales.
+11. LegislaciÃ³n Aplicable
+Este acuerdo se rige por las leyes de la RepÃºblica Argentina. Cualquier controversia serÃ¡ resuelta en los tribunales ordinarios con jurisdicciÃ³n en la Ciudad AutÃ³noma de Buenos Aires, salvo pacto en contrario.

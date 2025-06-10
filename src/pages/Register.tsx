@@ -20,6 +20,7 @@ const Register: React.FC = () => {
   const [materials, setMaterials] = useState('');
   const [experienceYears, setExperienceYears] = useState(0);
   const [alias, setAlias] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   
   const { login } = useUser();
   const navigate = useNavigate();
@@ -27,6 +28,10 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!acceptedTerms) {
+      setError('Debes aceptar los Términos y Condiciones para registrarte.');
+      return;
+    }
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
       return;
@@ -200,7 +205,9 @@ const Register: React.FC = () => {
 
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Nombre completo
+                Nombre completo <span className="text-red-600 cursor-pointer group relative">*
+                  <span className="absolute left-4 top-0 z-10 hidden group-hover:block bg-white border border-gray-300 text-xs text-gray-700 rounded px-2 py-1 shadow-lg whitespace-nowrap">Campo obligatorio</span>
+                </span>
               </label>
               <div className="mt-1">
                 <input
@@ -218,7 +225,9 @@ const Register: React.FC = () => {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Correo electrónico
+                Correo electrónico <span className="text-red-600 cursor-pointer group relative">*
+                  <span className="absolute left-4 top-0 z-10 hidden group-hover:block bg-white border border-gray-300 text-xs text-gray-700 rounded px-2 py-1 shadow-lg whitespace-nowrap">Campo obligatorio</span>
+                </span>
               </label>
               <div className="mt-1">
                 <input
@@ -236,7 +245,9 @@ const Register: React.FC = () => {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Contraseña
+                Contraseña <span className="text-red-600 cursor-pointer group relative">*
+                  <span className="absolute left-4 top-0 z-10 hidden group-hover:block bg-white border border-gray-300 text-xs text-gray-700 rounded px-2 py-1 shadow-lg whitespace-nowrap">Campo obligatorio</span>
+                </span>
               </label>
               <div className="mt-1">
                 <input
@@ -254,7 +265,9 @@ const Register: React.FC = () => {
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirmar contraseña
+                Confirmar contraseña <span className="text-red-600 cursor-pointer group relative">*
+                  <span className="absolute left-4 top-0 z-10 hidden group-hover:block bg-white border border-gray-300 text-xs text-gray-700 rounded px-2 py-1 shadow-lg whitespace-nowrap">Campo obligatorio</span>
+                </span>
               </label>
               <div className="mt-1">
                 <input
@@ -334,6 +347,31 @@ const Register: React.FC = () => {
                 </div>
               </>
             )}
+
+            <div className="flex items-center">
+              <input
+                id="acceptedTerms"
+                name="acceptedTerms"
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={e => setAcceptedTerms(e.target.checked)}
+                className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                required
+              />
+              <label htmlFor="acceptedTerms" className="ml-2 block text-sm text-gray-700">
+                <span className="text-red-600 mr-1">*</span>
+                Acepto los{' '}
+                <a
+                  href="/terminos-condiciones"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-700 underline hover:text-green-900"
+                >
+                  Términos y Condiciones
+                </a>{' '}de la app
+                <span className="ml-1 text-xs text-gray-400">(Obligatorio)</span>
+              </label>
+            </div>
 
             <div>
               <button

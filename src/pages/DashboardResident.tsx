@@ -37,6 +37,7 @@ type CollectionPoint = {
   user_id: string;
   lat?: number;
   lng?: number;
+  materials?: string[]; // <-- Añadido explícitamente
   // Agrega aquí otros campos si existen en tu tabla
 };
 
@@ -348,21 +349,24 @@ const puntosDemorados = detailedPoints.filter(p => {
   // Función para volver a poner un punto como disponible
   const handleMakeAvailableAgain = async (point: DetailedPoint) => {
     try {
-      // 1. Crear un nuevo punto disponible (clonando los datos relevantes)
+      // 1. Crear un nuevo punto disponible (clonando TODOS los datos relevantes)
       const { data: newPoint, error: createError } = await supabase
-      .from('collection_points')
-      .insert({
-        address: point.address,
-        district: point.district,
-        schedule: point.schedule,
-        user_id: point.user_id,
-        notas: point.notas,
-        additional_info: point.additional_info,
-        status: 'available',
-        // Otros campos relevantes que quieras clonar
-      })
-      .select()
-      .single();
+        .from('collection_points')
+        .insert({
+          address: point.address,
+          district: point.district,
+          schedule: point.schedule,
+          user_id: point.user_id,
+          notas: point.notas,
+          additional_info: point.additional_info,
+          status: 'available',
+          lat: point.lat ?? null,
+          lng: point.lng ?? null,
+          materials: point.materials ?? [],
+          // Si tienes otros campos personalizados, agrégalos aquí
+        })
+        .select()
+        .single();
       if (createError || !newPoint) {
         toast.error('Error al crear el nuevo punto disponible.');
         return;

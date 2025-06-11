@@ -661,10 +661,24 @@ const DashboardRecycler: React.FC = () => {
 
   // --- MODALES Y ESTADOS PARA ACCIONES DEL HEADER ---
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  const [showStatsModal, setShowStatsModal] = useState(false);
   const [showPointsStatsModal, setShowPointsStatsModal] = useState(false);
-  // Simulación de permiso para chat (ajusta según tu lógica real)
-  const canChatWithResident = true; // Cambia a false para probar el deshabilitado
+  const [profileId, setProfileId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user && user.profileId) {
+      setProfileId(user.profileId);
+    } else if (user && user.id) {
+      // Buscar el id interno del perfil si no está en el contexto
+      (async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (data && data.id) setProfileId(data.id);
+      })();
+    }
+  }, [user]);
 
   // --- COMPONENTE EditProfileForm ---
   // Define un tipo local para el perfil completo del reciclador
@@ -1096,7 +1110,7 @@ const DashboardRecycler: React.FC = () => {
                   </button>
                   <button
                     className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
-                    onClick={() => setShowStatsModal(true)}
+                    onClick={() => navigate('/estadisticas')}
                   >
                     Ver Estadísticas
                   </button>
@@ -1109,8 +1123,8 @@ const DashboardRecycler: React.FC = () => {
                   <button
                     className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2 relative"
                     onClick={() => setShowChatModal(true)}
-                    disabled={!canChatWithResident}
-                    title={canChatWithResident ? "Abrir chat con residente" : "Solo disponible si el residente habilita el chat"}
+                    // disabled={!canChatWithResident}
+                    // title={canChatWithResident ? "Abrir chat con residente" : "Solo disponible si el residente habilita el chat"}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4.28 1.07A1 1 0 013 19.13V17.6c0-.29.13-.56.35-.74A7.97 7.97 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     Mensajes
@@ -1517,7 +1531,7 @@ const DashboardRecycler: React.FC = () => {
                               </div>
                             </div>
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
-                          </div>
+                                                   </div>
                           <div className="flex flex-row justify-between items-start mt-4">
                             <div className="flex-1">
                               <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
@@ -1765,27 +1779,11 @@ const DashboardRecycler: React.FC = () => {
                 </div>
               </div>
             )}
-            {showStatsModal && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">Estadísticas Generales</h3>
-                    <button onClick={() => setShowStatsModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
-                  </div>
-                  {/* Aquí irían las estadísticas reales */}
-                  <div className="mb-4 text-gray-700">Visualización de estadísticas generales próximamente.</div>
-                  <div className="flex justify-end">
-                    <button onClick={() => setShowStatsModal(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cerrar</button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* MODAL REAL DE CALIFICACIONES DEL RECICLADOR */}
-            {showPointsStatsModal && (
+            {showPointsStatsModal && profileId && (
               <MyRecyclerRatingsModal
                 open={showPointsStatsModal}
                 onClose={() => setShowPointsStatsModal(false)}
-                recyclerId={user.id}
+                recyclerId={profileId}
                 recyclerName={user.name}
                 avatarUrl={user.avatar_url}
               />

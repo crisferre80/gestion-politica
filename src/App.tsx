@@ -23,6 +23,7 @@ import React from 'react';
 import DossierPage from './pages/DossierPage';
 import QuienesSomosPage from './pages/QuienesSomosPage';
 import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
+import Estadisticas from './pages/Estadisticas';
 
 // ErrorBoundary para redirigir al inicio en caso de error
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -74,6 +75,7 @@ function App() {
                   <Route path="/dossier" element={<DossierPage />} />
                   <Route path="/quienes-somos" element={<QuienesSomosPage />} />
                   <Route path="/terminos-condiciones" element={<TerminosCondicionesPage />} />
+                  <Route path="/estadisticas" element={<Estadisticas />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </main>

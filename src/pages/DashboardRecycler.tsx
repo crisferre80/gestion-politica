@@ -1542,72 +1542,100 @@ const DashboardRecycler: React.FC = () => {
               )}
               {view === 'retirados' && (
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Retirados</h2>
+                  <div className="flex justify-end mb-4">
+                   
+                    <button
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
+                      onClick={async () => {
+                        if (!user) return;
+                        // Filtrar puntos retirados
+                        const retirados = claimedPoints.filter(p => p.claim_status === 'completed');
+                        if (retirados.length === 0) return;
+                        if (!window.confirm('¿Estás seguro de que deseas vaciar los puntos retirados? Esta acción no se puede deshacer. Los datos para estadísticas se conservarán.')) return;
+                        // Clonar los puntos retirados a una tabla de respaldo antes de eliminar
+                        for (const punto of retirados) {
+                          // Clonar en tabla 'collection_points_backup' (debe existir en la base de datos)
+                          await supabase.from('collection_points_backup').insert({ ...punto, original_id: punto.id, deleted_at: new Date().toISOString() });
+                          // Eliminar de collection_points
+                          await supabase.from('collection_points').delete().eq('id', punto.id);
+                        }
+                        // Refrescar datos
+                        fetchData();
+                      }}
+                    >
+                      Vaciar Puntos
+                    </button>
+                  </div>
+                  {/* Listado de puntos retirados */}
                   <div className="grid gap-6 md:grid-cols-2">
-                    {claimedPoints.filter(p => p.claim_status === 'completed').length === 0 && (
+                    {claimedPoints.filter(p => p.claim_status === 'completed').length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos retirados.</div>
-                    )}
-                    {claimedPoints.filter(p => p.claim_status === 'completed').map(point => (
-                      <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                        <div className="p-6">
-                          {/* Info principal */}
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start space-x-3">
-                              <MapPin className="h-6 w-6 text-green-500" />
-                              <div>
-                                <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
-                                <p className="mt-1 text-sm text-gray-500">{point.district}</p>
-                              </div>
-                            </div>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
-                          </div>
-                          <div className="flex flex-row justify-between items-start mt-4">
-                            <div className="flex-1">
-                              <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
-                                  <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="ml-4 flex-shrink-0">
-                              <img
-                                src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
-                                alt="Reciclaje"
-                                className="w-28 h-28 object-contain bg-white shadow-none"
-                              />
-                            </div>
-                          </div>
-                          <div className="mt-4 flex items-center text-sm text-gray-500">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            <span>{point.schedule}</span>
-                          </div>
-                          {point.completed_at && (
-                            <div className="mt-2 text-xs text-gray-500">Retirado el: {new Date(point.completed_at).toLocaleString()}</div>
-                          )}
-                          {/* Info residente */}
-                          <div className="mt-6 pt-6 border-t border-gray-200">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
-                            <div className="space-y-2">
-                              <div className="flex items-center text-sm text-gray-500">
-                                <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
-                                <span>{point.creator_name}</span>
-                              </div>
-                              <div className="flex items-center text-sm text-gray-500">
-                                <Mail className="h-4 w-4 mr-2" />
-                                <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
-                              </div>
-                              {point.profiles?.phone && (
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <Phone className="h-4 w-4 mr-1" />
-                                  <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                    ) : (
+                      claimedPoints.filter(p => p.claim_status === 'completed').map(point => (
+                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">
+                          <div className="p-6">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3">
+                                <MapPin className="h-6 w-6 text-green-500" />
+                                <div>
+                                  <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
+                                  <p className="mt-1 text-sm text-gray-500">{point.district}</p>
                                 </div>
-                              )}
+                              </div>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
+                            </div>
+                            <div className="flex flex-row items-start mt-4">
+                              <div className="mr-6 flex-shrink-0">
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                                  alt="Reciclaje"
+                                  className="w-36 h-36 object-contain animate-bounce-slow"
+                                  style={{ filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
+                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex items-center text-sm text-gray-500">
+                              <Calendar className="h-4 w-4 mr-2" />
+                              <span>{point.pickup_time ? new Date(point.pickup_time).toLocaleString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                            </div>
+                            {/* Información adicional del residente */}
+                            {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
+                              <div className="mt-2 text-sm text-gray-600">
+                                <strong>Información adicional:</strong> {point.additional_info}
+                              </div>
+                            )}
+                            {/* Info residente */}
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                              <div className="space-y-2">
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
+                                  <span>{point.creator_name}</span>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <Mail className="h-4 w-4 mr-2" />
+                                  <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
+                                </div>
+                                {point.profiles?.phone && (
+                                  <div className="flex items-center text-sm text-gray-500">
+                                    <Phone className="h-4 w-4 mr-1" />
+                                    <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               )}

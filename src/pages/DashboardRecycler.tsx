@@ -995,6 +995,8 @@ const DashboardRecycler: React.FC = () => {
     setEditSelectedPoints(prev => prev.includes(pointId) ? prev.filter(id => id !== pointId) : [...prev, pointId]);
   };
 
+  const [showAllPointsMap, setShowAllPointsMap] = useState(false);
+
   // Si necesitas rutas en el futuro, descomenta y usa estas líneas.
 
   if (!user) {
@@ -1042,6 +1044,48 @@ const DashboardRecycler: React.FC = () => {
     <div className="bg-gray-50 min-h-screen py-8">
       <HeaderRecycler />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* --- MAPA DE PUNTOS DE RECOLECCIÓN --- */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-2xl font-bold text-green-700 flex items-center gap-2">
+              <svg className="w-7 h-7 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 12.414a4 4 0 10-1.414 1.414l4.243 4.243a1 1 0 001.414-1.414z" /></svg>
+              Mapa de Puntos de Recolección
+            </h2>
+            <button
+              className="px-3 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 font-semibold text-sm"
+              onClick={() => setShowAllPointsMap((v) => !v)}
+            >
+              {showAllPointsMap ? 'Ocultar mapa' : 'Ver mapa'}
+            </button>
+          </div>
+          {showAllPointsMap && (
+            <div className="w-full h-96 rounded-lg overflow-hidden border border-green-300 shadow mb-2 animate-fade-in">
+              <Map
+                points={[
+                  ...availablePoints.map(p => ({
+                    id: p.id,
+                    lat: Number(p.lat),
+                    lng: Number(p.lng),
+                    title: p.address,
+                    avatar_url: p.creator_avatar || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png',
+                    status: 'disponible',
+                  })),
+                  ...claimedPoints.map(p => ({
+                    id: p.id,
+                    lat: Number(p.lat),
+                    lng: Number(p.lng),
+                    title: p.address,
+                    avatar_url: p.creator_avatar || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png',
+                    status: p.claim_status,
+                  })),
+                ]}
+                showUserLocation={true}
+                showRoute={false}
+              />
+            </div>
+          )}
+        </div>
+        {/* --- FIN MAPA --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <h1 className="text-3xl font-bold text-green-800">Panel del Reciclador</h1>
           <div className="flex items-center gap-4">
@@ -1387,7 +1431,7 @@ const DashboardRecycler: React.FC = () => {
                               <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
                               <div className="space-y-2">
                                 <div className="flex items-center text-sm text-gray-500">
-                                  <User className="h-4 w-4 mr-2" />
+                                  <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
                                   <span>{point.creator_name}</span>
                                 </div>
                                 <div className="flex items-center text-sm text-gray-500">
@@ -1484,12 +1528,13 @@ const DashboardRecycler: React.FC = () => {
                             {point.cancellation_reason && (
                               <div className="mt-2 text-xs text-red-600 font-semibold">Motivo: {point.cancellation_reason}</div>
                             )}
+
                             {/* Info residente */}
                             <div className="mt-6 pt-6 border-t border-gray-200">
                               <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
                               <div className="space-y-2">
                                 <div className="flex items-center text-sm text-gray-500">
-                                  <User className="h-4 w-4 mr-2" />
+                                  <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
                                   <span>{point.creator_name}</span>
                                 </div>
                                 <div className="flex items-center text-sm text-gray-500">
@@ -1531,7 +1576,7 @@ const DashboardRecycler: React.FC = () => {
                               </div>
                             </div>
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
-                                                   </div>
+                          </div>
                           <div className="flex flex-row justify-between items-start mt-4">
                             <div className="flex-1">
                               <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
@@ -1561,7 +1606,7 @@ const DashboardRecycler: React.FC = () => {
                             <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
                             <div className="space-y-2">
                               <div className="flex items-center text-sm text-gray-500">
-                                <User className="h-4 w-4 mr-2" />
+                                <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
                                 <span>{point.creator_name}</span>
                               </div>
                               <div className="flex items-center text-sm text-gray-500">
@@ -2015,19 +2060,6 @@ const DashboardRecycler: React.FC = () => {
 };
 
 export default DashboardRecycler;
-
-// Agrega la animación CSS al final del archivo o en tu CSS global:
-/*
-@keyframes bounce-in {
-  0% { transform: scale(0.7); opacity: 0; }
-  60% { transform: scale(1.1); opacity: 1; }
-  80% { transform: scale(0.95); }
-  100% { transform: scale(1); }
-}
-.animate-bounce-in {
-  animation: bounce-in 0.7s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-}
-*/
 
 
 

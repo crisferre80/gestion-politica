@@ -7,7 +7,7 @@ import PhotoCapture from '../components/PhotoCapture';
 
 const RecyclerProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useUser();
+  useUser();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editName, setEditName] = useState('');
@@ -30,11 +30,10 @@ const RecyclerProfile: React.FC = () => {
   
   const [reviews, setReviews] = useState<Review[]>([]);
   const [ratingAverage, setRatingAverage] = useState<number>(0);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewComment, setReviewComment] = useState('');
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewSuccess, setReviewSuccess] = useState('');
-  const [reviewError, setReviewError] = useState('');
+  // eslint-disable-next-line no-empty-pattern
+  const [] = useState(false);
+  const [reviewSuccess] = useState('');
+  // Removed invalid empty array destructuring from useState
 
   // Move fetchProfile outside useEffect so it's accessible elsewhere
   const fetchProfile = React.useCallback(async () => {
@@ -90,32 +89,6 @@ const RecyclerProfile: React.FC = () => {
 
 
   // Handle review submit
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setReviewError('');
-    setReviewSuccess('');
-    if (!reviewRating) {
-      setReviewError('Por favor selecciona una calificación.');
-      return;
-    }
-    setReviewLoading(true);
-    try {
-      const { error } = await supabase.from('recycler_ratings').insert({
-        recycler_id: id,
-        rater_id: user?.id,
-        rating: reviewRating,
-        comment: reviewComment,
-      });
-      if (error) throw error;
-      setReviewSuccess('¡Reseña enviada correctamente!');
-      setReviewRating(0);
-      setReviewComment('');
-    } catch {
-      setReviewError('Error al enviar la reseña.');
-    } finally {
-      setReviewLoading(false);
-    }
-  };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
@@ -164,76 +137,9 @@ const RecyclerProfile: React.FC = () => {
                   ))}
                 </div>
               </div>
-              {/* Right Column - Bio and Reviews */}
-              <div className="md:col-span-2">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Acerca de</h2>
-                <p className="text-gray-600 mb-8">{editBio}</p>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Reseñas</h2>
-                {reviews.length > 0 ? (
-                  <div className="space-y-6">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-gray-900">{review.rater_id?.slice(0, 8) || 'Usuario'}</p>
-                            <p className="text-sm text-gray-500">{new Date(review.created_at).toLocaleDateString()}</p>
-                          </div>
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400' : 'text-gray-300'}`} fill="currentColor" />
-                            ))}
-                          </div>
-                        </div>
-                        <p className="mt-2 text-gray-600">{review.comment}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No hay reseñas disponibles.</p>
-                )}
-                {/* Add Review Form */}
-                <div className="mt-8 border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Dejar una Reseña</h3>
-                  <form onSubmit={handleReviewSubmit}>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Calificación</label>
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5].map((rating) => (
-                          <button
-                            key={rating}
-                            type="button"
-                            className={reviewRating >= rating ? 'text-yellow-400' : 'text-gray-300'}
-                            onClick={() => setReviewRating(rating)}
-                          >
-                            <Star className="h-6 w-6" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="mb-4">
-                      <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">Comentario</label>
-                      <textarea
-                        id="comment"
-                        rows={4}
-                        className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                        placeholder="Comparte tu experiencia con este reciclador..."
-                        value={reviewComment}
-                        onChange={e => setReviewComment(e.target.value)}
-                      />
-                    </div>
-                    {reviewError && <div className="text-red-600 text-sm mb-2">{reviewError}</div>}
-                    {reviewSuccess && <div className="text-green-600 text-sm mb-2">{reviewSuccess}</div>}
-                    <button
-                      type="submit"
-                      className="bg-green-600 text-white px-4 py-2 rounded-md font-medium hover:bg-green-700 transition"
-                      disabled={reviewLoading}
-                    >
-                      {reviewLoading ? 'Enviando...' : 'Enviar Reseña'}
-                    </button>
-                  </form>
-                </div>
-                {/* Edit Profile Section */}
-                <div className="mt-8 border-t border-gray-200 pt-6">
+             
+              {/* Edit Profile Section */}
+              <div className="md:col-span-3 mt-8 border-t border-gray-200 pt-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Editar Perfil</h3>
                   <div className="w-24 h-24 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
                     <img src={avatarUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(editName || 'Reciclador') + '&background=22c55e&color=fff&size=128'} alt="Foto de perfil" className="w-full h-full object-cover" />
@@ -307,7 +213,6 @@ const RecyclerProfile: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

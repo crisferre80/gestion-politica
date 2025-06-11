@@ -244,6 +244,7 @@ useEffect(() => {
         avatar_url?: string;
         email?: string;
         phone?: string;
+        alias?: string; // <-- Añadido para permitir alias
       };
     } | null; // <-- Permitir null explícitamente
   };
@@ -411,6 +412,10 @@ const puntosDemorados = detailedPoints.filter(p => {
 const [showRatingsModal, setShowRatingsModal] = useState(false);
 const [ratingsModalTarget, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 const [showMyRecyclerRatingsModal, setShowMyRecyclerRatingsModal] = useState<{ recyclerId: string; recyclerName?: string; avatarUrl?: string } | false>(false);
+
+// --- Estado para el modal de donación ---
+const [showDonationModal, setShowDonationModal] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string; alias?: string } | null>(null);
+const [donationAmount, setDonationAmount] = useState<number>(0);
 
 // --- Estado para mensajes no leídos por reciclador ---
 const [unreadMessagesByRecycler, setUnreadMessagesByRecycler] = useState<Record<string, number>>({});
@@ -809,30 +814,35 @@ useEffect(() => {
                             {(() => {
                               const recyclerId = point.claim?.recycler?.id || '';
                               const recyclerName = point.claim?.recycler?.name || 'Reciclador';
-                              function handleOpenDonation() {
-                                toast('Funcionalidad de donación no implementada aún.');
-                              }
+                              const recyclerAlias = point.claim?.recycler?.alias || '';
 
                               return (
                                 <>
-                                  <button
-                                    className="mt-2 px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md"
-                                    onClick={() => {
-                                      setRatingTarget({ recyclerId, recyclerName, avatarUrl: point.claim?.recycler?.avatar_url });
-                                      setShowRatingsModal(true);
-                                    }}
-                                  >
-                                    Calificar reciclador
-                                  </button>
-                                  <button
-                                    className="mt-2 ml-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md"
-                                    onClick={() => handleOpenDonation()}
-                                    type="button"
-                                  >
-                                    Donar
-                                  </button>
-                                  {/* BOTÓN PARA VOLVER A DISPONIBLE UN PUNTO RETIRADO */}
-                                
+                                  {/* Botones de acción en puntos retirados: Calificar y Donar, ordenados y responsive */}
+<div className="flex flex-col md:flex-row gap-2 mt-2 md:mt-0 w-full md:w-auto">
+  <button
+    className="px-4 py-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 shadow-md w-full md:w-auto"
+    onClick={() => {
+      setRatingTarget({ recyclerId, recyclerName, avatarUrl: point.claim?.recycler?.avatar_url });
+      setShowRatingsModal(true);
+    }}
+    type="button"
+  >
+    Calificar reciclador
+  </button>
+  <button
+    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md w-full md:w-auto"
+    onClick={() => setShowDonationModal({
+      recyclerId,
+      recyclerName,
+      avatarUrl: point.claim?.recycler?.avatar_url,
+      alias: recyclerAlias
+    })}
+    type="button"
+  >
+    Donar
+  </button>
+</div>
                                 </>
                               );
                             })()}
@@ -1203,6 +1213,80 @@ useEffect(() => {
           avatarUrl={showMyRecyclerRatingsModal.avatarUrl}
         />
       )}
+      {/* Modal de donación */}
+      {showDonationModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+    <div className="bg-white rounded-lg shadow-lg p-8 max-w-sm w-full relative">
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+        onClick={() => setShowDonationModal(null)}
+      >
+        ×
+      </button>
+      <div className="flex flex-col items-center">
+        <img
+          src={showDonationModal.avatarUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(showDonationModal.recyclerName) + '&background=FACC15&color=fff&size=64'}
+          alt="Avatar reciclador"
+          className="w-16 h-16 rounded-full border-2 border-blue-400 object-cover mb-2"
+        />
+        <h3 className="text-lg font-bold mb-2">Donar a {showDonationModal.recyclerName}</h3>
+        {/* Alias del reciclador */}
+        <div className="mb-3 w-full flex flex-col items-center">
+          <span className="text-gray-700 text-sm font-semibold">Alias para billetera virtual:</span>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="bg-gray-100 px-2 py-1 rounded text-blue-700 font-mono select-all" id="alias-donacion">
+              {showDonationModal.alias ? showDonationModal.alias : <span className="text-red-500">Sin alias</span>}
+            </span>
+            {showDonationModal.alias && (
+              <button
+                className="text-blue-600 hover:text-blue-900 text-xs border px-2 py-1 rounded"
+                onClick={() => {
+                  navigator.clipboard.writeText(showDonationModal.alias!);
+                  toast.success('Alias copiado al portapapeles');
+                }}
+                type="button"
+              >
+                Copiar
+              </button>
+            )}
+          </div>
+        </div>
+        <input
+          type="number"
+          min={1}
+          className="border rounded px-3 py-2 mb-3 w-full text-center"
+          placeholder="Monto a donar (EcoCreditos)"
+          value={donationAmount > 0 ? donationAmount : ''}
+          onChange={e => setDonationAmount(Number(e.target.value))}
+        />
+        <button
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full font-semibold"
+          disabled={donationAmount <= 0 || donationAmount > ecoCreditos}
+          onClick={async () => {
+            if (donationAmount <= 0 || donationAmount > ecoCreditos) return;
+            setEcoCreditos(prev => prev - donationAmount);
+            setShowDonationModal(null);
+            setDonationAmount(0);
+            toast.success(`¡Has donado ${donationAmount} EcoCreditos a ${showDonationModal.recyclerName}!`);
+          }}
+        >
+          Confirmar donación
+        </button>
+        <p className="text-xs text-gray-500 mt-2">Tu saldo actual: {ecoCreditos} EcoCreditos</p>
+        {/* Botones de redirección a billeteras virtuales */}
+        <div className="mt-4 w-full flex flex-col gap-2">
+          <span className="text-gray-600 text-xs mb-1">¿Quieres donar dinero real? Usa el alias en tu billetera favorita:</span>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <a href="https://www.mercadopago.com.ar/" target="_blank" rel="noopener noreferrer" className="bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-semibold">Mercado Pago</a>
+            <a href="https://www.naranjax.com/" target="_blank" rel="noopener noreferrer" className="bg-orange-500 hover:bg-orange-700 text-white px-3 py-1 rounded text-xs font-semibold">Naranja X</a>
+            <a href="https://www.uala.com.ar/" target="_blank" rel="noopener noreferrer" className="bg-purple-600 hover:bg-purple-800 text-white px-3 py-1 rounded text-xs font-semibold">Ualá</a>
+            <a href="https://www.personalpay.com.ar/" target="_blank" rel="noopener noreferrer" className="bg-pink-500 hover:bg-pink-700 text-white px-3 py-1 rounded text-xs font-semibold">Personal Pay</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

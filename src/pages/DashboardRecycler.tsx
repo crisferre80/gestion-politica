@@ -1341,25 +1341,9 @@ const DashboardRecycler: React.FC = () => {
                                   <button
                                     onClick={e => {
                                       e.stopPropagation();
-                                      // Usar la ubicación actual del reciclador como origen
-                                      if (navigator.geolocation) {
-                                        navigator.geolocation.getCurrentPosition(
-                                          (position) => {
-                                            const origin = `${position.coords.latitude},${position.coords.longitude}`;
-                                            const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${point.lat},${point.lng}&travelmode=driving`;
-                                            window.open(url, '_blank', 'noopener,noreferrer');
-                                          },
-                                          () => {
-                                            // Si falla la geolocalización, usar solo destino
-                                            const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`;
-                                            window.open(url, '_blank', 'noopener,noreferrer');
-                                          }
-                                        );
-                                      } else {
-                                        // Si no hay geolocalización disponible
-                                        const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`;
-                                        window.open(url, '_blank', 'noopener,noreferrer');
-                                      }
+                                      // Abrir Google Maps inmediatamente solo con el destino
+                                      const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`;
+                                      window.open(url, '_blank', 'noopener,noreferrer');
                                     }}
                                     title="Ver ruta en Google Maps"
                                     className="ml-2 p-0 bg-transparent border-none shadow-none focus:outline-none"

@@ -11,7 +11,7 @@ import CollectionPoints from './pages/CollectionPoints';
 import AddCollectionPoint from './pages/AddCollectionPoint';
 import Dashboard from './pages/Dashboard';
 import AdminAds from './pages/AdminAds';
-import { UserProvider } from './context/UserContext';
+import { UserProvider, useUser } from './context/UserContext';
 import Chat from './pages/Chat';
 import { MessagesProvider } from './context/MessagesContext';
 import DashboardRecycler from './pages/DashboardRecycler';
@@ -24,6 +24,7 @@ import DossierPage from './pages/DossierPage';
 import QuienesSomosPage from './pages/QuienesSomosPage';
 import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
 import Estadisticas from './pages/Estadisticas';
+import EstadisticasPanel from './components/EstadisticasPanel';
 
 // ErrorBoundary para redirigir al inicio en caso de error
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -44,6 +45,12 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     }
     return this.props.children;
   }
+}
+
+function MiHistorialRoute() {
+  const { user } = useUser();
+  if (!user?.id) return <div className="text-center text-red-600 py-10">Debes iniciar sesión para ver tu historial.</div>;
+  return <EstadisticasPanel userId={user.id} />;
 }
 
 function App() {
@@ -76,6 +83,7 @@ function App() {
                   <Route path="/quienes-somos" element={<QuienesSomosPage />} />
                   <Route path="/terminos-condiciones" element={<TerminosCondicionesPage />} />
                   <Route path="/estadisticas" element={<Estadisticas />} />
+                  <Route path="/mi-historial" element={<MiHistorialRoute />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </main>

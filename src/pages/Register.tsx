@@ -21,6 +21,7 @@ const Register: React.FC = () => {
   const [experienceYears, setExperienceYears] = useState(0);
   const [alias, setAlias] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   
   const { login } = useUser();
   const navigate = useNavigate();
@@ -95,7 +96,7 @@ const Register: React.FC = () => {
             user_name: name,
             user_email: email
           });
-        } catch (notifErr) {
+        } catch {
           setError('El usuario fue registrado, pero no se pudo enviar la notificación de bienvenida.');
         }
         // Fetch perfil actualizado para obtener avatar_url real
@@ -138,9 +139,6 @@ const Register: React.FC = () => {
     }
   };
 
-  const handlePhotoCapture = (file: File) => {
-    setProfilePhoto(file);
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -205,7 +203,7 @@ const Register: React.FC = () => {
 
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Nombre completo <span className="text-red-600 cursor-pointer group relative">*
+                Nombre de Usuario <span className="text-red-600 cursor-pointer group relative">*
                   <span className="absolute left-4 top-0 z-10 hidden group-hover:block bg-white border border-gray-300 text-xs text-gray-700 rounded px-2 py-1 shadow-lg whitespace-nowrap">Campo obligatorio</span>
                 </span>
               </label>
@@ -287,9 +285,26 @@ const Register: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Foto de perfil
               </label>
-              <PhotoCapture onCapture={handlePhotoCapture} onCancel={function (): void {
-                throw new Error('Function not implemented.');
-              } } />
+              <button
+                type="button"
+                className="mb-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center gap-2"
+                onClick={() => setShowPhotoCapture(true)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 19.5V7.125c0-.621.504-1.125 1.125-1.125h3.38c.414 0 .788-.252.94-.639l.57-1.522A1.125 1.125 0 018.21 3.75h7.58c.482 0 .915.304 1.07.764l.57 1.522c.152.387.526.639.94.639h3.38c.621 0 1.125.504 1.125 1.125V19.5a1.125 1.125 0 01-1.125 1.125H3.375A1.125 1.125 0 012.25 19.5z" />
+                  <circle cx="12" cy="13.5" r="3.75" />
+                </svg>
+                Tomar foto
+              </button>
+              {showPhotoCapture && (
+                <PhotoCapture
+                  onCapture={(file) => {
+                    setProfilePhoto(file);
+                    setShowPhotoCapture(false);
+                  }}
+                  onCancel={() => setShowPhotoCapture(false)}
+                />
+              )}
               {profilePhoto && (
                 <p className="mt-2 text-sm text-green-600">
                   Foto seleccionada: {profilePhoto.name}

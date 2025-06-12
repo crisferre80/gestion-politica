@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favor
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import PhotoCapture from '../components/PhotoCapture';
 import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
+import EstadisticasPanel from '../components/EstadisticasPanel';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -247,6 +248,7 @@ useEffect(() => {
         alias?: string; // <-- Añadido para permitir alias
       };
     } | null; // <-- Permitir null explícitamente
+    created_at?: string; // <-- Añadido para acceso seguro a la fecha de creación
   };
   const [detailedPoints, setDetailedPoints] = useState<DetailedPoint[]>([]);
 
@@ -683,22 +685,46 @@ useEffect(() => {
       </div>
       {activeTab === 'puntos' && (
         <div className="w-full max-w-4xl">
-          <div className="mb-4 flex gap-2">
-            <button onClick={() => setActivePointsTab('todos')} className={`px-3 py-1 rounded ${activePointsTab==='todos'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Disponibles</button>
-            <button onClick={() => setActivePointsTab('reclamados')} className={`px-3 py-1 rounded ${activePointsTab==='reclamados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos reclamados</button>
-            <button onClick={() => setActivePointsTab('demorados')} className={`px-3 py-1 rounded ${activePointsTab==='demorados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos demorados</button>
-            <button onClick={() => setActivePointsTab('retirados')} className={`px-3 py-1 rounded ${activePointsTab==='retirados'?'bg-green-600 text-white':'bg-gray-100 text-gray-700'}`}>Puntos retirados</button>
+          <div className="mb-4 flex flex-wrap gap-2 justify-center md:justify-start">
+            <button
+              onClick={() => setActivePointsTab('todos')}
+              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
+                ${activePointsTab==='todos' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
+            >
+              Disponibles
+            </button>
+            <button
+              onClick={() => setActivePointsTab('reclamados')}
+              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
+                ${activePointsTab==='reclamados' ? 'bg-yellow-400 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}
+            >
+              Puntos reclamados
+            </button>
+            <button
+              onClick={() => setActivePointsTab('demorados')}
+              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
+                ${activePointsTab==='demorados' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+            >
+              Puntos demorados
+            </button>
+            <button
+              onClick={() => setActivePointsTab('retirados')}
+              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
+                ${activePointsTab==='retirados' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
+            >
+              Puntos retirados
+            </button>
           </div>
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
             <h2 className="text-2xl font-bold mb-4">Mis Puntos de Recolección</h2>
             {/* Enlace para agregar punto: elimina el paso de función por state */}
             <Link
               to="/add-collection-point"
-              className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700 focus:ring-2 focus:ring-green-400 focus:outline-none shadow-md transition-all duration-200 w-fit mb-4 group"
-              style={{ minWidth: 'unset', maxWidth: '220px' }}
+              className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700 focus:ring-4 focus:ring-green-400 focus:outline-none shadow-xl transition-all duration-300 w-fit mb-4 group animate-bounce animate-delay-500 animate-once animate-ease-in-out animate-fill-both animate-fast animate-important border-2 border-green-400 scale-105 hover:scale-110 ring-4 ring-green-300/40 hover:ring-green-500/60"
+              style={{ minWidth: 'unset', maxWidth: '220px', boxShadow: '0 0 0 4px #bbf7d0, 0 8px 24px 0 rgba(34,197,94,0.15)' }}
             >
               <Plus className="h-4 w-4 mr-1 group-hover:rotate-90 transition-transform duration-300" />
-              <span>Agregar Punto</span>
+              <span className="font-bold tracking-wide text-base animate-pulse">Agregar Punto</span>
             </Link>
             {(() => {
               let pointsToShow = puntosTodos;
@@ -1287,6 +1313,86 @@ useEffect(() => {
     </div>
   </div>
 )}
+      {activeTab === 'historial' && user?.id && (
+        <div className="w-full max-w-4xl mx-auto flex flex-col items-center">
+          <div className="w-full flex flex-col items-center justify-center">
+            <h2 className="text-2xl font-bold mb-4 text-green-700 text-center">Historial de Movimientos</h2>
+            <div className="space-y-8 w-full">
+              {/* Puntos Creados */}
+              <div>
+                <h3 className="text-lg font-semibold text-green-800 mb-2 text-center">Puntos Creados</h3>
+                {detailedPoints.length === 0 ? (
+                  <p className="text-gray-500 text-center">No has creado puntos aún.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {detailedPoints.map((p) => (
+                      <li key={p.id} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between text-center md:text-left">
+                        <span className="font-medium text-gray-800 text-sm">{p.address}</span>
+                        <span className="text-gray-500 text-xs">{p.created_at ? new Date(p.created_at).toLocaleString('es-AR') : ''}</span>
+                        <span className="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-semibold ml-2">Creado</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {/* Puntos Reclamados */}
+              <div>
+                <h3 className="text-lg font-semibold text-yellow-700 mb-2 text-center">Puntos Reclamados</h3>
+                {puntosReclamados.length === 0 ? (
+                  <p className="text-gray-500 text-center">No tienes puntos reclamados.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {puntosReclamados.map((p) => (
+                      <li key={p.id} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between text-center md:text-left">
+                        <span className="font-medium text-gray-800 text-sm">{p.address}</span>
+                        <span className="text-gray-500 text-xs">{p.claim && p.claim.pickup_time ? new Date(p.claim.pickup_time).toLocaleString('es-AR') : ''}</span>
+                        <span className="inline-block px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 text-xs font-semibold ml-2">Reclamado</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {/* Puntos Demorados */}
+              <div>
+                <h3 className="text-lg font-semibold text-red-700 mb-2 text-center">Puntos Demorados</h3>
+                {puntosDemorados.length === 0 ? (
+                  <p className="text-gray-500 text-center">No tienes puntos demorados.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {puntosDemorados.map((p) => (
+                      <li key={p.id} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between text-center md:text-left">
+                        <span className="font-medium text-gray-800 text-sm">{p.address}</span>
+                        <span className="text-gray-500 text-xs">{p.claim && p.claim.pickup_time ? new Date(p.claim.pickup_time).toLocaleString('es-AR') : ''}</span>
+                        <span className="inline-block px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs font-semibold ml-2">Demorado</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {/* Puntos Retirados */}
+              <div>
+                <h3 className="text-lg font-semibold text-purple-700 mb-2 text-center">Puntos Retirados</h3>
+                {puntosRetirados.length === 0 ? (
+                  <p className="text-gray-500 text-center">No tienes puntos retirados.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {puntosRetirados.map((p) => (
+                      <li key={p.id} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between text-center md:text-left">
+                        <span className="font-medium text-gray-800 text-sm">{p.address}</span>
+                        <span className="text-gray-500 text-xs">{p.claim && p.claim.pickup_time ? new Date(p.claim.pickup_time).toLocaleString('es-AR') : ''}</span>
+                        <span className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs font-semibold ml-2">Retirado</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="w-full mt-10">
+            <EstadisticasPanel userId={user.id} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

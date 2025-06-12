@@ -24,9 +24,11 @@ export interface User {
   bio?: string;
   experience_years?: number;
   service_areas?: string[];
+  dni?: string; // <-- Agregado para permitir el uso de dni
 }
 
 export type CollectionPoint = {
+  creator_dni: string | undefined;
   additional_info: unknown;
   user_id: string;
   recycler_id: string;
@@ -85,7 +87,7 @@ export interface CollectionClaim {
   pickup_time?: string; // Added for countdown timer
 }
 
-export async function signUpUser(email: string, password: string, userData: Partial<User>) {
+export async function signUpUser(email: string, password: string, userData: Partial<User> & { dni?: string }) {
   try {
     // Intenta crear el usuario en Auth
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
@@ -134,6 +136,7 @@ export async function signUpUser(email: string, password: string, userData: Part
         email: email,
         name: userData.name,
         role: userData.type,
+        dni: userData.dni, // dni is now explicitly typed
       }])
       .select()
       .single();
@@ -412,26 +415,30 @@ export async function deleteCollectionPoint(pointId: string, userId: string): Pr
       .eq('id', pointId)
       .eq('user_id', userId);
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
   } catch (error) {
     console.error('Error deleting collection point:', error);
     throw error;
   }
 }
 
-// Copia local de ensureUserProfile (solo si no existe en supabase.ts)
-export async function ensureUserProfile({ id, email, name }: { id: string; email?: string; name?: string }) {
-  if (!id) return;
+export async function ensureUserProfile({ id, email, name }: { id: string; email: string; name: string; }) {
+  // Verifica si el perfil ya existe
   const { data, error } = await supabase
     .from('profiles')
     .select('id')
     .eq('user_id', id)
     .maybeSingle();
+
   if (!data && !error) {
+    // Si no existe, lo crea
     await supabase.from('profiles').insert({
       user_id: id,
-      email: email || '',
-      name: name || ''
+      email,
+      name,
     });
   }
+  // Si hay error, lo ignora aquí porque se maneja en el llamador
 }

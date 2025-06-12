@@ -17,6 +17,7 @@ const RecyclerProfile: React.FC = () => {
   const [editBio, setEditBio] = useState('');
   const [editMaterials, setEditMaterials] = useState('');
   const [editAlias, setEditAlias] = useState('');
+  const [editDni, setEditDni] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   type Review = {
@@ -56,6 +57,7 @@ const RecyclerProfile: React.FC = () => {
     setEditBio(data.bio || '');
     setEditMaterials(Array.isArray(data.materials) ? data.materials.join(', ') : '');
     setEditAlias(data.alias || '');
+    setEditDni(data.dni || '');
     setAvatarUrl(data.avatar_url || '');
     setLoading(false);
   }, [id]);
@@ -128,6 +130,7 @@ const RecyclerProfile: React.FC = () => {
                   <li className="flex items-start"><Mail className="h-5 w-5 text-green-500 mr-3 mt-0.5" /><span>{editEmail}</span></li>
                   <li className="flex items-start"><Phone className="h-5 w-5 text-green-500 mr-3 mt-0.5" /><span>{editPhone}</span></li>
                   <li className="flex items-start"><MapPin className="h-5 w-5 text-green-500 mr-3 mt-0.5" /><span>{editAddress}</span></li>
+                  <li className="flex items-start"><span className="font-semibold text-green-700 mr-3 mt-0.5">DNI:</span><span>{editDni}</span></li>
                   {/* Puedes agregar más campos aquí */}
                 </ul>
                 <h2 className="text-lg font-semibold text-gray-900 mt-6 mb-4">Materiales que Recolecta</h2>
@@ -174,6 +177,7 @@ const RecyclerProfile: React.FC = () => {
                       updateObj.materials = editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean);
                     }
                     if (editAlias && editAlias.trim()) updateObj.alias = editAlias.trim();
+                    if (editDni && editDni.trim()) updateObj.dni = editDni.trim();
                     await supabase.from('profiles').update(updateObj).eq('user_id', id);
                     await fetchProfile(); // <-- Refresca el perfil tras actualizar
                   }}>
@@ -196,6 +200,10 @@ const RecyclerProfile: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Alias</label>
                       <input className="font-semibold w-full border rounded px-2 py-1" value={editAlias} onChange={e => setEditAlias(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">DNI</label>
+                      <input className="font-semibold w-full border rounded px-2 py-1" value={editDni} onChange={e => setEditDni(e.target.value)} required />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700">Biografía / Nota</label>

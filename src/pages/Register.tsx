@@ -22,6 +22,7 @@ const Register: React.FC = () => {
   const [alias, setAlias] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [dni, setDni] = useState('');
   
   const { login } = useUser();
   const navigate = useNavigate();
@@ -37,6 +38,10 @@ const Register: React.FC = () => {
       setError('Las contraseñas no coinciden');
       return;
     }
+    if (userType === 'recycler' && !dni.trim()) {
+      setError('El DNI es obligatorio para recicladores.');
+      return;
+    }
     setLoading(true);
     try {
       const { data, error } = await signUpUser(email, password, {
@@ -46,6 +51,7 @@ const Register: React.FC = () => {
         bio,
         materials: materials.split(',').map((m) => m.trim()).filter(Boolean),
         experience_years: userType === 'recycler' ? experienceYears : undefined,
+        dni: userType === 'recycler' ? dni.trim() : undefined,
         // alias se actualizará después si es reciclador
       });
       if (error) {
@@ -359,6 +365,22 @@ const Register: React.FC = () => {
                     onChange={e => setAlias(e.target.value)}
                     placeholder="Ej: El Reciclador Verde"
                   />
+                </div>
+                <div>
+                  <label htmlFor="dni" className="block text-sm font-medium text-gray-700">
+                    DNI <span className="text-red-600">*</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="dni"
+                      name="dni"
+                      type="text"
+                      required
+                      value={dni}
+                      onChange={e => setDni(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    />
+                  </div>
                 </div>
               </>
             )}

@@ -12,6 +12,7 @@ import EstadisticasPanel from '../components/EstadisticasPanel';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
+  dni: string | undefined;
   id: string; // <-- Cambiado a string (uuid)
   user_id?: string; // <-- Agregado para acceso correcto
   avatar_url?: string;
@@ -77,6 +78,7 @@ const DashboardResident: React.FC = () => {
       name?: string;
       email?: string;
       phone?: string;
+      dni?: string; // Agrega el campo dni al objeto de perfiles
       // Add more specific fields if needed
     };
     rating_average?: number;
@@ -184,6 +186,7 @@ useEffect(() => {
                           name: newRec.name || r.profiles?.name,
                           email: newRec.email || r.profiles?.email,
                           phone: newRec.phone || r.profiles?.phone,
+                          dni: newRec.dni || r.profiles?.dni, // Agrega el campo dni al objeto de perfiles
                         },
                       }
                     : r
@@ -202,6 +205,7 @@ useEffect(() => {
                         name: newRec.name,
                         email: newRec.email,
                         phone: newRec.phone,
+                        dni: newRec.dni, // Agrega el campo dni al objeto de perfiles
                       },
                       rating_average: newRec.rating_average,
                       total_ratings: newRec.total_ratings,
@@ -298,6 +302,7 @@ useEffect(() => {
   // Normaliza claim: si es array, toma el primero; si es objeto, lo deja igual
 // Tipos para los claims y recicladores
 interface RecyclerType {
+  dni?: string;
   id?: string;
   user_id?: string;
   name?: string;
@@ -818,6 +823,11 @@ useEffect(() => {
                                     <Phone className="w-4 h-4 text-yellow-500" />{claim.recycler.phone}
                                   </span>
                                 )}
+                                {claim.recycler.dni && (
+                                  <span className="text-gray-500 text-sm flex items-center gap-1">
+                                    <span className="font-semibold mr-2">DNI:</span>{claim.recycler.dni}
+                                  </span>
+                                )}
                                 <span className="text-yellow-700 text-sm flex items-center gap-1">
                                   <Star className="w-4 h-4 text-yellow-400" />
                                   {typeof claim.recycler.rating_average === 'number' ? claim.recycler.rating_average.toFixed(1) : 'N/A'}
@@ -1023,6 +1033,9 @@ useEffect(() => {
                   )}
                   {rec.profiles?.phone && (
                     <p className="text-gray-500 text-sm mb-1 flex items-center"><Phone className="h-4 w-4 mr-1" />{rec.profiles.phone}</p>
+                  )}
+                  {rec.profiles?.dni && (
+                    <p className="text-gray-500 text-sm mb-1 flex items-center"><span className="font-semibold mr-2">DNI:</span>{rec.profiles.dni}</p>
                   )}
                   {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
                   {/* Validación de UUID para el chat */}

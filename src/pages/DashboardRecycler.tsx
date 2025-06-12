@@ -126,6 +126,7 @@ const DashboardRecycler: React.FC = () => {
 
   // Define ResidentProfile type at the top-level so it's accessible everywhere in the component
   type ResidentProfile = {
+    dni: string;
     user_id: string;
     name?: string;
     email?: string;
@@ -168,7 +169,7 @@ const DashboardRecycler: React.FC = () => {
           if (residentUserIds.length > 0) {
             const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
-              .select('user_id, name, email, phone, avatar_url')
+              .select('user_id, name, email, phone, avatar_url, dni')
               .in('user_id', residentUserIds);
             if (profilesError) throw profilesError;
             profilesById = (profilesData || []).reduce((acc, profile) => {
@@ -207,6 +208,7 @@ const DashboardRecycler: React.FC = () => {
               creator_email: profile.email,
               creator_phone: profile.phone,
               creator_avatar: profile.avatar_url,
+              creator_dni: profile.dni,
               pickup_time: claim.pickup_time,
               profiles: profile,
               cancelled_at: claim.cancelled_at,
@@ -271,7 +273,7 @@ const DashboardRecycler: React.FC = () => {
       if (userIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('user_id, name, email, phone, avatar_url')
+          .select('user_id, name, email, phone, avatar_url, dni')
           .in('user_id', userIds);
         if (profilesError) throw profilesError;
         profilesById = (profilesData || []).reduce((acc, profile) => {
@@ -302,6 +304,7 @@ const DashboardRecycler: React.FC = () => {
           creator_email: profile?.email,
           creator_phone: profile?.phone,
           creator_avatar: profile?.avatar_url,
+          creator_dni: profile?.dni,
           profiles: profile,
           materials,
         };
@@ -1443,6 +1446,9 @@ const DashboardRecycler: React.FC = () => {
                                     <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
                                   </div>
                                 )}
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <span className="font-semibold mr-2">DNI:</span> {point.creator_dni || point.profiles?.dni || 'No informado'}
+                                </div>
                               </div>
                             </div>
                             {/* Botones de acción */}
@@ -1554,6 +1560,9 @@ const DashboardRecycler: React.FC = () => {
                                     <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
                                   </div>
                                 )}
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <span className="font-semibold mr-2">DNI:</span> {point.creator_dni || point.profiles?.dni || 'No informado'}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1661,6 +1670,9 @@ const DashboardRecycler: React.FC = () => {
                                     <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
                                   </div>
                                 )}
+                                <div className="flex items-center text-sm text-gray-500">
+                                  <span className="font-semibold mr-2">DNI:</span> {point.creator_dni || point.profiles?.dni || 'No informado'}
+                                </div>
                               </div>
                             </div>
                           </div>

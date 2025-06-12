@@ -296,24 +296,40 @@ useEffect(() => {
   // Filtrado por sub-tab
   const now = new Date();
   // Normaliza claim: si es array, toma el primero; si es objeto, lo deja igual
-type ClaimType = {
+// Tipos para los claims y recicladores
+interface RecyclerType {
+  id?: string;
+  user_id?: string;
+  name?: string;
+  avatar_url?: string;
+  email?: string;
+  phone?: string;
+  alias?: string;
+  rating_average?: number; // Hacer opcional
+}
+
+interface ClaimType {
   id?: string;
   status?: string;
   pickup_time?: string;
-  recycler?: {
-    id?: string;
-    user_id?: string;
-    name?: string;
-    avatar_url?: string;
-    email?: string;
-    phone?: string;
-  };
-} | null;
+  recycler?: RecyclerType;
+}
 
-const normalizeClaim = (claim: ClaimType | ClaimType[] | null | undefined): ClaimType => {
-  if (Array.isArray(claim)) return claim[0] || null;
-  return claim || null;
-};
+// Normaliza el claim para asegurar que el tipo es correcto y rating_average es opcional
+function normalizeClaim(claim: unknown): ClaimType | undefined {
+  if (!claim || typeof claim !== 'object') return undefined;
+  const c = claim as ClaimType;
+  if (c.recycler && typeof c.recycler === 'object') {
+    return {
+      ...c,
+      recycler: {
+        ...c.recycler,
+        rating_average: c.recycler.rating_average ?? undefined,
+      },
+    };
+  }
+  return c as ClaimType;
+}
 
 const puntosTodos = detailedPoints.filter(p => {
   const claim = normalizeClaim(p.claim);
@@ -787,28 +803,39 @@ useEffect(() => {
                           {point.additional_info && (<p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>)}
                           {/* Info del reciclador reclamante */}
                           {isClaimed && claim && claim.recycler && (
-                            <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 shadow-sm">
+                            <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 shadow-sm flex-wrap">
                               <img
                                 src={claim.recycler.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(claim.recycler.name || 'Reciclador') + '&background=FACC15&color=fff&size=64'}
                                 alt="Avatar reciclador"
                                 className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover"
                               />
-                              <div className="flex flex-col">
-                            {/* Botón 'Ver reciclador' eliminado porque setSelectedRecycler no está definido */}
-                            {/* Botón para volver a disponible solo en tab demorados */}
-                            {activePointsTab === 'demorados' && (
-                              <button
-                                onClick={async () => {
-                                  await handleMakeAvailableAgain(point);
-                                }}
-                                className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md animate-bounce"
-                              >
-                                Disponible
-                              </button>
-                            )}
+                              <div className="flex flex-col min-w-[120px]">
+                                <span className="font-semibold text-yellow-800 text-base flex items-center gap-1">
+                                  {claim.recycler.name || 'Reciclador'}
+                                </span>
+                                {claim.recycler.phone && (
+                                  <span className="text-gray-600 text-sm flex items-center gap-1">
+                                    <Phone className="w-4 h-4 text-yellow-500" />{claim.recycler.phone}
+                                  </span>
+                                )}
+                                <span className="text-yellow-700 text-sm flex items-center gap-1">
+                                  <Star className="w-4 h-4 text-yellow-400" />
+                                  {typeof claim.recycler.rating_average === 'number' ? claim.recycler.rating_average.toFixed(1) : 'N/A'}
+                                </span>
+                              </div>
+                              {/* Botón para volver a disponible solo en tab demorados */}
+                              {activePointsTab === 'demorados' && (
+                                <button
+                                  onClick={async () => {
+                                    await handleMakeAvailableAgain(point);
+                                  }}
+                                  className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md animate-bounce"
+                                >
+                                  Disponible
+                                </button>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          )}
                         </div>
                         {/* Imagen estática en vez de GIF animado */}
                         <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">

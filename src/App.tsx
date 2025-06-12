@@ -25,6 +25,7 @@ import QuienesSomosPage from './pages/QuienesSomosPage';
 import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
 import Estadisticas from './pages/Estadisticas';
 import EstadisticasPanel from './components/EstadisticasPanel';
+import FeedbackForm from './pages/FeedbackForm';
 
 // ErrorBoundary para redirigir al inicio en caso de error
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -84,6 +85,7 @@ function App() {
                   <Route path="/terminos-condiciones" element={<TerminosCondicionesPage />} />
                   <Route path="/estadisticas" element={<Estadisticas />} />
                   <Route path="/mi-historial" element={<MiHistorialRoute />} />
+                  <Route path="/feedback" element={<FeedbackForm />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </main>

@@ -20,7 +20,7 @@ const AdminPanel: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMsg, setNotifMsg] = useState('');
-  const [notifTarget, setNotifTarget] = useState<'global' | 'individual'>('global');
+  const [notifTarget, setNotifTarget] = useState<'global' | 'individual' | 'residentes' | 'recicladores'>('global');
   const [notifStatus, setNotifStatus] = useState('');
   const [stats, setStats] = useState<{[role: string]: number}>({});
   const [roleFilter, setRoleFilter] = useState<string>('');
@@ -32,6 +32,19 @@ const AdminPanel: React.FC = () => {
   const [recyclers, setRecyclers] = useState<UserRow[]>([]);
   // Nuevo: Mapa de conteo de puntos por usuario
   const [userPointsCount, setUserPointsCount] = useState<Record<string, number>>({});
+  // Tipado para feedback
+  interface Feedback {
+    id: string;
+    type: string;
+    name: string;
+    email: string;
+    message: string;
+    created_at: string;
+  }
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string|null>(null);
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'notificaciones' | 'feedback' | 'publicidades'>('usuarios');
 
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
@@ -122,6 +135,40 @@ const AdminPanel: React.FC = () => {
         }
         setNotifStatus('Notificación global enviada');
         await refreshUsers();
+      } else if (notifTarget === 'residentes') {
+        for (const u of users) {
+          if (u.role !== 'resident' || !u.user_id) continue;
+          try {
+            await createNotification({
+              user_id: u.user_id,
+              title: notifTitle,
+              content: notifMsg,
+              type: 'admin',
+              user_name: u.name,
+              user_email: u.email
+            });
+          } catch (err) {
+            console.error('[NOTIF][ERROR] Falló envío a residente', u.user_id, err);
+          }
+        }
+        setNotifStatus('Notificación enviada a todos los residentes');
+      } else if (notifTarget === 'recicladores') {
+        for (const u of users) {
+          if (u.role !== 'recycler' || !u.user_id) continue;
+          try {
+            await createNotification({
+              user_id: u.user_id,
+              title: notifTitle,
+              content: notifMsg,
+              type: 'admin',
+              user_name: u.name,
+              user_email: u.email
+            });
+          } catch (err) {
+            console.error('[NOTIF][ERROR] Falló envío a reciclador', u.user_id, err);
+          }
+        }
+        setNotifStatus('Notificación enviada a todos los recicladores');
       } else if (selectedUser) {
         // Verifica que el usuario seleccionado existe en el estado
         const validUser = users.find(u => u.id === selectedUser.id);
@@ -198,123 +245,191 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  // Cargar sugerencias y reclamos
+  useEffect(() => {
+    const fetchFeedbacks = async () => {
+      setFeedbackLoading(true);
+      setFeedbackError(null);
+      const { data, error } = await supabase.from('feedback').select('*').order('created_at', { ascending: false });
+      if (error) setFeedbackError('Error al cargar feedback');
+      setFeedbacks(data || []);
+      setFeedbackLoading(false);
+    };
+    fetchFeedbacks();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <h1 className="text-3xl font-bold text-green-700 mb-6">Panel de Administrador</h1>
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-2">Estadísticas de usuarios</h2>
-        <ul className="flex gap-6">
-          {Object.entries(stats).map(([role, count]) => (
-            <li key={role} className="bg-white rounded shadow px-4 py-2">
-              <span className="font-bold text-green-700">{role}</span>: {count}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-2">Usuarios registrados</h2>
-        <div className="mb-2">
-          <label className="mr-2">Filtrar por rol:</label>
-          <select className="border rounded px-2 py-1" value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
-            <option value="">Todos</option>
-            <option value="admin">Admin</option>
-            <option value="recycler">Reciclador</option>
-            <option value="resident">Residente</option>
-          </select>
+        <div className="flex gap-4 mb-6">
+          <button onClick={() => setActiveTab('usuarios')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'usuarios' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Usuarios Registrados</button>
+          <button onClick={() => setActiveTab('notificaciones')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'notificaciones' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Enviar Notificaciones</button>
+          <button onClick={() => setActiveTab('feedback')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'feedback' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Sugerencias y Reclamos</button>
+          <button onClick={() => setActiveTab('publicidades')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'publicidades' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Gestionar Publicidades</button>
         </div>
-        <div className="overflow-x-auto w-full rounded-lg shadow-sm bg-white/80 border border-gray-200">
-          {loading ? <p className="p-4">Cargando...</p> : error ? <p className="text-red-600 p-4">{error}</p> : (
-            <table className="min-w-[600px] w-full text-sm md:text-base">
-              <thead className="sticky top-0 bg-green-100 z-10">
-                <tr>
-                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Nombre</th>
-                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
-                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Rol</th>
-                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">User ID</th>
-                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Avatar</th>
-                  <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.filter(u => !roleFilter || u.role === roleFilter).length === 0 ? (
-                  <tr><td colSpan={6} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
-                ) : (
-                  users.filter(u => !roleFilter || u.role === roleFilter).map(u => (
-                    <tr key={u.id} className={`border-b hover:bg-green-50 transition-colors ${!u.user_id || !u.role ? 'bg-yellow-100' : ''}`}>
-                      <td className="p-2 whitespace-nowrap">
-                        {u.avatar_url ? (
-                          <img src={u.avatar_url} alt="avatar" className="w-8 h-8 rounded-full object-cover border border-green-300 inline-block mr-2 align-middle" />
-                        ) : (
-                          <span className="inline-block w-8 h-8 rounded-full bg-gray-200 border border-green-100 mr-2 align-middle"></span>
-                        )}
-                        {u.name || <span className="text-red-600">Sin nombre</span>}
-                      </td>
-                      <td className="p-2 whitespace-nowrap">{u.email || <span className="text-red-600">Sin email</span>}</td>
-                      <td className="p-2 capitalize whitespace-nowrap">{u.role || <span className="text-red-600">Sin rol</span>}</td>
-                      <td className="p-2 max-w-[160px] whitespace-nowrap overflow-x-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-green-50" style={{ WebkitOverflowScrolling: 'touch' }}>
-                        <div className="min-w-[120px] flex items-center">
-                          {u.user_id || <span className="text-red-600">Sin user_id</span>}
-                        </div>
-                      </td>
-                      <td className="p-2 flex flex-col md:flex-row gap-2 items-start md:items-center">
-                        <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => handleDeleteUser(u.id)}>Eliminar</button>
-                        {u.user_id && (
-                          <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => { setNotifTarget('individual'); setSelectedUser(u); }}>Notificar</button>
-                        )}
-                        {u.user_id && (
-                          <button className={`relative px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto flex items-center justify-center font-semibold transition-colors
-      ${userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0
-        ? 'bg-green-500 hover:bg-green-600 text-white border-2 border-green-700'
-        : 'bg-gray-200 hover:bg-green-200 text-green-700'}`}
-                            onClick={() => handleShowPoints(u)}
-                          >
-                            Ver puntos
-                            {/* Marca visual: check verde si tiene puntos activos */}
-                            {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
-                              <span className="ml-2 text-green-700 font-bold text-lg" title="Tiene puntos activos">✔</span>
-                            )}
-                            {/* También muestra la cantidad */}
-                            {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
-                              <span className="ml-1 text-xs font-bold">({userPointsCount[u.user_id]})</span>
-                            )}
-                            {/* Acción realizada */}
-                            {selectedUser && selectedUser.id === u.id && showPointsModal && (
-                              <span className="ml-2 text-xs text-blue-700 font-semibold">(Viendo puntos)</span>
-                            )}
-                          </button>
-                        )}
-                        {(!u.user_id || !u.role) && (
-                          <span className="text-xs text-yellow-800 bg-yellow-200 rounded px-2 py-1 mt-1">Perfil incompleto</span>
-                        )}
-                      </td>
+        {activeTab === 'usuarios' && (
+          <>
+            <h2 className="text-xl font-semibold mb-2">Estadísticas de usuarios</h2>
+            <ul className="flex gap-6">
+              {Object.entries(stats).map(([role, count]) => (
+                <li key={role} className="bg-white rounded shadow px-4 py-2">
+                  <span className="font-bold text-green-700">{role}</span>: {count}
+                </li>
+              ))}
+            </ul>
+            <h2 className="text-xl font-semibold mb-2 mt-8">Usuarios registrados</h2>
+            <div className="mb-2">
+              <label className="mr-2">Filtrar por rol:</label>
+              <select className="border rounded px-2 py-1" value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
+                <option value="">Todos</option>
+                <option value="admin">Admin</option>
+                <option value="recycler">Reciclador</option>
+                <option value="resident">Residente</option>
+              </select>
+            </div>
+            <div className="overflow-x-auto w-full rounded-lg shadow-sm bg-white/80 border border-gray-200">
+              {loading ? <p className="p-4">Cargando...</p> : error ? <p className="text-red-600 p-4">{error}</p> : (
+                <table className="min-w-[600px] w-full text-sm md:text-base">
+                  <thead className="sticky top-0 bg-green-100 z-10">
+                    <tr>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Nombre</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Rol</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">User ID</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Avatar</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Acciones</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-2">Enviar notificación</h2>
-        <form onSubmit={handleSendNotification} className="flex flex-col gap-2 max-w-md">
-          <label className="flex gap-2 items-center">
-            <input type="radio" checked={notifTarget==='global'} onChange={() => setNotifTarget('global')} /> Global
-          </label>
-          <label className="flex gap-2 items-center">
-            <input type="radio" checked={notifTarget==='individual'} onChange={() => setNotifTarget('individual')} /> Individual
-            {notifTarget==='individual' && selectedUser && (
-              <span className="ml-2 text-green-700">{selectedUser.email}</span>
+                  </thead>
+                  <tbody>
+                    {users.filter(u => !roleFilter || u.role === roleFilter).length === 0 ? (
+                      <tr><td colSpan={6} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
+                    ) : (
+                      users.filter(u => !roleFilter || u.role === roleFilter).map(u => (
+                        <tr key={u.id} className={`border-b hover:bg-green-50 transition-colors ${!u.user_id || !u.role ? 'bg-yellow-100' : ''}`}>
+                          <td className="p-2 whitespace-nowrap">
+                            {u.avatar_url ? (
+                              <img src={u.avatar_url} alt="avatar" className="w-8 h-8 rounded-full object-cover border border-green-300 inline-block mr-2 align-middle" />
+                            ) : (
+                              <span className="inline-block w-8 h-8 rounded-full bg-gray-200 border border-green-100 mr-2 align-middle"></span>
+                            )}
+                            {u.name || <span className="text-red-600">Sin nombre</span>}
+                          </td>
+                          <td className="p-2 whitespace-nowrap">{u.email || <span className="text-red-600">Sin email</span>}</td>
+                          <td className="p-2 capitalize whitespace-nowrap">{u.role || <span className="text-red-600">Sin rol</span>}</td>
+                          <td className="p-2 max-w-[160px] whitespace-nowrap overflow-x-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-green-50" style={{ WebkitOverflowScrolling: 'touch' }}>
+                            <div className="min-w-[120px] flex items-center">
+                              {u.user_id || <span className="text-red-600">Sin user_id</span>}
+                            </div>
+                          </td>
+                          <td className="p-2 flex flex-col md:flex-row gap-2 items-start md:items-center">
+                            <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => handleDeleteUser(u.id)}>Eliminar</button>
+                            {u.user_id && (
+                              <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => { setNotifTarget('individual'); setSelectedUser(u); }}>Notificar</button>
+                            )}
+                            {u.user_id && (
+                              <button className={`relative px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto flex items-center justify-center font-semibold transition-colors
+        ${userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0
+          ? 'bg-green-500 hover:bg-green-600 text-white border-2 border-green-700'
+          : 'bg-gray-200 hover:bg-green-200 text-green-700'}`}
+                                onClick={() => handleShowPoints(u)}
+                              >
+                                Ver puntos
+                                {/* Marca visual: check verde si tiene puntos activos */}
+                                {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
+                                  <span className="ml-2 text-green-700 font-bold text-lg" title="Tiene puntos activos">✔</span>
+                                )}
+                                {/* También muestra la cantidad */}
+                                {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
+                                  <span className="ml-1 text-xs font-bold">({userPointsCount[u.user_id]})</span>
+                                )}
+                                {/* Acción realizada */}
+                                {selectedUser && selectedUser.id === u.id && showPointsModal && (
+                                  <span className="ml-2 text-xs text-blue-700 font-semibold">(Viendo puntos)</span>
+                                )}
+                              </button>
+                            )}
+                            {(!u.user_id || !u.role) && (
+                              <span className="text-xs text-yellow-800 bg-yellow-200 rounded px-2 py-1 mt-1">Perfil incompleto</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+        {activeTab === 'notificaciones' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-2">Enviar notificación</h2>
+            <form onSubmit={handleSendNotification} className="flex flex-col gap-2 max-w-md">
+              <div className="flex gap-4 mb-2">
+                <label className="flex gap-2 items-center">
+                  <input type="radio" checked={notifTarget==='global'} onChange={() => setNotifTarget('global')} /> Global
+                </label>
+                <label className="flex gap-2 items-center">
+                  <input type="radio" checked={notifTarget==='residentes'} onChange={() => setNotifTarget('residentes')} /> Todos los residentes
+                </label>
+                <label className="flex gap-2 items-center">
+                  <input type="radio" checked={notifTarget==='recicladores'} onChange={() => setNotifTarget('recicladores')} /> Todos los recicladores
+                </label>
+                <label className="flex gap-2 items-center">
+                  <input type="radio" checked={notifTarget==='individual'} onChange={() => setNotifTarget('individual')} /> Individual
+                  {notifTarget==='individual' && selectedUser && (
+                    <span className="ml-2 text-green-700">{selectedUser.email}</span>
+                  )}
+                </label>
+              </div>
+              <input className="border rounded px-2 py-1" placeholder="Título" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} required />
+              <textarea className="border rounded px-2 py-1" placeholder="Mensaje" value={notifMsg} onChange={e => setNotifMsg(e.target.value)} required />
+              <button className="bg-green-600 text-white px-4 py-2 rounded mt-2" type="submit">Enviar notificación</button>
+              {notifStatus && <p className="text-green-700 mt-2">{notifStatus}</p>}
+            </form>
+          </div>
+        )}
+        {activeTab === 'feedback' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-2">Sugerencias y Reclamos de Usuarios</h2>
+            {feedbackLoading ? <p>Cargando...</p> : feedbackError ? <p className="text-red-600">{feedbackError}</p> : (
+              <div className="overflow-x-auto w-full rounded-lg shadow-sm bg-white/80 border border-gray-200">
+                <table className="min-w-[600px] w-full text-sm md:text-base">
+                  <thead className="sticky top-0 bg-green-100 z-10">
+                    <tr>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Tipo</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Nombre</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Mensaje</th>
+                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {feedbacks.length === 0 ? (
+                      <tr><td colSpan={5} className="text-center text-gray-500 p-4">No hay sugerencias ni reclamos.</td></tr>
+                    ) : (
+                      feedbacks.map(fb => (
+                        <tr key={fb.id} className="border-b hover:bg-green-50 transition-colors">
+                          <td className="p-2 whitespace-nowrap capitalize">{fb.type}</td>
+                          <td className="p-2 whitespace-nowrap">{fb.name}</td>
+                          <td className="p-2 whitespace-nowrap">{fb.email}</td>
+                          <td className="p-2 whitespace-pre-line max-w-xs break-words">{fb.message}</td>
+                          <td className="p-2 whitespace-nowrap">{new Date(fb.created_at).toLocaleString()}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </label>
-          <input className="border rounded px-2 py-1" placeholder="Título" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} required />
-          <textarea className="border rounded px-2 py-1" placeholder="Mensaje" value={notifMsg} onChange={e => setNotifMsg(e.target.value)} required />
-          <button className="bg-green-600 text-white px-4 py-2 rounded mt-2" type="submit">Enviar notificación</button>
-          {notifStatus && <p className="text-green-700 mt-2">{notifStatus}</p>}
-        </form>
-      </div>
-      <div className="mb-12">
-        <AdminAds />
+          </div>
+        )}
+        {activeTab === 'publicidades' && (
+          <div className="mb-12">
+            <AdminAds />
+          </div>
+        )}
       </div>
       {/* Modal de puntos de recolección */}
       {showPointsModal && selectedUser && (

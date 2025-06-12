@@ -43,6 +43,7 @@ const Footer: React.FC = () => {
               <li><a href="/dossier" className="text-green-200 hover:text-white">Dossier Institucional</a></li>
               <li><a href="/quienes-somos" className="text-green-200 hover:text-white">¿Quiénes Somos?</a></li>
               <li><a href="/terminos-condiciones" className="text-green-200 hover:text-white">Términos y Condiciones</a></li>
+              <li><a href="/feedback" className="text-green-200 hover:text-white">Reclamos y Sugerencias</a></li>
             </ul>
           </div>
           

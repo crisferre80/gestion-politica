@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MapPin, Calendar, Phone, Mail, MapIcon, X, User, Clock } from 'lucide-react';
+import { Calendar, Phone, Mail, MapIcon, X, User, Clock } from 'lucide-react';
 import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection } from '../lib/supabase';
 import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
@@ -1135,7 +1135,7 @@ const DashboardRecycler: React.FC = () => {
                 )}
                 {user?.address && (
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-green-500" />
+                    <MapIcon className="h-4 w-4 text-green-500" />
                     <span>{user.address}</span>
                   </div>
                 )}
@@ -1176,11 +1176,14 @@ const DashboardRecycler: React.FC = () => {
                       const unreadTotal = chatPreviews.reduce((acc, chat) => acc + (typeof chat.unreadCount === 'number' ? chat.unreadCount : 0), 0);
                       console.log('[BADGE DEBUG] chatPreviews:', chatPreviews);
                       console.log('[BADGE DEBUG] unreadTotal:', unreadTotal);
-                      return unreadTotal > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
-                          {unreadTotal}
-                        </span>
-                      );
+                      if (unreadTotal > 0) {
+                        return (
+                          <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
+                            {unreadTotal}
+                          </span>
+                        );
+                      }
+                      return null;
                     })()}
                   </button>
                   <button
@@ -1253,7 +1256,11 @@ const DashboardRecycler: React.FC = () => {
                             {/* Info principal */}
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3">
-                                <MapPin className="h-6 w-6 text-green-500" />
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+                                  alt="Punto de Recolección"
+                                  className="w-12 h-12 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.2"
+                                />
                                 <div>
                                   <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
                                   <p className="mt-1 text-sm text-gray-500">{point.district}</p>
@@ -1277,7 +1284,7 @@ const DashboardRecycler: React.FC = () => {
                                 <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {point.materials.map((material: string, idx: number) => (
-                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                    <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
                                   ))}
                                 </div>
                               </div>
@@ -1334,22 +1341,22 @@ const DashboardRecycler: React.FC = () => {
                                   className="px-4 py-2 bg-gray-100 text-green-700 rounded hover:bg-gray-200 font-semibold border border-green-400 flex items-center"
                                 >
                                   <MapIcon className="h-4 w-4 mr-2" />
-                                  Ver en Mapa
+                                  Mapa
                                 </button>
                                 {/* Botón Google Maps justo al lado */}
                                 {typeof point.lng === 'number' && typeof point.lat === 'number' ? (
                                   <button
                                     onClick={e => {
                                       e.stopPropagation();
-                                      // Abrir Google Maps inmediatamente solo con el destino
                                       const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`;
                                       window.open(url, '_blank', 'noopener,noreferrer');
                                     }}
-                                    title="Ver ruta en Google Maps"
-                                    className="ml-2 p-0 bg-transparent border-none shadow-none focus:outline-none"
+                                    title="Abrir ruta de navegación en Google Maps"
+                                    className="ml-2 flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors shadow-sm text-green-800 font-semibold text-xs"
                                     style={{ minWidth: 0 }}
                                   >
-                                    <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-8 w-8 animate-bounce-map" />
+                                    <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-7 w-7 animate-bounce-map" />
+                                    <span>Navegación</span>
                                   </button>
                                 ) : (
                                   <span className="ml-2 text-xs text-gray-400 italic">Ubicación no disponible</span>
@@ -1377,7 +1384,11 @@ const DashboardRecycler: React.FC = () => {
                             {/* Info principal */}
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3">
-                                <MapPin className="h-8 w-8 text-green-500" />
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+                                  alt="Punto de Recolección"
+                                  className="w-7 h-7 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
+                                />
                                 <div>
                                   <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
                                   <p className="mt-1 text-sm text-gray-500">{point.district}</p>
@@ -1390,7 +1401,7 @@ const DashboardRecycler: React.FC = () => {
                                 <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
-                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                    <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
                                   ))}
                                 </div>
                               </div>
@@ -1415,7 +1426,11 @@ const DashboardRecycler: React.FC = () => {
                               <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
                               <div className="space-y-2">
                                 <div className="flex items-center text-sm text-gray-500">
-                                  <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
+                                  <img
+                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Residente')) + '&background=E0F2FE&color=2563EB&size=64'}
+                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Residente'}
+                                    className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
+                                  />
                                   <span>{point.creator_name}</span>
                                 </div>
                                 <div className="flex items-center text-sm text-gray-500">
@@ -1477,7 +1492,11 @@ const DashboardRecycler: React.FC = () => {
                             {/* Info principal */}
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3">
-                                <MapPin className="h-6 w-6 text-green-500" />
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+                                  alt="Punto de Recolección"
+                                  className="w-7 h-7 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
+                                />
                                 <div>
                                   <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
                                   <p className="mt-1 text-sm text-gray-500">{point.district}</p>
@@ -1505,20 +1524,24 @@ const DashboardRecycler: React.FC = () => {
                             <div className="mt-4 flex items-center text-sm text-gray-500">
                               <Calendar className="h-4 w-4 mr-2" />
                               <span>{point.schedule}</span>
-                            </div>
+                                                       </div>
                             {point.cancelled_at && (
                               <div className="mt-2 text-xs text-gray-500">Cancelado el: {new Date(point.cancelled_at).toLocaleString()}</div>
                             )}
                             {point.cancellation_reason && (
                               <div className="mt-2 text-xs text-red-600 font-semibold">Motivo: {point.cancellation_reason}</div>
-                            )}
+                                                       )}
 
                             {/* Info residente */}
                             <div className="mt-6 pt-6 border-t border-gray-200">
                               <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
                               <div className="space-y-2">
                                 <div className="flex items-center text-sm text-gray-500">
-                                  <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
+                                  <img
+                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Residente')) + '&background=E0F2FE&color=2563EB&size=64'}
+                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Residente'}
+                                    className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
+                                  />
                                   <span>{point.creator_name}</span>
                                 </div>
                                 <div className="flex items-center text-sm text-gray-500">
@@ -1576,7 +1599,11 @@ const DashboardRecycler: React.FC = () => {
                           <div className="p-6">
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3">
-                                <MapPin className="h-6 w-6 text-green-500" />
+                                <img
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+                                  alt="Punto de Recolección"
+                                  className="w-7 h-7 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
+                                />
                                 <div>
                                   <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
                                   <p className="mt-1 text-sm text-gray-500">{point.district}</p>
@@ -1617,7 +1644,11 @@ const DashboardRecycler: React.FC = () => {
                               <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
                               <div className="space-y-2">
                                 <div className="flex items-center text-sm text-gray-500">
-                                  <img src="/assets/recycling-marker.svg" alt="Punto de Recolección" className="h-5 w-5 mr-2 inline-block" />
+                                  <img
+                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Residente')) + '&background=E0F2FE&color=2563EB&size=64'}
+                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Residente'}
+                                    className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
+                                  />
                                   <span>{point.creator_name}</span>
                                 </div>
                                 <div className="flex items-center text-sm text-gray-500">

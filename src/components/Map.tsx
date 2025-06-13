@@ -75,6 +75,7 @@ const MapComponent = React.forwardRef<{
     const drawRef = useRef<MapboxDraw | null>(null);
     // Estado para saber si el mapa está listo
     const [mapReady, setMapReady] = useState(false);
+    const [styleLoaded, setStyleLoaded] = useState(false);
 
     // Asignar ref y marcar como listo
     const handleMapRef = (ref: MapRef | null) => {
@@ -258,7 +259,7 @@ const MapComponent = React.forwardRef<{
       if (!drawRef.current) {
         drawRef.current = new MapboxDraw({
           displayControlsDefault: false,
-          controls: {},
+          controls: { polygon: true, trash: true },
           defaultMode: 'simple_select',
         });
         map.addControl(drawRef.current, 'top-left');
@@ -276,15 +277,15 @@ const MapComponent = React.forwardRef<{
       const handleDrawCreate = (e: MapboxDraw.DrawCreateEvent) => {
         if (onZoneCreate && e.features && e.features[0]) {
           const feature = e.features[0] as Feature<Polygon>;
-          const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
-            (pos) => [pos[0], pos[1]] as [number, number]
-          );
-          // Validar que el polígono tenga al menos 4 puntos (incluyendo cierre)
-          if (coordinates.length < 4) {
+          // Validar que el polígono tenga geometry y coordinates
+          if (!feature.geometry || !feature.geometry.coordinates || !feature.geometry.coordinates[0] || feature.geometry.coordinates[0].length < 3) {
             alert('El polígono debe tener al menos 3 lados.');
             return;
           }
           // Usar nombre y color por defecto (elimina pendingZoneName/pendingZoneColor)
+          const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
+            (pos) => [pos[0], pos[1]] as [number, number]
+          );
           const zone: Zone = {
             id: String(feature.id),
             name: 'Nueva Zona',
@@ -327,14 +328,16 @@ const MapComponent = React.forwardRef<{
       const handleDoubleClick = (e: MouseEvent) => {
         if (drawMode === 'draw_polygon' && drawRef.current) {
           e.preventDefault();
-          // Obtener el id del polígono en edición
+          // No forzar el cambio de modo aquí, dejar que MapboxDraw maneje el cierre
+          // Solo validar y disparar onZoneCreate si el polígono es válido
           const features = drawRef.current.getAll();
           if (features.features.length > 0) {
-            // Forzar el cambio de modo para finalizar el polígono
-            drawRef.current.changeMode('simple_select' as unknown as never);
-            // Disparar manualmente el evento de creación si no se disparó
+            const feature = features.features[0] as Feature<Polygon>;
+            if (!feature.geometry || !feature.geometry.coordinates || !feature.geometry.coordinates[0] || feature.geometry.coordinates[0].length < 4) {
+              alert('El polígono debe tener al menos 3 lados y estar cerrado.');
+              return;
+            }
             if (onZoneCreate) {
-              const feature = features.features[0] as Feature<Polygon>;
               const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
                 (pos) => [pos[0], pos[1]] as [number, number]
               );
@@ -432,18 +435,33 @@ const MapComponent = React.forwardRef<{
         ? [...(zones || []), { ...pendingZone, id: 'pending' }]
         : zones || []
     ), [pendingZone, zones]);
+
+    // Adaptar coordinates: si es string, parsear a array
+    const parsedZones = allZones.map(zone => {
+      let coordinates = zone.coordinates;
+      if (typeof coordinates === 'string') {
+        try {
+          coordinates = JSON.parse(coordinates);
+        } catch (e) {
+          console.error('Error al parsear coordinates de zona', zone, e);
+          coordinates = [];
+        }
+      }
+      return { ...zone, coordinates };
+    });
+
     useEffect(() => {
-      if (!mapRef.current) return;
+      if (!mapRef.current || !styleLoaded) return;
       const map = mapRef.current.getMap();
       // Limpiar zonas previas
-      if (allZones && allZones.length) {
-        allZones.forEach(zone => {
+      if (parsedZones && parsedZones.length) {
+        parsedZones.forEach(zone => {
           if (map.getLayer(`zone-${zone.id}`)) map.removeLayer(`zone-${zone.id}`);
           if (map.getLayer(`zone-line-${zone.id}`)) map.removeLayer(`zone-line-${zone.id}`);
           if (map.getSource(`zone-${zone.id}`)) map.removeSource(`zone-${zone.id}`);
         });
         // Agregar cada zona como un polígono
-        allZones.forEach(zone => {
+        parsedZones.forEach(zone => {
           map.addSource(`zone-${zone.id}`, {
             type: 'geojson',
             data: {
@@ -477,7 +495,7 @@ const MapComponent = React.forwardRef<{
           });
         });
       }
-    }, [allZones, isAdmin, mapReady]);
+    }, [parsedZones, isAdmin, mapReady, styleLoaded]);
 
     // --- INTEGRACIÓN MAPBOX GL DRAW SOLO PARA ADMIN ---
     useEffect(() => {
@@ -486,7 +504,7 @@ const MapComponent = React.forwardRef<{
       if (!drawRef.current) {
         drawRef.current = new MapboxDraw({
           displayControlsDefault: false,
-          controls: {},
+          controls: { polygon: true, trash: true },
           defaultMode: 'simple_select',
         });
         map.addControl(drawRef.current, 'top-left');
@@ -504,15 +522,15 @@ const MapComponent = React.forwardRef<{
       const handleDrawCreate = (e: MapboxDraw.DrawCreateEvent) => {
         if (onZoneCreate && e.features && e.features[0]) {
           const feature = e.features[0] as Feature<Polygon>;
-          const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
-            (pos) => [pos[0], pos[1]] as [number, number]
-          );
-          // Validar que el polígono tenga al menos 4 puntos (incluyendo cierre)
-          if (coordinates.length < 4) {
+          // Validar que el polígono tenga geometry y coordinates
+          if (!feature.geometry || !feature.geometry.coordinates || !feature.geometry.coordinates[0] || feature.geometry.coordinates[0].length < 3) {
             alert('El polígono debe tener al menos 3 lados.');
             return;
           }
           // Usar nombre y color por defecto (elimina pendingZoneName/pendingZoneColor)
+          const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
+            (pos) => [pos[0], pos[1]] as [number, number]
+          );
           const zone: Zone = {
             id: String(feature.id),
             name: 'Nueva Zona',
@@ -555,14 +573,16 @@ const MapComponent = React.forwardRef<{
       const handleDoubleClick = (e: MouseEvent) => {
         if (drawMode === 'draw_polygon' && drawRef.current) {
           e.preventDefault();
-          // Obtener el id del polígono en edición
+          // No forzar el cambio de modo aquí, dejar que MapboxDraw maneje el cierre
+          // Solo validar y disparar onZoneCreate si el polígono es válido
           const features = drawRef.current.getAll();
           if (features.features.length > 0) {
-            // Forzar el cambio de modo para finalizar el polígono
-            drawRef.current.changeMode('simple_select' as unknown as never);
-            // Disparar manualmente el evento de creación si no se disparó
+            const feature = features.features[0] as Feature<Polygon>;
+            if (!feature.geometry || !feature.geometry.coordinates || !feature.geometry.coordinates[0] || feature.geometry.coordinates[0].length < 4) {
+              alert('El polígono debe tener al menos 3 lados y estar cerrado.');
+              return;
+            }
             if (onZoneCreate) {
-              const feature = features.features[0] as Feature<Polygon>;
               const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
                 (pos) => [pos[0], pos[1]] as [number, number]
               );

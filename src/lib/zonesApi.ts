@@ -8,7 +8,19 @@ export async function fetchZones(): Promise<Zone[]> {
       console.error('[fetchZones][ERROR]', error);
       return [];
     }
-    return data || [];
+    // Adaptar coordinates si viene como string JSON
+    return (data || []).map((z: any) => {
+      let coordinates = z.coordinates;
+      if (typeof coordinates === 'string') {
+        try {
+          coordinates = JSON.parse(coordinates);
+        } catch (e) {
+          console.error('Error al parsear coordinates de zona', z, e);
+          coordinates = [];
+        }
+      }
+      return { ...z, coordinates };
+    });
   } catch (e) {
     console.error('[fetchZones][EXCEPTION]', e);
     return [];

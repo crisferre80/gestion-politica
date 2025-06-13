@@ -281,11 +281,21 @@ const AdminPanel: React.FC = () => {
 
   // Agrupar zonas por nombre
   const groupedZones = Object.values(zones.reduce((acc, z) => {
+    // Adaptar coordinates: si es string, parsear a array
+    let coordinates = z.coordinates;
+    if (typeof coordinates === 'string') {
+      try {
+        coordinates = JSON.parse(coordinates);
+      } catch (e) {
+        console.error('Error al parsear coordinates de zona', z, e);
+        coordinates = [];
+      }
+    }
     if (!acc[z.name]) {
-      acc[z.name] = { ...z, color: z.color ?? '#3b82f6', ids: [z.id], coordinates: [z.coordinates] };
+      acc[z.name] = { ...z, color: z.color ?? '#3b82f6', ids: [z.id], coordinates: [coordinates] };
     } else {
       acc[z.name].ids.push(z.id);
-      acc[z.name].coordinates.push(z.coordinates);
+      acc[z.name].coordinates.push(coordinates);
     }
     return acc;
   }, {} as Record<string, { 
@@ -484,9 +494,6 @@ const AdminPanel: React.FC = () => {
                   {/* LOG DE DEPURACIÓN */}
                   {console.log('zones', zones, 'pendingZone', pendingZone)}
                   {/* Fallback visual si no hay zonas o hay error */}
-                  {(!zones || !Array.isArray(zones)) && (
-                    <div className="bg-red-100 text-red-700 p-2 rounded mb-2">Error: No se pudieron cargar las zonas.</div>
-                  )}
                   <div className="mb-4 flex flex-col md:flex-row gap-4 items-end">
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la zona a crear:</label>
@@ -547,7 +554,7 @@ const AdminPanel: React.FC = () => {
                   <MapComponent
                     ref={mapComponentRef}
                     points={[]}
-                    zones={zones}
+                    zones={zones.filter(z => Array.isArray(z.coordinates) && z.coordinates.length >= 3)}
                     isAdmin={true}
                     onZoneCreate={zone => setPendingZone({ ...zone, color: pendingZoneColor, name: pendingZoneName })}
                     onZoneEdit={handleEdit}
@@ -558,14 +565,49 @@ const AdminPanel: React.FC = () => {
                       className="bg-green-600 text-white px-4 py-2 rounded shadow disabled:opacity-50"
                       onClick={async () => {
                         if (pendingZone && pendingZoneName.trim() && (pendingZone.coordinates.length ?? 0) >= 4) {
-                          // Eliminar el campo id antes de guardar
                           const { id, ...zoneData } = pendingZone as any;
                           try {
-                            await handleCreate({ ...zoneData, name: pendingZoneName, color: pendingZoneColor });
-                            setPendingZone(null); // Limpiar tras guardar
-                            setPendingZoneName('');
+                            const { data: { user }, error: userError } = await supabase.auth.getUser();
+                            if (userError) {
+                              alert('Error de autenticación: ' + userError.message);
+                              return;
+                            }
+                            if (!user) {
+                              alert('Debes iniciar sesión para crear una zona.');
+                              return;
+                            }
+                            // Validar name
+                            if (!pendingZoneName.trim()) {
+                              alert('El nombre de la zona es obligatorio.');
+                              return;
+                            }
+                            // Validar coordinates
+                            const coordinatesString = Array.isArray(zoneData.coordinates)
+                              ? JSON.stringify(zoneData.coordinates)
+                              : (typeof zoneData.coordinates === 'string' ? zoneData.coordinates.replace(/^"|"$/g, '') : '[]');
+                            console.log('DEBUG: Insertando zona con coordinates:', coordinatesString);
+                            const { error } = await supabase.from('zones').insert([
+                              {
+                                ...zoneData,
+                                name: pendingZoneName,
+                                color: pendingZoneColor,
+                                coordinates: coordinatesString,
+                                user_id: user.id,
+                              }
+                            ]);
+                            if (error) {
+                              alert('Error al guardar la zona: ' + error.message);
+                            } else {
+                              alert('Zona guardada correctamente');
+                              setPendingZone(null);
+                              setPendingZoneName('');
+                              setPendingZoneColor('#3b82f6');
+                              await reloadZones();
+                              // Log para ver si reloadZones trae datos
+                              console.log('DEBUG: reloadZones ejecutado');
+                            }
                           } catch (e) {
-                            setError('Error al guardar la zona: ' + (e instanceof Error ? e.message : String(e)));
+                            alert('Error inesperado al guardar la zona');
                           }
                         }
                       }}

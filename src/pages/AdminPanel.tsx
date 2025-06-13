@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { deleteCollectionPoint, supabase, CollectionPoint } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
+import { useZones } from '../hooks/useZones';
+import MapComponent, { Zone } from '../components/Map';
+import { createZone } from '../lib/zonesApi';
 
 interface UserRow {
   avatar_url: string | null;
@@ -45,6 +48,12 @@ const AdminPanel: React.FC = () => {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string|null>(null);
   const [activeTab, setActiveTab] = useState<'usuarios' | 'notificaciones' | 'feedback' | 'publicidades'>('usuarios');
+  // Zonas para el mapa admin
+  const { zones, loading: zonesLoading, handleCreate, handleEdit } = useZones();
+  const [showZonesModal, setShowZonesModal] = useState(false);
+  const [pendingZone, setPendingZone] = useState<Omit<Zone, 'id'> | null>(null);
+  const [pendingZoneName, setPendingZoneName] = useState('');
+  const [pendingZoneColor, setPendingZoneColor] = useState('#3b82f6');
 
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
@@ -258,6 +267,29 @@ const AdminPanel: React.FC = () => {
     fetchFeedbacks();
   }, []);
 
+  const handlePendingZone = (zone: Zone) => {
+    // Solo aceptar polígonos con al menos 4 puntos (3 + cierre)
+    if (zone.coordinates.length >= 4) {
+      setPendingZone({
+        name: pendingZoneName || 'Nueva Zona',
+        color: pendingZoneColor,
+        coordinates: zone.coordinates,
+      });
+    }
+  };
+
+  const handleSaveZone = async () => {
+    if (pendingZone) {
+      await createZone(pendingZone);
+      setPendingZone(null);
+      setPendingZoneName('');
+      setPendingZoneColor('#3b82f6');
+      if (typeof handleCreate === 'function') {
+        await handleCreate(pendingZone);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <h1 className="text-3xl font-bold text-green-700 mb-6">Panel de Administrador</h1>
@@ -267,6 +299,7 @@ const AdminPanel: React.FC = () => {
           <button onClick={() => setActiveTab('notificaciones')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'notificaciones' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Enviar Notificaciones</button>
           <button onClick={() => setActiveTab('feedback')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'feedback' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Sugerencias y Reclamos</button>
           <button onClick={() => setActiveTab('publicidades')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'publicidades' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Gestionar Publicidades</button>
+          <button onClick={() => setShowZonesModal(true)} className="px-4 py-2 rounded-t-lg font-semibold border-b-2 border-transparent text-gray-500 bg-green-100 hover:bg-white">Zonas del Mapa</button>
         </div>
         {activeTab === 'usuarios' && (
           <>
@@ -428,6 +461,56 @@ const AdminPanel: React.FC = () => {
         {activeTab === 'publicidades' && (
           <div className="mb-12">
             <AdminAds />
+          </div>
+        )}
+        {showZonesModal && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl relative">
+              <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setShowZonesModal(false)}>✕</button>
+              <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa</h3>
+              {zonesLoading ? <p>Cargando zonas...</p> : (
+                <>
+                  <div className="mb-4 flex gap-4 items-end">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la zona a crear:</label>
+                      <input
+                        type="text"
+                        className="border rounded px-2 py-1 w-full"
+                        placeholder="Ej: Zona Norte, Centro, etc."
+                        value={pendingZoneName}
+                        onChange={e => setPendingZoneName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Color:</label>
+                      <input
+                        type="color"
+                        className="w-10 h-10 p-0 border-0 bg-transparent"
+                        value={pendingZoneColor}
+                        onChange={e => setPendingZoneColor(e.target.value)}
+                        title="Elige color de la zona"
+                      />
+                    </div>
+                  </div>
+                  <MapComponent
+                    points={[]}
+                    zones={zones}
+                    isAdmin={true}
+                    onZoneCreate={handlePendingZone}
+                    onZoneEdit={handleEdit}
+                  />
+                  <div className="flex justify-end mt-4">
+                    <button
+                      className="bg-green-600 text-white px-4 py-2 rounded shadow disabled:opacity-50"
+                      onClick={handleSaveZone}
+                      disabled={!pendingZone || !pendingZoneName.trim() || (pendingZone?.coordinates.length ?? 0) < 4}
+                    >
+                      Guardar Zona
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

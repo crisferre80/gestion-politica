@@ -3,6 +3,9 @@ import Map, { Marker, NavigationControl } from 'react-map-gl';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Trash2 } from 'lucide-react';
+import MapboxDraw from '@mapbox/mapbox-gl-draw';
+import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
+import { Feature, Polygon, Position } from 'geojson';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -12,6 +15,13 @@ const SANTIAGO_CENTER = {
   latitude: -27.7833,
   zoom: 13
 };
+
+export interface Zone {
+  id: string;
+  name: string;
+  color?: string;
+  coordinates: Array<[number, number]>; // [lng, lat]
+}
 
 interface MapComponentProps {
   points: Array<{
@@ -33,6 +43,10 @@ interface MapComponentProps {
   onDeletePoint?: (id: string) => void;
   // NUEVO: para rutas multipunto
   routePoints?: Array<{ lat: number; lng: number }>;
+  zones?: Zone[];
+  isAdmin?: boolean;
+  onZoneCreate?: (zone: Zone) => void;
+  onZoneEdit?: (zone: Zone) => void;
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({ 
@@ -45,7 +59,11 @@ const MapComponent: React.FC<MapComponentProps> = ({
   showRoute = false,
   routeDestination,
   onDeletePoint,
-  routePoints // NUEVO
+  routePoints, // NUEVO
+  zones = [],
+  isAdmin = false,
+  onZoneCreate,
+  onZoneEdit,
 }) => {
   const [userLocation, setUserLocation] = useState<{
     lat: number;
@@ -53,6 +71,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
 } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const [drawMode, setDrawMode] = useState<'none' | 'draw_polygon' | 'edit_polygon'>('none');
+  const drawRef = useRef<MapboxDraw | null>(null);
+
   // Removed local routeDestination state to avoid duplicate identifier error
 
   useEffect(() => {
@@ -281,8 +302,151 @@ const MapComponent: React.FC<MapComponentProps> = ({
     }
   }, [routePoints]);
 
+  // --- DIBUJAR ZONAS COMO POLÍGONOS SOLO SI ES ADMIN ---
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    // Limpiar zonas previas
+    if (zones && zones.length) {
+      zones.forEach(zone => {
+        if (map.getLayer(`zone-${zone.id}`)) map.removeLayer(`zone-${zone.id}`);
+        if (map.getLayer(`zone-line-${zone.id}`)) map.removeLayer(`zone-line-${zone.id}`);
+        if (map.getSource(`zone-${zone.id}`)) map.removeSource(`zone-${zone.id}`);
+      });
+      // Agregar cada zona como un polígono
+      zones.forEach(zone => {
+        map.addSource(`zone-${zone.id}`, {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Polygon',
+              coordinates: [zone.coordinates],
+            },
+          },
+        });
+        map.addLayer({
+          id: `zone-${zone.id}`,
+          type: 'fill',
+          source: `zone-${zone.id}`,
+          layout: {},
+          paint: {
+            'fill-color': zone.color || '#3b82f6',
+            'fill-opacity': 0.2,
+          },
+        });
+        map.addLayer({
+          id: `zone-line-${zone.id}`,
+          type: 'line',
+          source: `zone-${zone.id}`,
+          layout: {},
+          paint: {
+            'line-color': zone.color || '#3b82f6',
+            'line-width': 2,
+          },
+        });
+      });
+    }
+  }, [zones, isAdmin]);
+
+  // --- INTEGRACIÓN MAPBOX GL DRAW SOLO PARA ADMIN ---
+  useEffect(() => {
+    if (!isAdmin || !mapRef.current) return;
+    const map = mapRef.current;
+    if (!drawRef.current) {
+      drawRef.current = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: {},
+        defaultMode: 'simple_select',
+      });
+      map.addControl(drawRef.current, 'top-left');
+    }
+    // Cambiar modo de dibujo
+    if (drawMode === 'draw_polygon') {
+      drawRef.current.changeMode('draw_polygon');
+    } else if (drawMode === 'edit_polygon') {
+      if (drawRef.current.changeMode) {
+        drawRef.current.changeMode('direct_select' as unknown as never);
+      }
+    } else {
+      if (drawRef.current.changeMode) {
+        drawRef.current.changeMode('simple_select');
+      }
+    }
+    // Evento para capturar creación de zona
+    const handleDrawCreate = (e: MapboxDraw.DrawCreateEvent) => {
+      if (onZoneCreate && e.features && e.features[0]) {
+        const feature = e.features[0] as Feature<Polygon>;
+        const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
+          (pos) => [pos[0], pos[1]] as [number, number]
+        );
+        const zone: Zone = {
+          id: String(feature.id),
+          name: 'Nueva Zona',
+          coordinates,
+        };
+        onZoneCreate(zone);
+        // Cambia a modo selección para dejar de dibujar
+        if (drawRef.current) {
+          setTimeout(() => {
+            drawRef.current?.changeMode('simple_select' as unknown as never);
+          }, 100);
+        }
+      }
+    };
+    map.on('draw.create', handleDrawCreate);
+    // Evento para edición
+    map.on('draw.update', (e: MapboxDraw.DrawUpdateEvent) => {
+      if (onZoneEdit && e.features && e.features[0]) {
+        const feature = e.features[0] as Feature<Polygon>;
+        const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
+          (pos) => [pos[0], pos[1]] as [number, number]
+        );
+        const zone: Zone = {
+          id: String(feature.id),
+          name: 'Zona Editada',
+          coordinates,
+        };
+        onZoneEdit(zone);
+      }
+    });
+    // Evento para terminar dibujo con botón derecho
+    const handleContextMenu = (e: MouseEvent) => {
+      if (drawMode === 'draw_polygon' && drawRef.current) {
+        e.preventDefault();
+        drawRef.current.changeMode('simple_select' as unknown as never);
+      }
+    };
+    map.getCanvas().addEventListener('contextmenu', handleContextMenu);
+    return () => {
+      if (drawRef.current) {
+        map.removeControl(drawRef.current);
+        drawRef.current = null;
+      }
+      map.off('draw.create', handleDrawCreate);
+      map.getCanvas().removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [isAdmin, drawMode, onZoneCreate, onZoneEdit]);
+
   return (
     <div className="relative">
+      {isAdmin && (
+        <div className="absolute z-10 top-4 left-4 flex gap-2">
+          <button
+            className={`bg-green-600 text-white px-3 py-1 rounded shadow ${drawMode==='draw_polygon' ? 'ring-2 ring-green-400' : ''}`}
+            onClick={() => setDrawMode(drawMode === 'draw_polygon' ? 'none' : 'draw_polygon')}
+          >
+            {drawMode === 'draw_polygon' ? 'Cancelar' : 'Crear Zona'}
+          </button>
+          <button
+            className={`bg-blue-600 text-white px-3 py-1 rounded shadow ${drawMode==='edit_polygon' ? 'ring-2 ring-blue-400' : ''}`}
+            onClick={() => setDrawMode(drawMode === 'edit_polygon' ? 'none' : 'edit_polygon')}
+          >
+            {drawMode === 'edit_polygon' ? 'Cancelar' : 'Editar Zona'}
+          </button>
+        </div>
+      )}
       <Map
         ref={(ref) => {
           if (ref) {
@@ -346,7 +510,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                 </div>
               ) : (
                 <img
-                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+                  src="https://res.cloudinary.com/dhvrrxejo/image/upload_v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
                   alt="Punto de Recolección"
                   className="w-10 h-10 object-contain drop-shadow-lg"
                 />
@@ -374,7 +538,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
           >
             {/* Usa el mismo marcador visual que los puntos de recolección */}
             <img
-              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+              src="https://res.cloudinary.com/dhvrrxejo/image/upload_v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
               alt="Punto de Recolección"
               className="w-10 h-10 object-contain drop-shadow-lg"
             />

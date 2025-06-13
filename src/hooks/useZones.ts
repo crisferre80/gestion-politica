@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchZones, createZone, updateZone } from '../lib/zonesApi';
+import { fetchZones, createZone, updateZone, deleteZone } from '../lib/zonesApi';
 import { Zone } from '../components/Map';
 
 export function useZones() {
@@ -7,18 +7,27 @@ export function useZones() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reloadZones = useCallback(async () => {
     setLoading(true);
-    fetchZones()
-      .then(setZones)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+    try {
+      const zs = await fetchZones();
+      setZones(zs);
+    } catch (e: unknown) {
+      if (e instanceof Error) setError(e.message);
+      else setError(String(e));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    reloadZones();
+  }, [reloadZones]);
 
   const handleCreate = useCallback(async (zone: Omit<Zone, 'id'>) => {
     try {
-      const newZone = await createZone(zone);
-      setZones(zs => [...zs, newZone]);
+      await createZone(zone);
+      await reloadZones();
     } catch (e: unknown) {
       if (e instanceof Error) {
         setError(e.message);
@@ -26,12 +35,12 @@ export function useZones() {
         setError(String(e));
       }
     }
-  }, []);
+  }, [reloadZones]);
 
   const handleEdit = useCallback(async (zone: Zone) => {
     try {
-      const updated = await updateZone(zone);
-      setZones(zs => zs.map(z => z.id === updated.id ? updated : z));
+      await updateZone(zone);
+      await reloadZones();
     } catch (e: unknown) {
       if (e instanceof Error) {
         setError(e.message);
@@ -39,7 +48,17 @@ export function useZones() {
         setError(String(e));
       }
     }
-  }, []);
+  }, [reloadZones]);
 
-  return { zones, loading, error, handleCreate, handleEdit };
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await deleteZone(id);
+      await reloadZones();
+    } catch (e: unknown) {
+      if (e instanceof Error) setError(e.message);
+      else setError(String(e));
+    }
+  }, [reloadZones]);
+
+  return { zones, loading, error, handleCreate, handleEdit, handleDelete, reloadZones };
 }

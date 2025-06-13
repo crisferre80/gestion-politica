@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { deleteCollectionPoint, supabase, CollectionPoint } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
 import { useZones } from '../hooks/useZones';
 import MapComponent, { Zone } from '../components/Map';
-import { createZone } from '../lib/zonesApi';
 
 interface UserRow {
   avatar_url: string | null;
@@ -49,11 +48,13 @@ const AdminPanel: React.FC = () => {
   const [feedbackError, setFeedbackError] = useState<string|null>(null);
   const [activeTab, setActiveTab] = useState<'usuarios' | 'notificaciones' | 'feedback' | 'publicidades'>('usuarios');
   // Zonas para el mapa admin
-  const { zones, loading: zonesLoading, handleCreate, handleEdit } = useZones();
+  const { zones, loading: zonesLoading, handleCreate, handleEdit, handleDelete, reloadZones } = useZones();
   const [showZonesModal, setShowZonesModal] = useState(false);
   const [pendingZone, setPendingZone] = useState<Omit<Zone, 'id'> | null>(null);
   const [pendingZoneName, setPendingZoneName] = useState('');
   const [pendingZoneColor, setPendingZoneColor] = useState('#3b82f6');
+
+  const mapComponentRef = useRef<{ clearDraw: () => void }>(null);
 
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
@@ -267,28 +268,33 @@ const AdminPanel: React.FC = () => {
     fetchFeedbacks();
   }, []);
 
-  const handlePendingZone = (zone: Zone) => {
-    // Solo aceptar polígonos con al menos 4 puntos (3 + cierre)
-    if (zone.coordinates.length >= 4) {
-      setPendingZone({
-        name: pendingZoneName || 'Nueva Zona',
-        color: pendingZoneColor,
-        coordinates: zone.coordinates,
-      });
+  const handleCloseZonesModal = () => {
+    setShowZonesModal(false);
+    if (mapComponentRef.current) {
+      mapComponentRef.current.clearDraw();
     }
+    setPendingZone(null);
+    setPendingZoneName('');
+    setPendingZoneColor('#3b82f6');
   };
 
-  const handleSaveZone = async () => {
-    if (pendingZone) {
-      await createZone(pendingZone);
-      setPendingZone(null);
-      setPendingZoneName('');
-      setPendingZoneColor('#3b82f6');
-      if (typeof handleCreate === 'function') {
-        await handleCreate(pendingZone);
-      }
+  // Agrupar zonas por nombre
+  const groupedZones = Object.values(zones.reduce((acc, z) => {
+    if (!acc[z.name]) {
+      acc[z.name] = { ...z, color: z.color ?? '#3b82f6', ids: [z.id], coordinates: [z.coordinates] };
+    } else {
+      acc[z.name].ids.push(z.id);
+      acc[z.name].coordinates.push(z.coordinates);
     }
-  };
+    return acc;
+  }, {} as Record<string, { 
+    id: string; 
+    name: string; 
+    color: string; 
+    coordinates: number[][][]; 
+    ids: string[]; 
+    // coordinates is now an array of arrays for grouping
+  }>));
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -466,7 +472,7 @@ const AdminPanel: React.FC = () => {
         {showZonesModal && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl relative">
-              <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setShowZonesModal(false)}>✕</button>
+              <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={handleCloseZonesModal}>✕</button>
               <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa</h3>
               {zonesLoading ? <p>Cargando zonas...</p> : (
                 <>
@@ -492,21 +498,57 @@ const AdminPanel: React.FC = () => {
                       />
                     </div>
                   </div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="inline-block text-xs text-gray-600 bg-gray-100 rounded px-2 py-1 border border-gray-200 cursor-help" title="Puedes finalizar el dibujo de la zona haciendo doble clic o con el botón derecho del mouse">
+                      ℹ️ Finaliza el dibujo con doble clic o botón derecho
+                    </span>
+                  </div>
                   <MapComponent
+                    ref={mapComponentRef}
                     points={[]}
                     zones={zones}
                     isAdmin={true}
-                    onZoneCreate={handlePendingZone}
+                    onZoneCreate={zone => setPendingZone({ ...zone, color: pendingZoneColor, name: pendingZoneName })}
                     onZoneEdit={handleEdit}
+                    pendingZone={pendingZone ? { ...pendingZone, color: pendingZoneColor, name: pendingZoneName, id: 'pending' } : null}
                   />
-                  <div className="flex justify-end mt-4">
+                  <div className="flex justify-between mt-4 gap-2">
                     <button
                       className="bg-green-600 text-white px-4 py-2 rounded shadow disabled:opacity-50"
-                      onClick={handleSaveZone}
+                      onClick={() => {
+                        if (pendingZone && pendingZoneName.trim() && (pendingZone.coordinates.length ?? 0) >= 4) {
+                          handleCreate({ ...pendingZone, name: pendingZoneName, color: pendingZoneColor });
+                          setPendingZone(null); // Limpiar tras guardar
+                          setPendingZoneName('');
+                        }
+                      }}
                       disabled={!pendingZone || !pendingZoneName.trim() || (pendingZone?.coordinates.length ?? 0) < 4}
                     >
                       Guardar Zona
                     </button>
+                    <button
+                      className="bg-blue-500 text-white px-4 py-2 rounded shadow"
+                      onClick={reloadZones}
+                      type="button"
+                    >
+                      Recargar Zonas
+                    </button>
+                  </div>
+                  <div className="mt-4">
+                    <h4 className="font-bold mb-2">Zonas guardadas:</h4>
+                    <ul className="space-y-2">
+                      {groupedZones.map(z => (
+                        <li key={z.name} className="flex items-center gap-2 bg-gray-100 rounded px-2 py-1">
+                          <span className="font-semibold text-green-700">{z.name}</span>
+                          <button
+                            className="bg-red-500 text-white px-2 py-1 rounded text-xs ml-auto"
+                            onClick={() => z.ids.forEach((id: string) => handleDelete(id))}
+                          >
+                            Eliminar
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </>
               )}

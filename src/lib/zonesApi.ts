@@ -24,3 +24,8 @@ export async function updateZone(zone: Zone): Promise<Zone> {
   if (error) throw error;
   return data;
 }
+
+export async function deleteZone(id: string): Promise<void> {
+  const { error } = await supabase.from('zones').delete().eq('id', id);
+  if (error) throw error;
+}

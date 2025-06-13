@@ -71,7 +71,7 @@ const MapComponent = React.forwardRef<{
       lng: number; latitude: number; longitude: number 
     } | null>(null);
     const mapRef = useRef<MapRef | null>(null);
-    const [drawMode] = useState<'none' | 'draw_polygon' | 'edit_polygon'>('none');
+    const [drawMode, setDrawMode] = useState<'none' | 'draw_polygon' | 'edit_polygon'>('none');
     const drawRef = useRef<MapboxDraw | null>(null);
     // Estado para saber si el mapa está listo
     const [mapReady, setMapReady] = useState(false);
@@ -251,9 +251,122 @@ const MapComponent = React.forwardRef<{
       };
     }, [mapRef]);
 
+    // --- INTEGRACIÓN MAPBOX GL DRAW SOLO PARA ADMIN ---
+    useEffect(() => {
+      if (!isAdmin || !mapReady || !mapRef.current || !mapRef.current.getMap) return;
+      const map = mapRef.current.getMap();
+      if (!drawRef.current) {
+        drawRef.current = new MapboxDraw({
+          displayControlsDefault: false,
+          controls: {},
+          defaultMode: 'simple_select',
+        });
+        map.addControl(drawRef.current, 'top-left');
+        console.log('MapboxDraw añadido');
+      }
+      // Cambiar modo de dibujo según drawMode
+      if (drawMode === 'draw_polygon') {
+        drawRef.current.changeMode('draw_polygon');
+      } else if (drawMode === 'edit_polygon') {
+        drawRef.current.changeMode('direct_select' as unknown as never);
+      } else {
+        drawRef.current.changeMode('simple_select');
+      }
+      // Evento para capturar creación de zona
+      const handleDrawCreate = (e: MapboxDraw.DrawCreateEvent) => {
+        if (onZoneCreate && e.features && e.features[0]) {
+          const feature = e.features[0] as Feature<Polygon>;
+          const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
+            (pos) => [pos[0], pos[1]] as [number, number]
+          );
+          // Validar que el polígono tenga al menos 4 puntos (incluyendo cierre)
+          if (coordinates.length < 4) {
+            alert('El polígono debe tener al menos 3 lados.');
+            return;
+          }
+          // Usar nombre y color por defecto (elimina pendingZoneName/pendingZoneColor)
+          const zone: Zone = {
+            id: String(feature.id),
+            name: 'Nueva Zona',
+            color: '#3b82f6',
+            coordinates,
+          };
+          console.log('Zona creada:', zone);
+          onZoneCreate(zone);
+        }
+      };
+      map.on('draw.create', handleDrawCreate);
+      // Evento para edición
+      const handleDrawUpdate = (e: MapboxDraw.DrawUpdateEvent) => {
+        if (onZoneEdit && e.features && e.features[0]) {
+          const feature = e.features[0] as Feature<Polygon>;
+          const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
+            (pos) => [pos[0], pos[1]] as [number, number]
+          );
+          if (coordinates.length < 4) return;
+          const zone: Zone = {
+            id: String(feature.id),
+            name: 'Zona Editada',
+            color: '#3b82f6',
+            coordinates,
+          };
+          console.log('Zona editada:', zone);
+          onZoneEdit(zone);
+        }
+      };
+      map.on('draw.update', handleDrawUpdate);
+      // Evento para terminar dibujo con botón derecho
+      const handleContextMenu = (e: MouseEvent) => {
+        if (drawMode === 'draw_polygon' && drawRef.current) {
+          e.preventDefault();
+          drawRef.current.changeMode('simple_select' as unknown as never);
+        }
+      };
+      map.getCanvas().addEventListener('contextmenu', handleContextMenu);
+      // Evento para cerrar polígono con doble clic
+      const handleDoubleClick = (e: MouseEvent) => {
+        if (drawMode === 'draw_polygon' && drawRef.current) {
+          e.preventDefault();
+          // Obtener el id del polígono en edición
+          const features = drawRef.current.getAll();
+          if (features.features.length > 0) {
+            // Forzar el cambio de modo para finalizar el polígono
+            drawRef.current.changeMode('simple_select' as unknown as never);
+            // Disparar manualmente el evento de creación si no se disparó
+            if (onZoneCreate) {
+              const feature = features.features[0] as Feature<Polygon>;
+              const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
+                (pos) => [pos[0], pos[1]] as [number, number]
+              );
+              const zone: Zone = {
+                id: String(feature.id),
+                name: 'Nueva Zona',
+                color: '#3b82f6',
+                coordinates,
+              };
+              console.log('Zona creada (doble click):', zone);
+              onZoneCreate(zone);
+            }
+          }
+        }
+      };
+      map.getCanvas().addEventListener('dblclick', handleDoubleClick);
+      return () => {
+        if (drawRef.current) {
+          map.removeControl(drawRef.current);
+          drawRef.current = null;
+        }
+        map.off('draw.create', handleDrawCreate);
+        map.off('draw.update', handleDrawUpdate);
+        map.getCanvas().removeEventListener('contextmenu', handleContextMenu);
+        map.getCanvas().removeEventListener('dblclick', handleDoubleClick);
+      };
+    }, [isAdmin, drawMode, onZoneCreate, onZoneEdit, mapReady]);
+
     // --- DIBUJAR POLILÍNEA MULTIPUNTO SI routePoints ESTÁ PRESENTE ---
     useEffect(() => {
       if (!mapRef.current) return;
+      if (!routePoints || routePoints.length < 2) return; // Solo si hay al menos 2 puntos
       // Generar un id único para la capa y source de la ruta
       const routeId = `route-polyline-${Date.now()}`;
       // Limpiar todas las capas y sources previas que empiecen con 'route-polyline-'
@@ -377,6 +490,7 @@ const MapComponent = React.forwardRef<{
           defaultMode: 'simple_select',
         });
         map.addControl(drawRef.current, 'top-left');
+        console.log('MapboxDraw añadido');
       }
       // Cambiar modo de dibujo según drawMode
       if (drawMode === 'draw_polygon') {
@@ -393,34 +507,42 @@ const MapComponent = React.forwardRef<{
           const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
             (pos) => [pos[0], pos[1]] as [number, number]
           );
-          // Pedir nombre al terminar cada polígono
-          let name = window.prompt('Nombre de la zona:', 'Nueva Zona');
-          if (!name) name = 'Nueva Zona';
-          // Llamar a onZoneCreate con el nombre y dejar el polígono en el mapa
+          // Validar que el polígono tenga al menos 4 puntos (incluyendo cierre)
+          if (coordinates.length < 4) {
+            alert('El polígono debe tener al menos 3 lados.');
+            return;
+          }
+          // Usar nombre y color por defecto (elimina pendingZoneName/pendingZoneColor)
           const zone: Zone = {
             id: String(feature.id),
-            name,
+            name: 'Nueva Zona',
+            color: '#3b82f6',
             coordinates,
           };
+          console.log('Zona creada:', zone);
           onZoneCreate(zone);
         }
       };
       map.on('draw.create', handleDrawCreate);
       // Evento para edición
-      map.on('draw.update', (e: MapboxDraw.DrawUpdateEvent) => {
+      const handleDrawUpdate = (e: MapboxDraw.DrawUpdateEvent) => {
         if (onZoneEdit && e.features && e.features[0]) {
           const feature = e.features[0] as Feature<Polygon>;
           const coordinates = (feature.geometry.coordinates[0] as Position[]).map(
             (pos) => [pos[0], pos[1]] as [number, number]
           );
+          if (coordinates.length < 4) return;
           const zone: Zone = {
             id: String(feature.id),
             name: 'Zona Editada',
+            color: '#3b82f6',
             coordinates,
           };
+          console.log('Zona editada:', zone);
           onZoneEdit(zone);
         }
-      });
+      };
+      map.on('draw.update', handleDrawUpdate);
       // Evento para terminar dibujo con botón derecho
       const handleContextMenu = (e: MouseEvent) => {
         if (drawMode === 'draw_polygon' && drawRef.current) {
@@ -447,8 +569,10 @@ const MapComponent = React.forwardRef<{
               const zone: Zone = {
                 id: String(feature.id),
                 name: 'Nueva Zona',
+                color: '#3b82f6',
                 coordinates,
               };
+              console.log('Zona creada (doble click):', zone);
               onZoneCreate(zone);
             }
           }
@@ -461,19 +585,29 @@ const MapComponent = React.forwardRef<{
           drawRef.current = null;
         }
         map.off('draw.create', handleDrawCreate);
+        map.off('draw.update', handleDrawUpdate);
         map.getCanvas().removeEventListener('contextmenu', handleContextMenu);
         map.getCanvas().removeEventListener('dblclick', handleDoubleClick);
       };
     }, [isAdmin, drawMode, onZoneCreate, onZoneEdit, mapReady]);
 
     useImperativeHandle(ref, () => ({
-      clearDraw: () => {
+      clearDraw: (mode?: 'draw_polygon' | 'edit_polygon') => {
         if (drawRef.current) {
+          // Elimina polígonos temporales
           const all = drawRef.current.getAll();
           if (all && all.features.length > 0) {
             all.features.forEach(f => drawRef.current!.delete(f.id as string));
           }
         }
+        if (mode) {
+          setDrawMode(mode);
+        } else {
+          setDrawMode('none');
+        }
+      },
+      setDrawMode: (mode: 'draw_polygon' | 'edit_polygon' | 'none') => {
+        setDrawMode(mode);
       }
     }));
 
@@ -506,6 +640,13 @@ const MapComponent = React.forwardRef<{
     }, [allZones, mapReady]);
 
     // --- RENDER MAPA ---
+    if (!MAPBOX_TOKEN) {
+      return (
+        <div className="w-full h-[400px] flex items-center justify-center bg-gray-100 text-red-600 font-bold">
+          Error: MAPBOX_TOKEN no definido. No se puede mostrar el mapa.
+        </div>
+      );
+    }
     return (
       <div className="relative w-full h-[400px] md:h-[500px] rounded-lg overflow-hidden border border-gray-200">
         <Map

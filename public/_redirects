@@ -10,3 +10,6 @@
 /add-collection-point    /index.html   200
 /recycler-profile/*    /index.html   200
 /chat/*    /index.html   200
+/dossier    /index.html   200
+/quienes-somos    /index.html   200
+/terminos-condiciones    /index.html   200

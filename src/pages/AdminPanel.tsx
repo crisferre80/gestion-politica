@@ -55,6 +55,7 @@ const AdminPanel: React.FC = () => {
   const [pendingZoneColor, setPendingZoneColor] = useState('#3b82f6');
 
   const mapComponentRef = useRef<{ clearDraw: () => void }>(null);
+  const [isDrawingZone, setIsDrawingZone] = useState(false);
 
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
@@ -471,12 +472,22 @@ const AdminPanel: React.FC = () => {
         )}
         {showZonesModal && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl relative">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2 sm:p-4 md:p-6 max-h-[90vh] overflow-y-auto relative">
               <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={handleCloseZonesModal}>✕</button>
               <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa</h3>
+              {/* Manejo de errores de zonas */}
+              {error && (
+                <div className="bg-red-100 text-red-700 p-2 rounded mb-2 font-semibold">Error: {error}</div>
+              )}
               {zonesLoading ? <p>Cargando zonas...</p> : (
                 <>
-                  <div className="mb-4 flex gap-4 items-end">
+                  {/* LOG DE DEPURACIÓN */}
+                  {console.log('zones', zones, 'pendingZone', pendingZone)}
+                  {/* Fallback visual si no hay zonas o hay error */}
+                  {(!zones || !Array.isArray(zones)) && (
+                    <div className="bg-red-100 text-red-700 p-2 rounded mb-2">Error: No se pudieron cargar las zonas.</div>
+                  )}
+                  <div className="mb-4 flex flex-col md:flex-row gap-4 items-end">
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la zona a crear:</label>
                       <input
@@ -498,10 +509,40 @@ const AdminPanel: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <div className="mb-2 flex items-center gap-2">
+                  <div className="mb-2 flex flex-wrap gap-2 items-center">
                     <span className="inline-block text-xs text-gray-600 bg-gray-100 rounded px-2 py-1 border border-gray-200 cursor-help" title="Puedes finalizar el dibujo de la zona haciendo doble clic o con el botón derecho del mouse">
                       ℹ️ Finaliza el dibujo con doble clic o botón derecho
                     </span>
+                    {isDrawingZone ? (
+                      <button
+                        className="px-3 py-1 rounded bg-red-600 text-white font-semibold shadow hover:bg-red-700 transition"
+                        onClick={() => {
+                          setIsDrawingZone(false);
+                          mapComponentRef.current && mapComponentRef.current.setDrawMode && mapComponentRef.current.setDrawMode('none');
+                        }}
+                        type="button"
+                      >
+                        Cancelar
+                      </button>
+                    ) : (
+                      <button
+                        className="px-3 py-1 rounded bg-green-600 text-white font-semibold shadow hover:bg-green-700 transition"
+                        onClick={() => {
+                          setIsDrawingZone(true);
+                          mapComponentRef.current && mapComponentRef.current.clearDraw && mapComponentRef.current.clearDraw('draw_polygon');
+                        }}
+                        type="button"
+                      >
+                        Crear Zona
+                      </button>
+                    )}
+                    <button
+                      className={`px-3 py-1 rounded bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition disabled:opacity-50`}
+                      onClick={() => mapComponentRef.current && mapComponentRef.current.setDrawMode && mapComponentRef.current.setDrawMode('edit_polygon')}
+                      type="button"
+                    >
+                      Editar Zona
+                    </button>
                   </div>
                   <MapComponent
                     ref={mapComponentRef}
@@ -512,14 +553,20 @@ const AdminPanel: React.FC = () => {
                     onZoneEdit={handleEdit}
                     pendingZone={pendingZone ? { ...pendingZone, color: pendingZoneColor, name: pendingZoneName, id: 'pending' } : null}
                   />
-                  <div className="flex justify-between mt-4 gap-2">
+                  <div className="flex flex-col sm:flex-row justify-between mt-4 gap-2">
                     <button
                       className="bg-green-600 text-white px-4 py-2 rounded shadow disabled:opacity-50"
-                      onClick={() => {
+                      onClick={async () => {
                         if (pendingZone && pendingZoneName.trim() && (pendingZone.coordinates.length ?? 0) >= 4) {
-                          handleCreate({ ...pendingZone, name: pendingZoneName, color: pendingZoneColor });
-                          setPendingZone(null); // Limpiar tras guardar
-                          setPendingZoneName('');
+                          // Eliminar el campo id antes de guardar
+                          const { id, ...zoneData } = pendingZone as any;
+                          try {
+                            await handleCreate({ ...zoneData, name: pendingZoneName, color: pendingZoneColor });
+                            setPendingZone(null); // Limpiar tras guardar
+                            setPendingZoneName('');
+                          } catch (e) {
+                            setError('Error al guardar la zona: ' + (e instanceof Error ? e.message : String(e)));
+                          }
                         }
                       }}
                       disabled={!pendingZone || !pendingZoneName.trim() || (pendingZone?.coordinates.length ?? 0) < 4}

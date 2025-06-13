@@ -2,9 +2,17 @@ import { supabase } from './supabase';
 import { Zone } from '../components/Map';
 
 export async function fetchZones(): Promise<Zone[]> {
-  const { data, error } = await supabase.from('zones').select('*');
-  if (error) throw error;
-  return data || [];
+  try {
+    const { data, error } = await supabase.from('zones').select('*');
+    if (error) {
+      console.error('[fetchZones][ERROR]', error);
+      return [];
+    }
+    return data || [];
+  } catch (e) {
+    console.error('[fetchZones][EXCEPTION]', e);
+    return [];
+  }
 }
 
 export async function createZone(zone: Omit<Zone, 'id'>): Promise<Zone> {

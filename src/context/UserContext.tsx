@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 
 export type User = {
   user_id: string; // or number, depending on your actual user_id type
@@ -30,7 +30,42 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    // Restaurar usuario desde localStorage si existe
+    try {
+      const stored = localStorage.getItem('eco_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Persistir usuario en localStorage
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('eco_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('eco_user');
+    }
+  }, [user]);
+
+  // Escuchar cambios de sesión de Supabase (si está disponible)
+  useEffect(() => {
+    let sub: any;
+    try {
+      import('../lib/supabase').then(({ supabase }) => {
+        sub = supabase.auth.onAuthStateChange((event, session) => {
+          if (!session) {
+            setUser(null);
+            console.log('[UserContext] Sesión de Supabase terminada, usuario deslogueado');
+          }
+        });
+      });
+    } catch {}
+    return () => {
+      if (sub && typeof sub.unsubscribe === 'function') sub.unsubscribe();
+    };
+  }, []);
 
   const login = (userData: User) => setUser(userData);
   const logout = () => setUser(null);

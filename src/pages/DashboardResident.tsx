@@ -590,6 +590,32 @@ useEffect(() => {
   }
 }, [ecoCreditos, lastEcoRewardStep]);
 
+  // Sube el avatar a Supabase Storage y retorna la URL pública
+  async function uploadAvatar(file: File, userId: string): Promise<string | null> {
+    if (!file || !userId) return null;
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}_${Date.now()}.${fileExt}`;
+    const filePath = `avatars/${fileName}`;
+
+    // Sube el archivo a Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: file.type,
+      });
+
+    if (uploadError) {
+      console.error('Error uploading avatar:', uploadError);
+      return null;
+    }
+
+    // Obtiene la URL pública del archivo subido
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    return data?.publicUrl || null;
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -959,7 +985,7 @@ useEffect(() => {
                   avatar_url: rec.profiles?.avatar_url || undefined,
                   role: 'recycler',
                   online: rec.online === true,
-                  bikeIconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1747537980/bicireciclador-Photoroom_ij5myq.png'
+                  iconUrl: '/assets/bicireciclador-Photoroom.png',
                 }))}
               showUserLocation={true}
             />
@@ -1165,7 +1191,7 @@ useEffect(() => {
             }}
           >
             <PhotoCapture
-              onCapture={file => {
+              onCapture={async file => {
                 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
                 if (!allowedTypes.includes(file.type)) {
                   setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
@@ -1176,7 +1202,32 @@ useEffect(() => {
                   return;
                 }
                 setError(null);
-                // Aquí iría la lógica de subida real
+                try {
+                  // Subir el avatar y obtener la URL
+                  const url = await uploadAvatar(file, user?.id || '');
+                  if (!url) {
+                    setError('Error al subir la imagen.');
+                    return;
+                  }
+                  // Actualizar el perfil en Supabase
+                  const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ avatar_url: url })
+                    .eq('user_id', user!.id);
+                  if (updateError) {
+                    setError('Error al actualizar el perfil con la nueva foto.');
+                    return;
+                  }
+                  // Actualizar el estado local del usuario
+                  login({
+                    ...user!,
+                    avatar_url: url
+                  });
+                  toast.success('Foto de perfil actualizada correctamente');
+                } catch (e) {
+                  setError('Error inesperado al subir la foto.');
+                  console.error(e);
+                }
               }}
               onCancel={() => {}}
             />

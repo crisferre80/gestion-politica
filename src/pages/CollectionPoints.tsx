@@ -133,7 +133,8 @@ function PuntosRecoleccion() {
     lat: Number(point.lat),
     lng: Number(point.lng),
     title: point.address,
-    isRecycler: false
+    isRecycler: false,
+    iconUrl: '/assets/Punto de Recoleccion Marcador.png',
   }));
 
   

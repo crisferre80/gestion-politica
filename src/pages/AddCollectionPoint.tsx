@@ -307,10 +307,14 @@ const AddCollectionPoint: React.FC = () => {
                   Selecciona la ubicación en el mapa <span className="text-red-500">*</span>
                 </label>
                 <Map
-                  points={[]}
+                  points={selectedLocation ? [{
+                    id: 'nuevo-punto',
+                    lat: selectedLocation.lat,
+                    lng: selectedLocation.lng,
+                    title: 'Nuevo Punto de Recolección',
+                    iconUrl: '/assets/Punto de Recoleccion Marcador.png',
+                  }] : []}
                   onMapClick={handleMapClick}
-                  selectedLocation={selectedLocation}
-                  isAddingPoint={true}
                 />
               </div>
 

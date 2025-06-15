@@ -61,6 +61,9 @@ const AdminPanel: React.FC = () => {
   }>(null);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
 
+  // Ref para drag-scroll en el carrusel de pestañas
+  const tabCarouselRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
       setLoading(true);
@@ -311,16 +314,82 @@ const AdminPanel: React.FC = () => {
     // coordinates is now an array of arrays for grouping
   }>));
 
+  // Drag to scroll para el carrusel de pestañas
+  useEffect(() => {
+    const el = tabCarouselRef.current;
+    if (!el) return;
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+    const onMouseDown = (e: MouseEvent) => {
+      isDown = true;
+      el.classList.add('cursor-grabbing');
+      startX = e.pageX - el.offsetLeft;
+      scrollLeft = el.scrollLeft;
+    };
+    const onMouseLeave = () => {
+      isDown = false;
+      el.classList.remove('cursor-grabbing');
+    };
+    const onMouseUp = () => {
+      isDown = false;
+      el.classList.remove('cursor-grabbing');
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - el.offsetLeft;
+      const walk = (x - startX) * 1.2; // velocidad
+      el.scrollLeft = scrollLeft - walk;
+    };
+    el.addEventListener('mousedown', onMouseDown);
+    el.addEventListener('mouseleave', onMouseLeave);
+    el.addEventListener('mouseup', onMouseUp);
+    el.addEventListener('mousemove', onMouseMove);
+    // Touch events para mobile
+    let touchStartX = 0;
+    let touchScrollLeft = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].pageX;
+      touchScrollLeft = el.scrollLeft;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const x = e.touches[0].pageX;
+      const walk = (x - touchStartX) * 1.2;
+      el.scrollLeft = touchScrollLeft - walk;
+    };
+    el.addEventListener('touchstart', onTouchStart);
+    el.addEventListener('touchmove', onTouchMove);
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown);
+      el.removeEventListener('mouseleave', onMouseLeave);
+      el.removeEventListener('mouseup', onMouseUp);
+      el.removeEventListener('mousemove', onMouseMove);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <h1 className="text-3xl font-bold text-green-700 mb-6">Panel de Administrador</h1>
       <div className="mb-8">
-        <div className="flex gap-4 mb-6">
-          <button onClick={() => setActiveTab('usuarios')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'usuarios' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Usuarios Registrados</button>
-          <button onClick={() => setActiveTab('notificaciones')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'notificaciones' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Enviar Notificaciones</button>
-          <button onClick={() => setActiveTab('feedback')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'feedback' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Sugerencias y Reclamos</button>
-          <button onClick={() => setActiveTab('publicidades')} className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 ${activeTab === 'publicidades' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Gestionar Publicidades</button>
-          <button onClick={() => setShowZonesModal(true)} className="px-4 py-2 rounded-t-lg font-semibold border-b-2 border-transparent text-gray-500 bg-green-100 hover:bg-white">Zonas del Mapa</button>
+        {/* Carrusel de pestañas responsive con drag-scroll */}
+        <div className="relative">
+          <div
+            ref={tabCarouselRef}
+            className="overflow-x-auto whitespace-nowrap flex gap-4 mb-6 px-1 sm:px-0 scrollbar-hide cursor-grab select-none"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            <button onClick={() => setActiveTab('usuarios')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'usuarios' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Usuarios Registrados</button>
+            <button onClick={() => setActiveTab('notificaciones')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'notificaciones' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Enviar Notificaciones</button>
+            <button onClick={() => setActiveTab('feedback')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'feedback' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Sugerencias y Reclamos</button>
+            <button onClick={() => setActiveTab('publicidades')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'publicidades' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Gestionar Publicidades</button>
+            <button onClick={() => setShowZonesModal(true)} className="px-4 py-4 rounded-t-lg font-semibold border-b-2 border-transparent text-gray-500 bg-green-100 hover:bg-white min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs">Zonas del Mapa</button>
+          </div>
+          {/* Fade visual para efecto carrusel */}
+          <div className="pointer-events-none absolute left-0 top-0 h-full w-6 bg-gradient-to-r from-gray-50 to-transparent" />
+          <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-gray-50 to-transparent" />
         </div>
         {activeTab === 'usuarios' && (
           <>

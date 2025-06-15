@@ -31,6 +31,7 @@ interface MapComponentProps {
     avatar_url?: string;
     role?: string;
     online?: boolean;
+    iconUrl?: string; // NUEVO: URL del ícono personalizado
   }>;
   onMarkerClick?: (id: string) => void;
   onMapClick?: (event: { lng: number; lat: number }) => void;
@@ -687,7 +688,33 @@ const MapComponent = React.forwardRef<{
               anchor="bottom"
               onClick={() => onMarkerClick && onMarkerClick(point.id)}
             >
-              <div className="w-6 h-6 bg-green-600 rounded-full border-2 border-white shadow-lg" />
+              {point.iconUrl && point.role === 'recycler' ? (
+                <div style={{ position: 'relative', width: 60, height: 60 }}>
+                  <img
+                    src={point.iconUrl}
+                    alt="Reciclador en bicicleta"
+                    className="w-14 h-14 object-contain drop-shadow-lg"
+                    style={{ pointerEvents: 'none', userSelect: 'none', width: 56, height: 56 }}
+                  />
+                  {point.avatar_url && (
+                    <img
+                      src={point.avatar_url}
+                      alt="Avatar reciclador"
+                      className="w-8 h-8 rounded-full border-2 border-white shadow-md absolute left-1/2 -translate-x-1/2"
+                      style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: '28px', width: 32, height: 32, borderRadius: '50%', border: '2px solid white', background: 'white' }}
+                    />
+                  )}
+                </div>
+              ) : point.iconUrl ? (
+                <img
+                  src={point.iconUrl}
+                  alt="Punto de recolección"
+                  className="w-10 h-10 object-contain drop-shadow-lg"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                />
+              ) : (
+                <div className="w-6 h-6 bg-green-600 rounded-full border-2 border-white shadow-lg" />
+              )}
             </Marker>
           ))}
         </Map>

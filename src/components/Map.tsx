@@ -75,7 +75,7 @@ const MapComponent = React.forwardRef<{
     const drawRef = useRef<MapboxDraw | null>(null);
     // Estado para saber si el mapa está listo
     const [mapReady, setMapReady] = useState(false);
-    const [styleLoaded, setStyleLoaded] = useState(false);
+    const [styleLoaded] = useState(false);
 
     // Asignar ref y marcar como listo
     const handleMapRef = (ref: MapRef | null) => {

@@ -9,7 +9,7 @@ export async function fetchZones(): Promise<Zone[]> {
       return [];
     }
     // Adaptar coordinates si viene como string JSON
-    return (data || []).map((z: any) => {
+    return (data || []).map((z: Zone) => {
       let coordinates = z.coordinates;
       if (typeof coordinates === 'string') {
         try {

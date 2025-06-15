@@ -48,13 +48,17 @@ const AdminPanel: React.FC = () => {
   const [feedbackError, setFeedbackError] = useState<string|null>(null);
   const [activeTab, setActiveTab] = useState<'usuarios' | 'notificaciones' | 'feedback' | 'publicidades'>('usuarios');
   // Zonas para el mapa admin
-  const { zones, loading: zonesLoading, handleCreate, handleEdit, handleDelete, reloadZones } = useZones();
+  const { zones, loading: zonesLoading, handleDelete, reloadZones } = useZones();
   const [showZonesModal, setShowZonesModal] = useState(false);
   const [pendingZone, setPendingZone] = useState<Omit<Zone, 'id'> | null>(null);
   const [pendingZoneName, setPendingZoneName] = useState('');
   const [pendingZoneColor, setPendingZoneColor] = useState('#3b82f6');
 
-  const mapComponentRef = useRef<{ clearDraw: () => void }>(null);
+  // Ref para el mapa admin, ahora incluye setDrawMode y clearDraw
+  const mapComponentRef = useRef<{
+    clearDraw: (mode?: 'draw_polygon' | 'edit_polygon') => void;
+    setDrawMode: (mode: 'draw_polygon' | 'edit_polygon' | 'none') => void;
+  }>(null);
   const [isDrawingZone, setIsDrawingZone] = useState(false);
 
   useEffect(() => {
@@ -525,7 +529,9 @@ const AdminPanel: React.FC = () => {
                         className="px-3 py-1 rounded bg-red-600 text-white font-semibold shadow hover:bg-red-700 transition"
                         onClick={() => {
                           setIsDrawingZone(false);
-                          mapComponentRef.current && mapComponentRef.current.setDrawMode && mapComponentRef.current.setDrawMode('none');
+                          if (mapComponentRef.current && typeof mapComponentRef.current.clearDraw === 'function') {
+                            mapComponentRef.current.clearDraw();
+                          }
                         }}
                         type="button"
                       >
@@ -536,7 +542,15 @@ const AdminPanel: React.FC = () => {
                         className="px-3 py-1 rounded bg-green-600 text-white font-semibold shadow hover:bg-green-700 transition"
                         onClick={() => {
                           setIsDrawingZone(true);
-                          mapComponentRef.current && mapComponentRef.current.clearDraw && mapComponentRef.current.clearDraw('draw_polygon');
+                          setPendingZone(null); // Limpiar zona pendiente
+                          setPendingZoneName('');
+                          setPendingZoneColor('#3b82f6');
+                          if (mapComponentRef.current && typeof mapComponentRef.current.clearDraw === 'function') {
+                            mapComponentRef.current.clearDraw();
+                          }
+                          if (mapComponentRef.current && typeof mapComponentRef.current.setDrawMode === 'function') {
+                            mapComponentRef.current.setDrawMode('draw_polygon');
+                          }
                         }}
                         type="button"
                       >
@@ -545,27 +559,41 @@ const AdminPanel: React.FC = () => {
                     )}
                     <button
                       className={`px-3 py-1 rounded bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition disabled:opacity-50`}
-                      onClick={() => mapComponentRef.current && mapComponentRef.current.setDrawMode && mapComponentRef.current.setDrawMode('edit_polygon')}
+                      onClick={() => {
+                        if (
+                          mapComponentRef.current &&
+                          typeof mapComponentRef.current.setDrawMode === 'function'
+                        ) {
+                          mapComponentRef.current.setDrawMode('edit_polygon');
+                        }
+                      }}
                       type="button"
                     >
                       Editar Zona
                     </button>
                   </div>
-                  <MapComponent
-                    ref={mapComponentRef}
-                    points={[]}
-                    zones={zones.filter(z => Array.isArray(z.coordinates) && z.coordinates.length >= 3)}
-                    isAdmin={true}
-                    onZoneCreate={zone => setPendingZone({ ...zone, color: pendingZoneColor, name: pendingZoneName })}
-                    onZoneEdit={handleEdit}
-                    pendingZone={pendingZone ? { ...pendingZone, color: pendingZoneColor, name: pendingZoneName, id: 'pending' } : null}
-                  />
+                  <div style={{ height: '500px', width: '100%' }}>
+                    <MapComponent
+                      ref={mapComponentRef}
+                      points={[]}
+                      zones={zones.filter(z => {
+                        console.log('DEBUG: zona', z.name, 'coordinates:', z.coordinates, 'tipo:', typeof z.coordinates, 'length:', Array.isArray(z.coordinates) ? z.coordinates.length : 'no-array');
+                        return Array.isArray(z.coordinates) && z.coordinates.length >= 4;
+                      })}
+                      isAdmin={true}
+                      onZoneCreate={zone => {
+                        setPendingZone({ ...zone, color: pendingZoneColor, name: pendingZoneName });
+                        // No limpiar pendingZone aquí, solo después de guardar
+                      }}
+                      pendingZone={pendingZone ? { ...pendingZone, color: pendingZoneColor, name: pendingZoneName, id: 'pending' } : null}
+                    />
+                  </div>
                   <div className="flex flex-col sm:flex-row justify-between mt-4 gap-2">
                     <button
                       className="bg-green-600 text-white px-4 py-2 rounded shadow disabled:opacity-50"
                       onClick={async () => {
                         if (pendingZone && pendingZoneName.trim() && (pendingZone.coordinates.length ?? 0) >= 4) {
-                          const { id, ...zoneData } = pendingZone as any;
+                          const zoneData: Omit<Zone, 'id'> = { ...pendingZone };
                           try {
                             const { data: { user }, error: userError } = await supabase.auth.getUser();
                             if (userError) {
@@ -584,17 +612,14 @@ const AdminPanel: React.FC = () => {
                             // Validar coordinates
                             const coordinatesString = Array.isArray(zoneData.coordinates)
                               ? JSON.stringify(zoneData.coordinates)
-                              : (typeof zoneData.coordinates === 'string' ? zoneData.coordinates.replace(/^"|"$/g, '') : '[]');
+                              : (typeof zoneData.coordinates === 'string'
+                                  ? (zoneData.coordinates as string).replace(/^"|"$/g, '')
+                                  : '[]');
                             console.log('DEBUG: Insertando zona con coordinates:', coordinatesString);
-                            const { error } = await supabase.from('zones').insert([
-                              {
-                                ...zoneData,
-                                name: pendingZoneName,
-                                color: pendingZoneColor,
-                                coordinates: coordinatesString,
-                                user_id: user.id,
-                              }
-                            ]);
+                            // Solo crear el objeto sin el campo id
+                            const zoneToInsert = { ...zoneData, name: pendingZoneName, color: pendingZoneColor, coordinates: zoneData.coordinates, user_id: user.id };
+                            const { error } = await supabase.from('zones').insert([zoneToInsert]);
+                            console.log('DEBUG: Resultado de insert:', error);
                             if (error) {
                               alert('Error al guardar la zona: ' + error.message);
                             } else {
@@ -602,11 +627,35 @@ const AdminPanel: React.FC = () => {
                               setPendingZone(null);
                               setPendingZoneName('');
                               setPendingZoneColor('#3b82f6');
+                              setIsDrawingZone(false); // <-- Permitir volver a crear otra zona
+                              await reloadZones();
+                              // Esperar a que la zona guardada esté en zones antes de limpiar pendingZone
+                              const checkZoneInList = () => {
+                                return zones.some(z => {
+                                  // Comparar por nombre y color y coordenadas
+                                  return (
+                                    z.name === pendingZoneName &&
+                                    z.color === pendingZoneColor &&
+                                    JSON.stringify(z.coordinates) === coordinatesString
+                                  );
+                                });
+                              };
+                              let retries = 10;
+                              while (!checkZoneInList() && retries > 0) {
+                                await new Promise(res => setTimeout(res, 300));
+                                await reloadZones();
+                                retries--;
+                              }
+                              setPendingZone(null);
+                              setPendingZoneName('');
+                              setPendingZoneColor('#3b82f6');
+                              setIsDrawingZone(false); // <-- Permitir volver a crear otra zona
                               await reloadZones();
                               // Log para ver si reloadZones trae datos
                               console.log('DEBUG: reloadZones ejecutado');
+                              console.log('DEBUG: Zonas después de reloadZones:', zones);
                             }
-                          } catch (e) {
+                          } catch {
                             alert('Error inesperado al guardar la zona');
                           }
                         }

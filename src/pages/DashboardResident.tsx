@@ -987,8 +987,7 @@ useEffect(() => {
                   online: rec.online === true,
                   iconUrl: '/assets/bicireciclador-Photoroom.png',
                 }))}
-              showUserLocation={true}
-            />
+              showUserLocation={true} zones={[]}            />
             {/* DEBUG: Mostrar recicladores que deberían aparecer en el mapa */}
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-900">
             <b>Recicladores en línea con coordenadas:</b>

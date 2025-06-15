@@ -286,9 +286,29 @@ const AdminPanel: React.FC = () => {
     setPendingZoneColor('#3b82f6');
   };
 
+  // Normaliza cualquier entrada a [number, number][][]
+  function normalizePolygonCoordinates(input: unknown): [number, number][][] {
+    if (!Array.isArray(input)) return [];
+    // Si es [ [ [lng,lat], ... ] ]
+    if (
+      Array.isArray(input[0]) &&
+      Array.isArray((input[0] as unknown[])[0]) &&
+      typeof ((input[0] as unknown[])[0] as unknown[])[0] === 'number'
+    ) {
+      return [input as [number, number][]];
+    }
+    // Si es [ [lng,lat], ... ]
+    if (
+      Array.isArray(input[0]) &&
+      typeof (input[0] as unknown[])[0] === 'number'
+    ) {
+      return [input as [number, number][]];
+    }
+    return [];
+  }
+
   // Agrupar zonas por nombre
   const groupedZones = Object.values(zones.reduce((acc, z) => {
-    // Adaptar coordinates: si es string, parsear a array
     let coordinates = z.coordinates;
     if (typeof coordinates === 'string') {
       try {
@@ -298,20 +318,20 @@ const AdminPanel: React.FC = () => {
         coordinates = [];
       }
     }
+    const normalized = normalizePolygonCoordinates(coordinates);
     if (!acc[z.name]) {
-      acc[z.name] = { ...z, color: z.color ?? '#3b82f6', ids: [z.id], coordinates: [coordinates] };
+      acc[z.name] = { ...z, color: z.color ?? '#3b82f6', ids: [z.id], coordinates: normalized };
     } else {
       acc[z.name].ids.push(z.id);
-      acc[z.name].coordinates.push(coordinates);
+      acc[z.name].coordinates = acc[z.name].coordinates.concat(normalized);
     }
     return acc;
-  }, {} as Record<string, { 
-    id: string; 
-    name: string; 
-    color: string; 
-    coordinates: number[][][]; 
-    ids: string[]; 
-    // coordinates is now an array of arrays for grouping
+  }, {} as Record<string, {
+    id: string;
+    name: string;
+    color: string;
+    coordinates: [number, number][][];
+    ids: string[];
   }>));
 
   // Drag to scroll para el carrusel de pestañas
@@ -646,15 +666,14 @@ const AdminPanel: React.FC = () => {
                       ref={mapComponentRef}
                       points={[]}
                       zones={zones.filter(z => {
-                        console.log('DEBUG: zona', z.name, 'coordinates:', z.coordinates, 'tipo:', typeof z.coordinates, 'length:', Array.isArray(z.coordinates) ? z.coordinates.length : 'no-array');
-                        return Array.isArray(z.coordinates) && z.coordinates.length >= 4;
-                      })}
+                        const coords = normalizePolygonCoordinates(z.coordinates);
+                        return coords[0]?.length >= 4;
+                      }).map(z => ({ ...z, coordinates: normalizePolygonCoordinates(z.coordinates) }))}
                       isAdmin={true}
                       onZoneCreate={zone => {
                         setPendingZone({ ...zone, color: pendingZoneColor, name: pendingZoneName });
                         // No limpiar pendingZone aquí, solo después de guardar
                       }}
-                      pendingZone={pendingZone ? { ...pendingZone, color: pendingZoneColor, name: pendingZoneName, id: 'pending' } : null}
                     />
                   </div>
                   <div className="flex flex-col sm:flex-row justify-between mt-4 gap-2">
@@ -673,22 +692,30 @@ const AdminPanel: React.FC = () => {
                               alert('Debes iniciar sesión para crear una zona.');
                               return;
                             }
-                            // Validar name
                             if (!pendingZoneName.trim()) {
                               alert('El nombre de la zona es obligatorio.');
                               return;
                             }
-                            // Validar coordinates
-                            const coordinatesString = Array.isArray(zoneData.coordinates)
-                              ? JSON.stringify(zoneData.coordinates)
-                              : (typeof zoneData.coordinates === 'string'
-                                  ? (zoneData.coordinates as string).replace(/^"|"$/g, '')
-                                  : '[]');
-                            console.log('DEBUG: Insertando zona con coordinates:', coordinatesString);
-                            // Solo crear el objeto sin el campo id
-                            const zoneToInsert = { ...zoneData, name: pendingZoneName, color: pendingZoneColor, coordinates: zoneData.coordinates, user_id: user.id };
+                            // Asegurar formato GeoJSON Polygon: [[[lng,lat],...]]
+                            let polygonCoordinates = normalizePolygonCoordinates(zoneData.coordinates);
+                            // Si coordinates es un array de [number, number], envuélvelo en dos arrays para GeoJSON Polygon [[[lng,lat],...]]
+                            if (
+                              Array.isArray(polygonCoordinates) &&
+                              Array.isArray(polygonCoordinates[0]) &&
+                              Array.isArray(polygonCoordinates[0][0]) === false &&
+                              typeof polygonCoordinates[0][0] === 'number'
+                            ) {
+                              polygonCoordinates = [polygonCoordinates as unknown as [number, number][]];
+                            }
+                            const coordinatesString = JSON.stringify(polygonCoordinates);
+                            const zoneToInsert = {
+                              ...zoneData,
+                              name: pendingZoneName,
+                              color: pendingZoneColor,
+                              coordinates: polygonCoordinates,
+                              user_id: user.id
+                            };
                             const { error } = await supabase.from('zones').insert([zoneToInsert]);
-                            console.log('DEBUG: Resultado de insert:', error);
                             if (error) {
                               alert('Error al guardar la zona: ' + error.message);
                             } else {
@@ -696,12 +723,11 @@ const AdminPanel: React.FC = () => {
                               setPendingZone(null);
                               setPendingZoneName('');
                               setPendingZoneColor('#3b82f6');
-                              setIsDrawingZone(false); // <-- Permitir volver a crear otra zona
+                              setIsDrawingZone(false);
                               await reloadZones();
                               // Esperar a que la zona guardada esté en zones antes de limpiar pendingZone
                               const checkZoneInList = () => {
                                 return zones.some(z => {
-                                  // Comparar por nombre y color y coordenadas
                                   return (
                                     z.name === pendingZoneName &&
                                     z.color === pendingZoneColor &&
@@ -718,11 +744,8 @@ const AdminPanel: React.FC = () => {
                               setPendingZone(null);
                               setPendingZoneName('');
                               setPendingZoneColor('#3b82f6');
-                              setIsDrawingZone(false); // <-- Permitir volver a crear otra zona
+                              setIsDrawingZone(false);
                               await reloadZones();
-                              // Log para ver si reloadZones trae datos
-                              console.log('DEBUG: reloadZones ejecutado');
-                              console.log('DEBUG: Zonas después de reloadZones:', zones);
                             }
                           } catch {
                             alert('Error inesperado al guardar la zona');

@@ -134,7 +134,7 @@ function PuntosRecoleccion() {
     lng: Number(point.lng),
     title: point.address,
     isRecycler: false,
-    iconUrl: '/assets/Punto de Recoleccion Marcador.png',
+    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png', // icono personalizado
   }));
 
   
@@ -193,8 +193,9 @@ function PuntosRecoleccion() {
           </p>
           <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm">
             <Map
-              points={mapPoints}
+              markers={mapPoints}
               showUserLocation={true}
+              hideDrawControls={true} // Oculta controles de dibujo
             />
           </div>
         </div>

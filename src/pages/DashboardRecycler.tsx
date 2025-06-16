@@ -1070,7 +1070,8 @@ const DashboardRecycler: React.FC = () => {
                     lat: Number(p.lat),
                     lng: Number(p.lng),
                     title: p.address,
-                    avatar_url: p.creator_avatar || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png',
+                    avatar_url: p.creator_avatar || undefined,
+                    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
                     status: 'disponible',
                   })),
                   ...claimedPoints.map(p => ({
@@ -1078,12 +1079,14 @@ const DashboardRecycler: React.FC = () => {
                     lat: Number(p.lat),
                     lng: Number(p.lng),
                     title: p.address,
-                    avatar_url: p.creator_avatar || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png',
+                    avatar_url: p.creator_avatar || undefined,
+                    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750101287/Punto_de_Recoleccion_reclamado_Marcador_m3c4rd.png',
                     status: p.claim_status,
                   })),
                 ]}
                 showUserLocation={true}
                 showAdminZonesButton={true}
+                hideDrawControls={true} // Oculta controles de dibujo
               />
             </div>
           )}

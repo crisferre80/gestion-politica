@@ -27,6 +27,17 @@ export interface MapboxPolygonProps {
     online?: boolean;
     iconUrl?: string;
   }>;
+  // Alias para markers (para compatibilidad con 'points')
+  // points?: Array<{
+  //   id: string;
+  //   lat: number;
+  //   lng: number;
+  //   title: string;
+  //   avatar_url?: string;
+  //   role?: string;
+  //   online?: boolean;
+  //   iconUrl?: string;
+  // }>;
   showUserLocation?: boolean;
   zones?: AdminZone[];
   hideDrawControls?: boolean;
@@ -34,6 +45,7 @@ export interface MapboxPolygonProps {
   // NUEVAS PROPS PARA RUTAS
   route?: { lat: number; lng: number }[];
   showRoute?: boolean;
+  onMapClick?: (event: { lng: number; lat: number }) => void;
 }
 
 const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
@@ -45,7 +57,8 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   hideDrawControls = false,
   showAdminZonesButton = false,
   route = [],
-  showRoute = false
+  showRoute = false,
+  onMapClick,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -123,6 +136,32 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
       center: initialCenter,
       zoom: initialZoom
     });
+
+    // Geolocalización automática si showUserLocation está activo
+    if (showUserLocation && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          mapRef.current!.flyTo({ center: [longitude, latitude], zoom: 15 });
+          if (userMarkerRef.current) userMarkerRef.current.remove();
+          userMarkerRef.current = new mapboxgl.Marker({ color: '#22c55e' })
+            .setLngLat([longitude, latitude])
+            .addTo(mapRef.current!);
+        },
+        () => {
+          // Si el usuario no da permiso, no hacer nada
+        },
+        { enableHighAccuracy: true }
+      );
+    }
+
+    // Manejar click en el mapa para seleccionar ubicación
+    if (onMapClick) {
+      mapRef.current.on('click', (e) => {
+        onMapClick({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+      });
+    }
+
     if (!hideDrawControls) {
       drawRef.current = new MapboxDraw({
         displayControlsDefault: false,
@@ -137,14 +176,17 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
       });
     }
     mapRef.current.on('load', () => {
-      // Agregar marcadores de recicladores
+      // Limpiar marcadores previos
+      // ...no hay lógica previa para limpiar, pero si se requiere, agregar aquí...
+      // Agregar marcadores personalizados
       markers.forEach(marker => {
         const el = document.createElement('div');
-        el.style.width = '64px';
-        el.style.height = '64px';
-        el.style.backgroundImage = `url(/assets/bicireciclador-Photoroom.png)`;
+        el.style.width = '48px';
+        el.style.height = '48px';
+        el.style.backgroundImage = `url(${marker.iconUrl || '/assets/Punto de Recoleccion Marcador.png'})`;
         el.style.backgroundSize = 'contain';
         el.style.backgroundRepeat = 'no-repeat';
+        el.style.backgroundPosition = 'center';
         el.title = marker.title;
         new mapboxgl.Marker(el)
           .setLngLat([marker.lng, marker.lat])
@@ -297,7 +339,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
         mapRef.current.remove();
       }
     };
-  }, [onPolygonCreate, onSelectZone, markers, showUserLocation, zones, hideDrawControls, adminZones, showAdminZones, route, showRoute]);
+  }, [onPolygonCreate, onSelectZone, markers, showUserLocation, zones, hideDrawControls, adminZones, showAdminZones, route, showRoute, onMapClick]);
 
   return (
     <div style={{ width: '100%', height: 500, position: 'relative' }}>

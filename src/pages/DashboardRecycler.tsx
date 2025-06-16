@@ -1064,7 +1064,7 @@ const DashboardRecycler: React.FC = () => {
           {showAllPointsMap && (
             <div className="w-full h-96 rounded-lg overflow-hidden border border-green-300 shadow mb-2 animate-fade-in">
               <Map
-                points={[
+                markers={[
                   ...availablePoints.map(p => ({
                     id: p.id,
                     lat: Number(p.lat),
@@ -1083,7 +1083,7 @@ const DashboardRecycler: React.FC = () => {
                   })),
                 ]}
                 showUserLocation={true}
-                showRoute={false}
+                showAdminZonesButton={true}
               />
             </div>
           )}
@@ -1696,7 +1696,7 @@ const DashboardRecycler: React.FC = () => {
                   </div>
                   <div className="h-96">
                     <Map
-                      points={[
+                      markers={[
                         {
                           id: selectedPoint.id,
                           lat: Number(selectedPoint.lat),
@@ -1707,7 +1707,6 @@ const DashboardRecycler: React.FC = () => {
                       ]}
                       showUserLocation={true}
                       showRoute={true}
-                      routeDestination={{ lat: Number(selectedPoint.lat), lng: Number(selectedPoint.lng) }}
                     />
                   </div>
                 </div>
@@ -2088,8 +2087,8 @@ const DashboardRecycler: React.FC = () => {
                               }
                               return (
                                 <MapComponent
-                                  points={markerPoints}
-                                  routePoints={routeLine}
+                                  markers={markerPoints}
+                                  route={routeLine}
                                   showUserLocation={false}
                                   showRoute={true}
                                 />

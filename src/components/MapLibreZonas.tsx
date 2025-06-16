@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import './maplibre-gl-terradraw.css';
-// import '@watergis/maplibre-gl-terradraw/dist/maplibre-gl-terradraw.css';
+import '@watergis/maplibre-gl-terradraw/dist/maplibre-gl-terradraw.css'; // Importa el CSS original de TerraDraw
 import { MaplibreTerradrawControl } from '@watergis/maplibre-gl-terradraw';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../lib/supabase';
@@ -58,7 +58,22 @@ const MapLibreZonas: React.FC<MapLibreZonasProps> = ({ zones, onZoneCreated, rel
     map.on('load', () => {
       // Control de dibujo
       drawRef.current = new MaplibreTerradrawControl({
-        modes: ['polygon', 'delete', 'select', 'download'],
+        modes: [
+          'polygon',
+          'linestring',
+          'point',
+          'rectangle',
+          'circle',
+          'freehand',
+          'angled-rectangle',
+          'sensor',
+          'sector',
+          'select',
+          'delete-selection',
+          'delete',
+          'download',
+          'render',
+        ],
       });
       map.addControl(drawRef.current, 'top-left');
       zones.forEach((zone, idx) => {

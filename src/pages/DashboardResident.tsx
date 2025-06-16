@@ -975,19 +975,20 @@ useEffect(() => {
               </span>
             </h3>
             <Map
-              points={recyclers
-                .filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true)
-                .map((rec) => ({
-                  id: rec.id.toString(),
-                  lat: rec.lat ?? 0,
-                  lng: rec.lng ?? 0,
-                  title: rec.profiles?.name || 'Reciclador',
-                  avatar_url: rec.profiles?.avatar_url || undefined,
-                  role: 'recycler',
-                  online: rec.online === true,
-                  iconUrl: '/assets/bicireciclador-Photoroom.png',
-                }))}
-              showUserLocation={true} zones={[]}            />
+  markers={recyclers
+    .filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true)
+    .map((rec) => ({
+      id: rec.id.toString(),
+      lat: rec.lat ?? 0,
+      lng: rec.lng ?? 0,
+      title: rec.profiles?.name || 'Reciclador',
+      avatar_url: rec.profiles?.avatar_url || undefined,
+      role: 'recycler',
+      online: rec.online === true,
+      iconUrl: '/assets/bicireciclador-Photoroom.png',
+    }))}
+  showUserLocation={true}
+/>
             {/* DEBUG: Mostrar recicladores que deberían aparecer en el mapa */}
           <div className="mt-4 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-900">
             <b>Recicladores en línea con coordenadas:</b>

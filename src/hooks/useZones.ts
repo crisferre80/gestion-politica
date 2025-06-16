@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fetchZones, createZone, updateZone, deleteZone } from '../lib/zonesApi';
-import { Zone } from '../components/Map';
+import type { Zone } from '../lib/zonesApi';
 
 export function useZones() {
   const [zones, setZones] = useState<Zone[]>([]);

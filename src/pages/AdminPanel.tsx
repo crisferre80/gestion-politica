@@ -3,7 +3,7 @@ import { deleteCollectionPoint, supabase, CollectionPoint } from '../lib/supabas
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
 import { useZones } from '../hooks/useZones';
-import MapComponent, { Zone } from '../components/Map';
+import MapLibreZonas from '../components/MapLibreZonas';
 
 interface UserRow {
   avatar_url: string | null;
@@ -48,22 +48,90 @@ const AdminPanel: React.FC = () => {
   const [feedbackError, setFeedbackError] = useState<string|null>(null);
   const [activeTab, setActiveTab] = useState<'usuarios' | 'notificaciones' | 'feedback' | 'publicidades'>('usuarios');
   // Zonas para el mapa admin
-  const { zones, loading: zonesLoading, handleDelete, reloadZones } = useZones();
+  const { zones, loading: zonesLoading, reloadZones } = useZones();
+  useEffect(() => {
+    console.log('Zonas cargadas:', zones);
+  }, [zones]);
   const [showZonesModal, setShowZonesModal] = useState(false);
-  const [pendingZone, setPendingZone] = useState<Omit<Zone, 'id'> | null>(null);
-  const [pendingZoneName, setPendingZoneName] = useState('');
-  const [pendingZoneColor, setPendingZoneColor] = useState('#3b82f6');
+  // Define Zone type if not importado
+  // Quitar export aquí, solo type local
+  type Zone = {
+    id: string;
+    name: string;
+    color?: string;
+    coordinates: [number, number][][]; // GeoJSON Polygon
+    [key: string]: unknown;
+  };
+  
+  // Al crear o editar zona, pendingZone siempre tiene coordinates: [number, number][]
+  const [, setPendingZone] = useState<Omit<Zone, 'id'> | null>(null);
 
   // Ref para el mapa admin, ahora incluye setDrawMode y clearDraw
   const mapComponentRef = useRef<{
     clearDraw: (mode?: 'draw_polygon' | 'edit_polygon') => void;
     setDrawMode: (mode: 'draw_polygon' | 'edit_polygon' | 'none') => void;
   }>(null);
-  const [isDrawingZone, setIsDrawingZone] = useState(false);
 
   // Ref para drag-scroll en el carrusel de pestañas
   const tabCarouselRef = useRef<HTMLDivElement>(null);
 
+  // Drag to scroll para el carrusel de pestañas
+  useEffect(() => {
+    const el = tabCarouselRef.current;
+    if (!el) return;
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+    const onMouseDown = (e: MouseEvent) => {
+      isDown = true;
+      el.classList.add('cursor-grabbing');
+      startX = e.pageX - el.offsetLeft;
+      scrollLeft = el.scrollLeft;
+    };
+    const onMouseLeave = () => {
+      isDown = false;
+      el.classList.remove('cursor-grabbing');
+    };
+    const onMouseUp = () => {
+      isDown = false;
+      el.classList.remove('cursor-grabbing');
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - el.offsetLeft;
+      const walk = (x - startX) * 1.2; // velocidad
+      el.scrollLeft = scrollLeft - walk;
+    };
+    el.addEventListener('mousedown', onMouseDown);
+    el.addEventListener('mouseleave', onMouseLeave);
+    el.addEventListener('mouseup', onMouseUp);
+    el.addEventListener('mousemove', onMouseMove);
+    // Touch events para mobile
+    let touchStartX = 0;
+    let touchScrollLeft = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].pageX;
+      touchScrollLeft = el.scrollLeft;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const x = e.touches[0].pageX;
+      const walk = (x - touchStartX) * 1.2;
+      el.scrollLeft = touchScrollLeft - walk;
+    };
+    el.addEventListener('touchstart', onTouchStart);
+    el.addEventListener('touchmove', onTouchMove);
+    return () => {
+      el.removeEventListener('mousedown', onMouseDown);
+      el.removeEventListener('mouseleave', onMouseLeave);
+      el.removeEventListener('mouseup', onMouseUp);
+      el.removeEventListener('mousemove', onMouseMove);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+    };
+  }, []);
+
+  // Cargar usuarios y puntos de recolección
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
       setLoading(true);
@@ -282,57 +350,7 @@ const AdminPanel: React.FC = () => {
       mapComponentRef.current.clearDraw();
     }
     setPendingZone(null);
-    setPendingZoneName('');
-    setPendingZoneColor('#3b82f6');
   };
-
-  // Normaliza cualquier entrada a [number, number][][]
-  function normalizePolygonCoordinates(input: unknown): [number, number][][] {
-    if (!Array.isArray(input)) return [];
-    // Si es [ [ [lng,lat], ... ] ]
-    if (
-      Array.isArray(input[0]) &&
-      Array.isArray((input[0] as unknown[])[0]) &&
-      typeof ((input[0] as unknown[])[0] as unknown[])[0] === 'number'
-    ) {
-      return [input as [number, number][]];
-    }
-    // Si es [ [lng,lat], ... ]
-    if (
-      Array.isArray(input[0]) &&
-      typeof (input[0] as unknown[])[0] === 'number'
-    ) {
-      return [input as [number, number][]];
-    }
-    return [];
-  }
-
-  // Agrupar zonas por nombre
-  const groupedZones = Object.values(zones.reduce((acc, z) => {
-    let coordinates = z.coordinates;
-    if (typeof coordinates === 'string') {
-      try {
-        coordinates = JSON.parse(coordinates);
-      } catch (e) {
-        console.error('Error al parsear coordinates de zona', z, e);
-        coordinates = [];
-      }
-    }
-    const normalized = normalizePolygonCoordinates(coordinates);
-    if (!acc[z.name]) {
-      acc[z.name] = { ...z, color: z.color ?? '#3b82f6', ids: [z.id], coordinates: normalized };
-    } else {
-      acc[z.name].ids.push(z.id);
-      acc[z.name].coordinates = acc[z.name].coordinates.concat(normalized);
-    }
-    return acc;
-  }, {} as Record<string, {
-    id: string;
-    name: string;
-    color: string;
-    coordinates: [number, number][][];
-    ids: string[];
-  }>));
 
   // Drag to scroll para el carrusel de pestañas
   useEffect(() => {
@@ -440,13 +458,12 @@ const AdminPanel: React.FC = () => {
                       <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
                       <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Rol</th>
                       <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">User ID</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Avatar</th>
                       <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.filter(u => !roleFilter || u.role === roleFilter).length === 0 ? (
-                      <tr><td colSpan={6} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
+                      <tr><td colSpan={5} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
                     ) : (
                       users.filter(u => !roleFilter || u.role === roleFilter).map(u => (
                         <tr key={u.id} className={`border-b hover:bg-green-50 transition-colors ${!u.user_id || !u.role ? 'bg-yellow-100' : ''}`}>
@@ -577,210 +594,15 @@ const AdminPanel: React.FC = () => {
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow-lg w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2 sm:p-4 md:p-6 max-h-[90vh] overflow-y-auto relative">
               <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={handleCloseZonesModal}>✕</button>
-              <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa</h3>
-              {/* Manejo de errores de zonas */}
+              <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa (MapLibre)</h3>
               {error && (
                 <div className="bg-red-100 text-red-700 p-2 rounded mb-2 font-semibold">Error: {error}</div>
               )}
               {zonesLoading ? <p>Cargando zonas...</p> : (
-                <>
-                  {/* LOG DE DEPURACIÓN */}
-                  {console.log('zones', zones, 'pendingZone', pendingZone)}
-                  {/* Fallback visual si no hay zonas o hay error */}
-                  <div className="mb-4 flex flex-col md:flex-row gap-4 items-end">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la zona a crear:</label>
-                      <input
-                        type="text"
-                        className="border rounded px-2 py-1 w-full"
-                        placeholder="Ej: Zona Norte, Centro, etc."
-                        value={pendingZoneName}
-                        onChange={e => setPendingZoneName(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Color:</label>
-                      <input
-                        type="color"
-                        className="w-10 h-10 p-0 border-0 bg-transparent"
-                        value={pendingZoneColor}
-                        onChange={e => setPendingZoneColor(e.target.value)}
-                        title="Elige color de la zona"
-                      />
-                    </div>
-                  </div>
-                  <div className="mb-2 flex flex-wrap gap-2 items-center">
-                    <span className="inline-block text-xs text-gray-600 bg-gray-100 rounded px-2 py-1 border border-gray-200 cursor-help" title="Puedes finalizar el dibujo de la zona haciendo doble clic o con el botón derecho del mouse">
-                      ℹ️ Finaliza el dibujo con doble clic o botón derecho
-                    </span>
-                    {isDrawingZone ? (
-                      <button
-                        className="px-3 py-1 rounded bg-red-600 text-white font-semibold shadow hover:bg-red-700 transition"
-                        onClick={() => {
-                          setIsDrawingZone(false);
-                          if (mapComponentRef.current && typeof mapComponentRef.current.clearDraw === 'function') {
-                            mapComponentRef.current.clearDraw();
-                          }
-                        }}
-                        type="button"
-                      >
-                        Cancelar
-                      </button>
-                    ) : (
-                      <button
-                        className="px-3 py-1 rounded bg-green-600 text-white font-semibold shadow hover:bg-green-700 transition"
-                        onClick={() => {
-                          setIsDrawingZone(true);
-                          setPendingZone(null); // Limpiar zona pendiente
-                          setPendingZoneName('');
-                          setPendingZoneColor('#3b82f6');
-                          if (mapComponentRef.current && typeof mapComponentRef.current.clearDraw === 'function') {
-                            mapComponentRef.current.clearDraw();
-                          }
-                          if (mapComponentRef.current && typeof mapComponentRef.current.setDrawMode === 'function') {
-                            mapComponentRef.current.setDrawMode('draw_polygon');
-                          }
-                        }}
-                        type="button"
-                      >
-                        Crear Zona
-                      </button>
-                    )}
-                    <button
-                      className={`px-3 py-1 rounded bg-blue-600 text-white font-semibold shadow hover:bg-blue-700 transition disabled:opacity-50`}
-                      onClick={() => {
-                        if (
-                          mapComponentRef.current &&
-                          typeof mapComponentRef.current.setDrawMode === 'function'
-                        ) {
-                          mapComponentRef.current.setDrawMode('edit_polygon');
-                        }
-                      }}
-                      type="button"
-                    >
-                      Editar Zona
-                    </button>
-                  </div>
-                  <div style={{ height: '500px', width: '100%' }}>
-                    <MapComponent
-                      ref={mapComponentRef}
-                      points={[]}
-                      zones={zones.filter(z => {
-                        const coords = normalizePolygonCoordinates(z.coordinates);
-                        return coords[0]?.length >= 4;
-                      }).map(z => ({ ...z, coordinates: normalizePolygonCoordinates(z.coordinates) }))}
-                      isAdmin={true}
-                      onZoneCreate={zone => {
-                        setPendingZone({ ...zone, color: pendingZoneColor, name: pendingZoneName });
-                        // No limpiar pendingZone aquí, solo después de guardar
-                      }}
-                    />
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-between mt-4 gap-2">
-                    <button
-                      className="bg-green-600 text-white px-4 py-2 rounded shadow disabled:opacity-50"
-                      onClick={async () => {
-                        if (pendingZone && pendingZoneName.trim() && (pendingZone.coordinates.length ?? 0) >= 4) {
-                          const zoneData: Omit<Zone, 'id'> = { ...pendingZone };
-                          try {
-                            const { data: { user }, error: userError } = await supabase.auth.getUser();
-                            if (userError) {
-                              alert('Error de autenticación: ' + userError.message);
-                              return;
-                            }
-                            if (!user) {
-                              alert('Debes iniciar sesión para crear una zona.');
-                              return;
-                            }
-                            if (!pendingZoneName.trim()) {
-                              alert('El nombre de la zona es obligatorio.');
-                              return;
-                            }
-                            // Asegurar formato GeoJSON Polygon: [[[lng,lat],...]]
-                            let polygonCoordinates = normalizePolygonCoordinates(zoneData.coordinates);
-                            // Si coordinates es un array de [number, number], envuélvelo en dos arrays para GeoJSON Polygon [[[lng,lat],...]]
-                            if (
-                              Array.isArray(polygonCoordinates) &&
-                              Array.isArray(polygonCoordinates[0]) &&
-                              Array.isArray(polygonCoordinates[0][0]) === false &&
-                              typeof polygonCoordinates[0][0] === 'number'
-                            ) {
-                              polygonCoordinates = [polygonCoordinates as unknown as [number, number][]];
-                            }
-                            const coordinatesString = JSON.stringify(polygonCoordinates);
-                            const zoneToInsert = {
-                              ...zoneData,
-                              name: pendingZoneName,
-                              color: pendingZoneColor,
-                              coordinates: polygonCoordinates,
-                              user_id: user.id
-                            };
-                            const { error } = await supabase.from('zones').insert([zoneToInsert]);
-                            if (error) {
-                              alert('Error al guardar la zona: ' + error.message);
-                            } else {
-                              alert('Zona guardada correctamente');
-                              setPendingZone(null);
-                              setPendingZoneName('');
-                              setPendingZoneColor('#3b82f6');
-                              setIsDrawingZone(false);
-                              await reloadZones();
-                              // Esperar a que la zona guardada esté en zones antes de limpiar pendingZone
-                              const checkZoneInList = () => {
-                                return zones.some(z => {
-                                  return (
-                                    z.name === pendingZoneName &&
-                                    z.color === pendingZoneColor &&
-                                    JSON.stringify(z.coordinates) === coordinatesString
-                                  );
-                                });
-                              };
-                              let retries = 10;
-                              while (!checkZoneInList() && retries > 0) {
-                                await new Promise(res => setTimeout(res, 300));
-                                await reloadZones();
-                                retries--;
-                              }
-                              setPendingZone(null);
-                              setPendingZoneName('');
-                              setPendingZoneColor('#3b82f6');
-                              setIsDrawingZone(false);
-                              await reloadZones();
-                            }
-                          } catch {
-                            alert('Error inesperado al guardar la zona');
-                          }
-                        }
-                      }}
-                      disabled={!pendingZone || !pendingZoneName.trim() || (pendingZone?.coordinates.length ?? 0) < 4}
-                    >
-                      Guardar Zona
-                    </button>
-                    <button
-                      className="bg-blue-500 text-white px-4 py-2 rounded shadow"
-                      onClick={reloadZones}
-                      type="button"
-                    >
-                      Recargar Zonas
-                    </button>
-                  </div>
-                  <div className="mt-4">
-                    <h4 className="font-bold mb-2">Zonas guardadas:</h4>
-                    <ul className="space-y-2">
-                      {groupedZones.map(z => (
-                        <li key={z.name} className="flex items-center gap-2 bg-gray-100 rounded px-2 py-1">
-                          <span className="font-semibold text-green-700">{z.name}</span>
-                          <button
-                            className="bg-red-500 text-white px-2 py-1 rounded text-xs ml-auto"
-                            onClick={() => z.ids.forEach((id: string) => handleDelete(id))}
-                          >
-                            Eliminar
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
+                <MapLibreZonas
+                  zones={zones.map(z => ({ ...z, color: z.color || '#3388ff' }))}
+                  reloadZones={reloadZones}
+                />
               )}
             </div>
           </div>

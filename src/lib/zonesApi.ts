@@ -1,5 +1,13 @@
 import { supabase } from './supabase';
-import { Zone } from '../components/Map';
+
+// Definir el tipo Zone localmente aquí (debe ser type, no import default)
+export type Zone = {
+  id: string;
+  name: string;
+  color?: string;
+  coordinates: [number, number][][]; // Debe ser array de arrays para polígonos
+  [key: string]: unknown;
+};
 
 export async function fetchZones(): Promise<Zone[]> {
   try {
@@ -9,7 +17,8 @@ export async function fetchZones(): Promise<Zone[]> {
       return [];
     }
     // Adaptar coordinates si viene como string JSON
-    return (data || []).map((z: Zone) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data || []).map((z: any) => {
       let coordinates = z.coordinates;
       if (typeof coordinates === 'string') {
         try {
@@ -18,6 +27,10 @@ export async function fetchZones(): Promise<Zone[]> {
           console.error('Error al parsear coordinates de zona', z, e);
           coordinates = [];
         }
+      }
+      // Si coordinates no es array de arrays, lo normalizamos
+      if (Array.isArray(coordinates) && Array.isArray(coordinates[0]) && typeof coordinates[0][0] === 'number') {
+        coordinates = [coordinates];
       }
       return { ...z, coordinates };
     });

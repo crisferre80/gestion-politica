@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useUser } from '../context/UserContext';
@@ -123,7 +123,20 @@ const AddCollectionPoint: React.FC = () => {
     }
   };
 
-  const handleMapClick = (event: { lng: number; lat: number }) => {
+  // Memoizar los markers para evitar renders innecesarios del mapa
+  const mapMarkers = useMemo(() => {
+    if (!selectedLocation) return [];
+    return [{
+      id: 'nuevo-punto',
+      lat: selectedLocation.lat,
+      lng: selectedLocation.lng,
+      title: 'Nuevo Punto de Recolección',
+      iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+    }];
+  }, [selectedLocation]);
+
+  // Memoizar handleMapClick para evitar refrescos innecesarios del mapa
+  const handleMapClick = useCallback((event: { lng: number; lat: number }) => {
     // Solo actualiza si la ubicación realmente cambió
     if (
       !selectedLocation ||
@@ -155,7 +168,7 @@ const AddCollectionPoint: React.FC = () => {
           console.error('Error in reverse geocoding:', err);
         });
     }
-  };
+  }, [selectedLocation, address, district]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,18 +280,6 @@ const AddCollectionPoint: React.FC = () => {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
-
-  // Memoizar los markers para evitar renders innecesarios del mapa
-  const mapMarkers = useMemo(() => {
-    if (!selectedLocation) return [];
-    return [{
-      id: 'nuevo-punto',
-      lat: selectedLocation.lat,
-      lng: selectedLocation.lng,
-      title: 'Nuevo Punto de Recolección',
-      iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
-    }];
-  }, [selectedLocation]);
 
   if (!user) {
     return (

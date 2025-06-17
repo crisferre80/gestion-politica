@@ -46,6 +46,7 @@ export interface MapboxPolygonProps {
   route?: { lat: number; lng: number }[];
   showRoute?: boolean;
   onMapClick?: (event: { lng: number; lat: number }) => void;
+  disableDraw?: boolean; // Nueva prop para desactivar toda la lógica de dibujo
 }
 
 const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
@@ -59,6 +60,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   route = [],
   showRoute = false,
   onMapClick,
+  disableDraw = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -162,7 +164,8 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
       });
     }
 
-    if (!hideDrawControls) {
+    // --- SOLO INICIALIZAR DRAW SI NO ESTÁ DESACTIVADO ---
+    if (!hideDrawControls && !disableDraw) {
       drawRef.current = new MapboxDraw({
         displayControlsDefault: false,
         controls: { polygon: true, trash: true },
@@ -339,7 +342,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
         mapRef.current.remove();
       }
     };
-  }, [onPolygonCreate, onSelectZone, markers, showUserLocation, zones, hideDrawControls, adminZones, showAdminZones, route, showRoute, onMapClick]);
+  }, [onPolygonCreate, onSelectZone, markers, showUserLocation, zones, hideDrawControls, adminZones, showAdminZones, route, showRoute, onMapClick, disableDraw]);
 
   return (
     <div style={{ width: '100%', height: 500, position: 'relative' }}>

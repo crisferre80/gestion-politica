@@ -13,6 +13,7 @@ import { getChatPreviews } from '../lib/chatUtils';
 import { useNavigate } from 'react-router-dom';
 import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 import MapComponent from '../components/Map';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 const DashboardRecycler: React.FC = () => {
   const { user, login } = useUser();
@@ -1384,106 +1385,137 @@ const DashboardRecycler: React.FC = () => {
                     {claimedPoints.filter(p => p.claim_status === 'claimed').length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
                     ) : (
-                      claimedPoints.filter(p => p.claim_status === 'claimed').map(point => (
-                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                          <div className="p-6">
-                            {/* Info principal */}
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-start space-x-3">
-                                <img
-                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
-                                  alt="Punto de Recolección"
-                                  className="w-7 h-7 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
-                                />
-                                <div>
-                                  <h3 className="text-lg font-medium text-gray-900">{point.address}</h3>
-                                  <p className="mt-1 text-sm text-gray-500">{point.district}</p>
-                                </div>
-                              </div>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
-                            </div>
-                            <div className="flex flex-row justify-between items-start mt-4">
-                              <div className="flex-1">
-                                <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
-                                    <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="ml-4 flex-shrink-0">
-                                <img
-                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
-                                  alt="Reciclaje"
-                                  className="w-28 h-28 object-contain bg-white shadow-none"
-                                />
-                              </div>
-                            </div>
-                            <div className="mt-4">
-                              {point.pickup_time && (
-                                <div className="text-xs text-gray-500">Retiro programado: {new Date(point.pickup_time).toLocaleString()}</div>
-                              )}
-                              {point.status === 'claimed' && point.pickup_time && (
-                                <CountdownTimer targetDate={new Date(point.pickup_time)} onComplete={() => fetchData()} />
-                              )}
-                            </div>
-                            {/* Info residente */}
-                            <div className="mt-6 pt-6 border-t border-gray-200">
-                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
-                              <div className="space-y-2">
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <img
-                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Residente')) + '&background=E0F2FE&color=2563EB&size=64'}
-                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Residente'}
-                                    className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
-                                  />
-                                  <span>{point.creator_name}</span>
-                                </div>
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <Mail className="h-4 w-4 mr-2" />
-                                  <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
-                                </div>
-                                {point.profiles?.phone && (
-                                  <div className="flex items-center text-sm text-gray-500">
-                                    <Phone className="h-4 w-4 mr-1" />
-                                    <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                      claimedPoints.filter(p => p.claim_status === 'claimed').map(point => {
+                        try {
+                          // Validación robusta de datos
+                          const address = point.address || 'Sin dirección';
+                          const district = point.district || 'Sin distrito';
+                          const materials = Array.isArray(point.materials) ? point.materials : [];
+                          const creator_avatar = point.creator_avatar || 'https://ui-avatars.com/api/?name=Residente&background=E0F2FE&color=2563EB&size=64';
+                          const creator_name = typeof point.creator_name === 'string' ? point.creator_name : 'Residente';
+                          const creator_email = point.creator_email || '';
+                          const creator_dni = point.creator_dni || point.profiles?.dni || 'No informado';
+                          const pickup_time = point.pickup_time ? new Date(point.pickup_time) : null;
+                          // Render robusto
+                          return (
+                            <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                              <div className="p-6">
+                                {/* Info principal */}
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-start space-x-3">
+                                    <img
+                                      src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+                                      alt="Punto de Recolección"
+                                      className="w-7 h-7 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
+                                    />
+                                    <div>
+                                      <h3 className="text-lg font-medium text-gray-900">{address}</h3>
+                                      <p className="mt-1 text-sm text-gray-500">{district}</p>
+                                    </div>
                                   </div>
-                                )}
-                                <div className="flex items-center text-sm text-gray-500">
-                                  <span className="font-semibold mr-2">DNI:</span> {point.creator_dni || point.profiles?.dni || 'No informado'}
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
+                                </div>
+                                <div className="flex flex-row justify-between items-start mt-4">
+                                  <div className="flex-1">
+                                    <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {materials.map((material, idx) => (
+                                        <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="ml-4 flex-shrink-0">
+                                    <img
+                                      src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
+                                      alt="Reciclaje"
+                                      className="w-28 h-28 object-contain bg-white shadow-none"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="mt-4">
+                                  {pickup_time && (
+                                    <div className="text-xs text-gray-500">Retiro programado: {pickup_time.toLocaleString()}</div>
+                                  )}
+                                  {/* CountdownTimer robusto */}
+                                  {point.status === 'claimed' && pickup_time && (
+                                    <ErrorBoundary fallback={<div className="text-red-600 text-xs mt-2">⚠️ Error en el temporizador de retiro. Verifica la fecha/hora seleccionada.</div>}>
+                                      <CountdownTimer 
+                                        targetDate={pickup_time} 
+                                        onComplete={() => {
+                                          try {
+                                            fetchData();
+                                          } catch (e) {
+                                            console.warn('Error al refrescar datos tras Countdown:', e);
+                                          }
+                                        }}
+                                      />
+                                    </ErrorBoundary>
+                                  )}
+                                  {/* Advertencia si el datapicker está mal configurado */}
+                                  {!pickup_time && <div className="text-yellow-600 text-xs mt-2">⚠️ Fecha/hora de retiro no configurada o inválida. Por favor, selecciona una fecha válida al reclamar el punto.</div>}
+                                </div>
+                                {/* Info residente */}
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center text-sm text-gray-500">
+                                      <img
+                                        src={creator_avatar}
+                                        alt={creator_name}
+                                        className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
+                                      />
+                                      <span>{creator_name}</span>
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-500">
+                                      <Mail className="h-4 w-4 mr-2" />
+                                      <a href={`mailto:${creator_email}`} className="text-green-600 hover:text-green-700">{creator_email}</a>
+                                    </div>
+                                    {point.profiles?.phone && (
+                                      <div className="flex items-center text-sm text-gray-500">
+                                        <Phone className="h-4 w-4 mr-1" />
+                                        <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center text-sm text-gray-500">
+                                      <span className="font-semibold mr-2">DNI:</span> {creator_dni}
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Botones de acción */}
+                                <div className="mt-4 flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      // Solo abrir el modal si ambos IDs son UUIDs válidos
+                                      const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+                                      if (isValidUuid(point.claim_id) && isValidUuid(point.id)) {
+                                        setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
+                                        setShowCancelClaimModal(true);
+                                      } else {
+                                        setError('Error: No se puede cancelar, IDs inválidos.');
+                                      }
+                                    }}
+                                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
+                                  >
+                                    Cancelar reclamo
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setPointToComplete(point);
+                                      setShowCompleteModal(true);
+                                    }}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
+                                  >
+                                    Marcar como retirado
+                                  </button>
                                 </div>
                               </div>
                             </div>
-                            {/* Botones de acción */}
-                            <div className="mt-4 flex gap-2">
-                              <button
-                                onClick={() => {
-                                  // Solo abrir el modal si ambos IDs son UUIDs válidos
-                                  const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
-                                  if (isValidUuid(point.claim_id) && isValidUuid(point.id)) {
-                                    setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
-                                    setShowCancelClaimModal(true);
-                                  } else {
-                                    setError('Error: No se puede cancelar, IDs inválidos.');
-                                  }
-                                }}
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
-                              >
-                                Cancelar reclamo
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setPointToComplete(point);
-                                  setShowCompleteModal(true);
-                                }}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
-                              >
-                                Marcar como retirado
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                          );
+                        } catch (e) {
+                          console.error('Error al renderizar punto reclamado:', e, point);
+                          return <div className="col-span-2 text-red-600">⚠️ Error al mostrar un punto reclamado. Revisa los datos del reclamo y la fecha/hora seleccionada.</div>;
+                        }
+                      })
                     )}
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useUser } from '../context/UserContext';
@@ -124,30 +124,37 @@ const AddCollectionPoint: React.FC = () => {
   };
 
   const handleMapClick = (event: { lng: number; lat: number }) => {
-    setSelectedLocation({ lat: event.lat, lng: event.lng });
-    
-    // Reverse geocoding
-    fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${event.lng},${event.lat}.json?access_token=${MAPBOX_TOKEN}`
-    )
-      .then(response => response.json())
-      .then(data => {
-        if (data.features && data.features.length > 0) {
-          const feature = data.features[0];
-          setAddress(feature.place_name);
+    // Solo actualiza si la ubicación realmente cambió
+    if (
+      !selectedLocation ||
+      selectedLocation.lat !== event.lat ||
+      selectedLocation.lng !== event.lng
+    ) {
+      setSelectedLocation({ lat: event.lat, lng: event.lng });
 
-          type ContextType = { id: string; text: string };
-          const districtContext = feature.context?.find((ctx: ContextType) => 
-            ctx.id.startsWith('neighborhood') || ctx.id.startsWith('locality')
-          );
-          if (districtContext) {
-            setDistrict(districtContext.text);
+      // Reverse geocoding
+      fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${event.lng},${event.lat}.json?access_token=${MAPBOX_TOKEN}`
+      )
+        .then(response => response.json())
+        .then(data => {
+          if (data.features && data.features.length > 0) {
+            const feature = data.features[0];
+            if (feature.place_name !== address) setAddress(feature.place_name);
+
+            type ContextType = { id: string; text: string };
+            const districtContext = feature.context?.find((ctx: ContextType) => 
+              ctx.id.startsWith('neighborhood') || ctx.id.startsWith('locality')
+            );
+            if (districtContext && districtContext.text !== district) {
+              setDistrict(districtContext.text);
+            }
           }
-        }
-      })
-      .catch(err => {
-        console.error('Error in reverse geocoding:', err);
-      });
+        })
+        .catch(err => {
+          console.error('Error in reverse geocoding:', err);
+        });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -261,6 +268,18 @@ const AddCollectionPoint: React.FC = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Memoizar los markers para evitar renders innecesarios del mapa
+  const mapMarkers = useMemo(() => {
+    if (!selectedLocation) return [];
+    return [{
+      id: 'nuevo-punto',
+      lat: selectedLocation.lat,
+      lng: selectedLocation.lng,
+      title: 'Nuevo Punto de Recolección',
+      iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+    }];
+  }, [selectedLocation]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -307,15 +326,10 @@ const AddCollectionPoint: React.FC = () => {
                   Selecciona la ubicación en el mapa <span className="text-red-500">*</span>
                 </label>
                 <Map
-                  markers={selectedLocation ? [{
-                    id: 'nuevo-punto',
-                    lat: selectedLocation.lat,
-                    lng: selectedLocation.lng,
-                    title: 'Nuevo Punto de Recolección',
-                    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
-                  }] : []}
+                  markers={mapMarkers}
                   onMapClick={handleMapClick}
                   hideDrawControls={true} // Oculta controles de dibujo
+                  disableDraw={true}      // Fuerza desactivar lógica de dibujo
                 />
               </div>
 

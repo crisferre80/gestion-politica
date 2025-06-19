@@ -41,6 +41,18 @@ const MapLibreZonas: React.FC<MapLibreZonasProps> = ({ zones, onZoneCreated, rel
   const [multiSuccess, setMultiSuccess] = useState(false);
 
   useEffect(() => {
+    console.log('Inicializando mapa con estilo:', MAP_STYLE);
+  }, []);
+
+  useEffect(() => {
+    console.log('Mapa inicializado correctamente:', mapRef.current);
+  }, []);
+
+  useEffect(() => {
+    console.log('Zonas cargadas:', zones);
+  }, [zones]);
+
+  useEffect(() => {
     if (!mapContainer.current) return;
     // Si ya existe un mapa, destrúyelo antes de crear uno nuevo
     if (mapRef.current) {

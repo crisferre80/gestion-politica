@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
 import './maplibre-gl-terradraw.css';
 import '@watergis/maplibre-gl-terradraw/dist/maplibre-gl-terradraw.css'; // Importa el CSS original de TerraDraw
 import { MaplibreTerradrawControl } from '@watergis/maplibre-gl-terradraw';
+import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { supabase } from '../lib/supabase';
 
@@ -19,7 +19,8 @@ interface MapLibreZonasProps {
   reloadZones?: () => void;
 }
 
-const MAP_STYLE = `https://tiles.stadiamaps.com/styles/osm_bright.json?api_key=${process.env.STADIA_MAPS_API_KEY}`;
+// Usar OpenStreetMap como estilo del mapa
+const MAP_STYLE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 const MapLibreZonas: React.FC<MapLibreZonasProps> = ({ zones, onZoneCreated, reloadZones }) => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -265,10 +266,6 @@ const MapLibreZonas: React.FC<MapLibreZonasProps> = ({ zones, onZoneCreated, rel
       console.log('Se detectó un nuevo polígono pendiente:', pendingPolygon);
     }
   }, [pendingPolygon]);
-
-  useEffect(() => {
-    console.log('Clave de API utilizada:', process.env.STADIA_MAPS_API_KEY);
-  }, []);
 
   return (
     <div style={{ position: 'relative' }}>

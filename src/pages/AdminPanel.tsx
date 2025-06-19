@@ -3,7 +3,8 @@ import { deleteCollectionPoint, supabase, CollectionPoint } from '../lib/supabas
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
 import { useZones } from '../hooks/useZones';
-import MapLibreZonas from '../components/MapLibreZonas';
+import 'leaflet/dist/leaflet.css';
+import MapaConPoligonos from '../components/MapaConPoligonos';
 
 interface UserRow {
   avatar_url: string | null;
@@ -48,7 +49,7 @@ const AdminPanel: React.FC = () => {
   const [feedbackError, setFeedbackError] = useState<string|null>(null);
   const [activeTab, setActiveTab] = useState<'usuarios' | 'notificaciones' | 'feedback' | 'publicidades'>('usuarios');
   // Zonas para el mapa admin
-  const { zones, loading: zonesLoading, reloadZones } = useZones();
+  const { zones, loading: zonesLoading } = useZones();
   useEffect(() => {
     console.log('Zonas cargadas:', zones);
   }, [zones]);
@@ -594,15 +595,13 @@ const AdminPanel: React.FC = () => {
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg shadow-lg w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2 sm:p-4 md:p-6 max-h-[90vh] overflow-y-auto relative">
               <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={handleCloseZonesModal}>✕</button>
-              <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa (MapLibre)</h3>
-              {error && (
-                <div className="bg-red-100 text-red-700 p-2 rounded mb-2 font-semibold">Error: {error}</div>
-              )}
-              {zonesLoading ? <p>Cargando zonas...</p> : (
-                <MapLibreZonas
-                  zones={zones.map(z => ({ ...z, color: z.color || '#3388ff' }))}
-                  reloadZones={reloadZones}
-                />
+              <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa</h3>
+              {zonesLoading ? (
+                <p>Cargando zonas...</p>
+              ) : (
+                <div style={{ height: '100vh', width: '100%' }}>
+                  <MapaConPoligonos zones={zones} />
+                </div>
               )}
             </div>
           </div>

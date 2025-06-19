@@ -19,7 +19,7 @@ interface MapLibreZonasProps {
   reloadZones?: () => void;
 }
 
-const MAP_STYLE = 'https://tiles.stadiamaps.com/styles/osm_bright.json';
+const MAP_STYLE = `https://tiles.stadiamaps.com/styles/osm_bright.json?api_key=${process.env.STADIA_MAPS_API_KEY}`;
 
 const MapLibreZonas: React.FC<MapLibreZonasProps> = ({ zones, onZoneCreated, reloadZones }) => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -265,6 +265,10 @@ const MapLibreZonas: React.FC<MapLibreZonasProps> = ({ zones, onZoneCreated, rel
       console.log('Se detectó un nuevo polígono pendiente:', pendingPolygon);
     }
   }, [pendingPolygon]);
+
+  useEffect(() => {
+    console.log('Clave de API utilizada:', process.env.STADIA_MAPS_API_KEY);
+  }, []);
 
   return (
     <div style={{ position: 'relative' }}>

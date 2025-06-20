@@ -4,7 +4,7 @@ import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
 import { useZones } from '../hooks/useZones';
 import 'leaflet/dist/leaflet.css';
-import MapaConPoligonos from '../components/MapaConPoligonos';
+import AdminZonesMap from '../components/AdminZonesMap';
 
 interface UserRow {
   avatar_url: string | null;
@@ -599,9 +599,22 @@ const AdminPanel: React.FC = () => {
               {zonesLoading ? (
                 <p>Cargando zonas...</p>
               ) : (
-                <div style={{ height: '100vh', width: '100%' }}>
-                  <MapaConPoligonos zones={zones} />
-                </div>
+                <AdminZonesMap
+                  zones={zones.map(z => ({
+                    type: 'Feature',
+                    geometry: {
+                      type: 'Polygon',
+                      coordinates: z.coordinates,
+                    },
+                    properties: {
+                      id: z.id,
+                      name: z.name,
+                      color: z.color ?? '', // Ensure color is always a string
+                      ...Object.fromEntries(Object.entries(z).filter(([k]) => !['id', 'name', 'color', 'coordinates'].includes(k))),
+                    },
+                  }))}
+                  onZoneSaved={() => { /* Opcional: recargar zonas si usas SWR o similar */ }}
+                />
               )}
             </div>
           </div>

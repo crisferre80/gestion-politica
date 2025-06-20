@@ -195,7 +195,6 @@ function PuntosRecoleccion() {
             <Map
               markers={mapPoints}
               showUserLocation={true}
-              hideDrawControls={true} // Oculta controles de dibujo
             />
           </div>
         </div>

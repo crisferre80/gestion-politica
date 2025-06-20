@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import Map, { Marker, NavigationControl, Popup } from 'react-map-gl';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import Map, { Marker, NavigationControl } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
@@ -20,8 +19,6 @@ export interface AdminZone {
 }
 
 export interface MapboxPolygonProps {
-  onPolygonCreate?: (feature: GeoJSON.Feature) => void;
-  onSelectZone?: (id: string) => void;
   markers?: Array<{
     id: string;
     lat: number;
@@ -34,32 +31,24 @@ export interface MapboxPolygonProps {
   }>;
   showUserLocation?: boolean;
   zones?: AdminZone[];
-  hideDrawControls?: boolean;
   showAdminZonesButton?: boolean;
-  route?: { lat: number; lng: number }[];
-  showRoute?: boolean;
   onMapClick?: (event: { lng: number; lat: number }) => void;
   disableDraw?: boolean;
 }
 
 const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
-  onPolygonCreate,
-  onSelectZone,
   markers = [],
   showUserLocation = false,
   zones = [],
-  hideDrawControls = false,
   showAdminZonesButton = false,
-  route = [],
-  showRoute = false,
   onMapClick,
   disableDraw = false,
 }) => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [selectedZone, setSelectedZone] = useState<AdminZone | null>(null);
   const [showAdminZones, setShowAdminZones] = useState(false);
   const [adminZones, setAdminZones] = useState<AdminZone[]>([]);
+  const mapRef = React.useRef<any>(null);
 
   // Cargar zonas desde supabase
   const fetchAdminZones = useCallback(async () => {
@@ -94,7 +83,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
               longitude: position.coords.longitude
             });
           },
-          (error) => {
+          () => {
             setLocationError('No se pudo obtener tu ubicación');
           }
         );
@@ -112,7 +101,6 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
     if (onMapClick) {
       onMapClick({ lng: event.lngLat.lng, lat: event.lngLat.lat });
     }
-    setSelectedZone(null);
   }, [onMapClick]);
 
   return (
@@ -141,6 +129,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
         </div>
       )}
       <Map
+        ref={mapRef}
         mapboxAccessToken={MAPBOX_TOKEN}
         initialViewState={SANTIAGO_CENTER}
         style={{ width: '100%', height: 500 }}
@@ -164,14 +153,9 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
           </Marker>
         ))}
         {/* Zonas como polígonos */}
-        {zonasParaMostrar.map((zone, idx) => (
+        {zonasParaMostrar.map((zone) => (
           zone.coordinates && Array.isArray(zone.coordinates[0]) && Array.isArray(zone.coordinates[0][0]) && (
-            <>
-              {/* Polígono SVG sobre el mapa (simplificado, para visualización) */}
-              {/* Si necesitas edición/dibujo, deberás integrar con MapboxDraw o similar */}
-              {/* Aquí solo se visualiza */}
-              {/* Puedes usar react-map-gl-draw para edición si lo necesitas */}
-            </>
+            <></>
           )
         ))}
       </Map>

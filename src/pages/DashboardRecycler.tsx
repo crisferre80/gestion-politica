@@ -155,6 +155,7 @@ const DashboardRecycler: React.FC = () => {
         if (claimsError) throw claimsError;
         // Para cada claim, obtener el punto y el perfil del residente
         let claimed: CollectionPoint[] = [];
+        let profilesById: Record<string, ResidentProfile> = {}; // <-- Declarar solo una vez aquí
         if (claimsData && claimsData.length > 0) {
           // Obtener todos los point_user_id únicos
           const pointIds = claimsData.map(claim => claim.collection_point_id);
@@ -166,7 +167,6 @@ const DashboardRecycler: React.FC = () => {
           if (pointsError) throw pointsError;
           // Obtener todos los user_id de los residentes
           const residentUserIds = [...new Set(pointsData.map(p => p.user_id))];
-          let profilesById: Record<string, ResidentProfile> = {};
           if (residentUserIds.length > 0) {
             const { data: profilesData, error: profilesError } = await supabase
               .from('profiles')
@@ -188,7 +188,6 @@ const DashboardRecycler: React.FC = () => {
             cancelled_at?: string;
             cancellation_reason?: string;
             completed_at?: string;
-            // [key: string]: any; // Index signature removed to avoid 'any' type. Add explicit fields if needed.
           };
           const latestClaimsByPoint: Record<string, CollectionClaim> = {};
           claimsData.forEach(claim => {
@@ -270,17 +269,19 @@ const DashboardRecycler: React.FC = () => {
       // Debug: mostrar cuántos puntos quedan tras el filtro de penalización
       console.log('DEBUG: Puntos disponibles tras filtro de penalización:', trulyAvailablePointsRaw.length, trulyAvailablePointsRaw.map(p => p.id));
       const userIds = [...new Set(trulyAvailablePointsRaw.map(p => p.user_id))];
-      let profilesById: Record<string, ResidentProfile> = {};
       if (userIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('user_id, name, email, phone, avatar_url, dni')
           .in('user_id', userIds);
         if (profilesError) throw profilesError;
-        profilesById = (profilesData || []).reduce((acc, profile) => {
-          acc[profile.user_id] = profile;
-          return acc;
-        }, {} as Record<string, ResidentProfile>);
+        profilesById = {
+          ...profilesById,
+          ...((profilesData || []).reduce((acc, profile) => {
+            acc[profile.user_id] = profile;
+            return acc;
+          }, {} as Record<string, ResidentProfile>))
+        };
       }
       setClaimedPoints(claimed);
       setAvailablePoints(trulyAvailablePointsRaw.map(point => {
@@ -1565,7 +1566,7 @@ const DashboardRecycler: React.FC = () => {
                             <div className="mt-4 flex items-center text-sm text-gray-500">
                               <Calendar className="h-4 w-4 mr-2" />
                               <span>{point.schedule}</span>
-                                                       </div>
+                            </div>
                             {point.cancelled_at && (
                               <div className="mt-2 text-xs text-gray-500">Cancelado el: {new Date(point.cancelled_at).toLocaleString()}</div>
                             )}

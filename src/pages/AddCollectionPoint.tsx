@@ -329,7 +329,6 @@ const AddCollectionPoint: React.FC = () => {
                 <Map
                   markers={mapMarkers}
                   onMapClick={handleMapClick}
-                  hideDrawControls={true} // Oculta controles de dibujo
                   disableDraw={true}      // Fuerza desactivar lógica de dibujo
                 />
               </div>

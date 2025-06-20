@@ -988,7 +988,6 @@ useEffect(() => {
       iconUrl: '/assets/bicireciclador-Photoroom.png',
     }))}
   showUserLocation={true}
-  hideDrawControls={true}
   showAdminZonesButton={false}
 />
             {/* DEBUG: Mostrar recicladores que deberían aparecer en el mapa */}

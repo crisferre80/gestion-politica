@@ -72,8 +72,8 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
  */
 export async function enviarMensajeSeguro(senderUserId: string, receiverUserId: string, content: string) {
   // Asegura que ambos perfiles existen
-  await ensureUserProfile({ id: senderUserId });
-  await ensureUserProfile({ id: receiverUserId });
+  await ensureUserProfile({ id: senderUserId, email: '', name: '' });
+  await ensureUserProfile({ id: receiverUserId, email: '', name: '' });
 
   // Reintenta hasta 5 veces obtener los perfiles internos (por si la inserción es lenta o RLS)
   async function getProfileWithRetry(userId: string, retries = 5, delay = 250): Promise<{ id: string; user_id: string } | null> {
@@ -115,4 +115,17 @@ export async function enviarMensajeSeguro(senderUserId: string, receiverUserId: 
     console.error('[enviarMensajeSeguro] Error al insertar mensaje:', error);
     throw error;
   }
+}
+
+/**
+ * Obtiene todos los mensajes entre dos usuarios (por user_id, no id interno).
+ */
+export async function fetchMessages(userId1: string, userId2: string) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .or(`and(sender_id.eq.${userId1},receiver_id.eq.${userId2}),and(sender_id.eq.${userId2},receiver_id.eq.${userId1})`)
+    .order('sent_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
 }

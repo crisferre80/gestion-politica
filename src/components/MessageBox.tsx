@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send } from 'lucide-react';
-// OR, if both are exported but with different names, import them with the correct names:
-// Update this import to match the actual export from '../lib/supabase'
-// Update the import to match the actual export names from '../lib/supabase'
-// Adjust the import below to match the actual exports from '../lib/supabase'
-import { fetchMessages, sendMessage } from '../lib/supabase';
+import { fetchMessages, enviarMensajeSeguro as sendMessage } from '../lib/chatUtils';
 
 interface Message {
   id: string;

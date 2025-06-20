@@ -1,80 +1,57 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { deleteCollectionPoint, supabase, CollectionPoint } from '../lib/supabase';
+import React, { useEffect, useState, useRef, ReactNode } from 'react';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
-import { useZones } from '../hooks/useZones';
-import 'leaflet/dist/leaflet.css';
-import AdminZonesMap from '../components/AdminZonesMap';
 
 interface UserRow {
   avatar_url: string | null;
   id: string;
   user_id: string; // <-- Agregado para notificaciones
-  name?: string;
+  name?: string; // <-- Agregado para resolver errores
   email?: string;
   role?: string;
   type?: string;
 }
 
+interface FeedbackRow {
+  id: string;
+  type: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at: string;
+}
+
+interface CollectionPoint {
+  address: ReactNode;
+  recycler_id: string | null;
+  id: string;
+  location: string;
+  user_id: string;
+  resident_id?: string; // Añadido para evitar error de propiedad inexistente
+}
+
 const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMsg, setNotifMsg] = useState('');
-  const [notifTarget, setNotifTarget] = useState<'global' | 'individual' | 'residentes' | 'recicladores'>('global');
-  const [notifStatus, setNotifStatus] = useState('');
-  const [stats, setStats] = useState<{[role: string]: number}>({});
-  const [roleFilter, setRoleFilter] = useState<string>('');
-  const [showPointsModal, setShowPointsModal] = useState(false);
-  const [points, setPoints] = useState<CollectionPoint[]>([]);
-  const [pointsLoading, setPointsLoading] = useState(false);
-  const [pointsError, setPointsError] = useState<string|null>(null);
-  const [assigningPointId, setAssigningPointId] = useState<string|null>(null);
-  const [recyclers, setRecyclers] = useState<UserRow[]>([]);
-  // Nuevo: Mapa de conteo de puntos por usuario
-  const [userPointsCount, setUserPointsCount] = useState<Record<string, number>>({});
-  // Tipado para feedback
-  interface Feedback {
-    id: string;
-    type: string;
-    name: string;
-    email: string;
-    message: string;
-    created_at: string;
-  }
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [feedbackError, setFeedbackError] = useState<string|null>(null);
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'notificaciones' | 'feedback' | 'publicidades'>('usuarios');
-  // Zonas para el mapa admin
-  const { zones, loading: zonesLoading } = useZones();
-  useEffect(() => {
-    console.log('Zonas cargadas:', zones);
-  }, [zones]);
-  const [showZonesModal, setShowZonesModal] = useState(false);
-  // Define Zone type if not importado
-  // Quitar export aquí, solo type local
-  type Zone = {
-    id: string;
-    name: string;
-    color?: string;
-    coordinates: [number, number][][]; // GeoJSON Polygon
-    [key: string]: unknown;
-  };
-  
-  // Al crear o editar zona, pendingZone siempre tiene coordinates: [number, number][]
-  const [, setPendingZone] = useState<Omit<Zone, 'id'> | null>(null);
-
-  // Ref para el mapa admin, ahora incluye setDrawMode y clearDraw
-  const mapComponentRef = useRef<{
-    clearDraw: (mode?: 'draw_polygon' | 'edit_polygon') => void;
-    setDrawMode: (mode: 'draw_polygon' | 'edit_polygon' | 'none') => void;
-  }>(null);
-
+  const [notifType, setNotifType] = useState(''); // Nuevo estado para el tipo de notificación
+  const [activeTab, setActiveTab] = useState('usuarios');
+  const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+  const [, setRecyclers] = useState<UserRow[]>([]);
+  const [feedbackData, setFeedbackData] = useState<FeedbackRow[]>([]);
+  const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
+  // eslint-disable-next-line no-empty-pattern
+  const [] = useState<string | null>(null);
   // Ref para drag-scroll en el carrusel de pestañas
   const tabCarouselRef = useRef<HTMLDivElement>(null);
+  const [showModal, setShowModal] = useState(false); // Estado para mostrar el modal
+  const [showAssignModal, setShowAssignModal] = useState(false); // Estado para mostrar el modal de asignación
+  const [selectedRecycler, setSelectedRecycler] = useState<UserRow | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
+  const [showPointsModal, setShowPointsModal] = useState(false);
+  const [residentPoints, setResidentPoints] = useState<CollectionPoint[]>([]);
 
   // Drag to scroll para el carrusel de pestañas
   useEffect(() => {
@@ -135,62 +112,44 @@ const AdminPanel: React.FC = () => {
   // Cargar usuarios y puntos de recolección
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
-      setLoading(true);
       const { data: usersData, error: usersError } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
       if (!usersError && usersData) {
         setUsers(usersData);
-        // Estadísticas por rol
-        const stats: {[role: string]: number} = {};
-        usersData.forEach((u: UserRow) => {
-          const role = u.role || 'sin rol';
-          stats[role] = (stats[role] || 0) + 1;
-        });
-        setStats(stats);
-        // Cargar conteo de puntos de recolección por usuario SOLO puntos activos
-        const { data: pointsAgg } = await supabase
-          .from('collection_points')
-          .select('user_id')
-          .in('status', ['available', 'claimed']) // Solo puntos activos
-          .not('user_id', 'is', null);
-        const pointsCount: Record<string, number> = {};
-        if (pointsAgg) {
-          pointsAgg.forEach((row: { user_id: string }) => {
-            if (row.user_id) {
-              pointsCount[row.user_id] = (pointsCount[row.user_id] || 0) + 1;
-            }
-          });
-        }
-        setUserPointsCount(pointsCount);
-        if (selectedUser && !usersData.find(u => u.id === selectedUser.id)) {
+        // Si no hay un usuario seleccionado o el usuario seleccionado ya no está en la lista, deseleccionar
+        if (!usersData.find(u => u.id === selectedUser?.id)) {
           setSelectedUser(null);
         }
       } else {
-        setError('Error al cargar usuarios');
+        alert('Error al cargar usuarios');
       }
-      setLoading(false);
     };
     fetchUsersAndPoints();
   }, [selectedUser]);
 
+  // Cargar puntos de recolección
+  useEffect(() => {
+    const fetchCollectionPoints = async () => {
+      const { data, error } = await supabase.from('collection_points').select('*');
+      if (error) {
+        console.error('Error al cargar puntos de recolección:', error);
+      } else {
+        setCollectionPoints(data);
+      }
+    };
+    fetchCollectionPoints();
+  }, []); // Asegurar que los puntos se carguen al inicio
+
   // Refrescar usuarios después de enviar notificación global o eliminar usuario
   const refreshUsers = async () => {
-    setLoading(true);
     const { data, error } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
     if (!error && data) {
       setUsers(data);
-      const stats: {[role: string]: number} = {};
-      data.forEach((u: UserRow) => {
-        const role = u.role || 'sin rol';
-        stats[role] = (stats[role] || 0) + 1;
-      });
-      setStats(stats);
       if (selectedUser && !data.find(u => u.id === selectedUser.id)) {
         setSelectedUser(null);
       }
     } else {
-      setError('Error al cargar usuarios');
+      alert('Error al cargar usuarios');
     }
-    setLoading(false);
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -201,90 +160,40 @@ const AdminPanel: React.FC = () => {
 
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
-    setNotifStatus('');
     try {
-      if (notifTarget === 'global') {
-        // Notificación global a todos SOLO a usuarios válidos en el estado
-        for (const u of users) {
-          if (!u.user_id) continue; // Usar user_id (UUID)
-          try {
-            await createNotification({
-              user_id: u.user_id,
-              title: notifTitle,
-              content: notifMsg,
-              type: 'admin',
-              user_name: u.name,
-              user_email: u.email
-            });
-          } catch (err) {
-            console.error('[NOTIF][ERROR] Falló envío a', u.user_id, err);
-          }
-        }
-        setNotifStatus('Notificación global enviada');
-        await refreshUsers();
-      } else if (notifTarget === 'residentes') {
-        for (const u of users) {
-          if (u.role !== 'resident' || !u.user_id) continue;
-          try {
-            await createNotification({
-              user_id: u.user_id,
-              title: notifTitle,
-              content: notifMsg,
-              type: 'admin',
-              user_name: u.name,
-              user_email: u.email
-            });
-          } catch (err) {
-            console.error('[NOTIF][ERROR] Falló envío a residente', u.user_id, err);
-          }
-        }
-        setNotifStatus('Notificación enviada a todos los residentes');
-      } else if (notifTarget === 'recicladores') {
-        for (const u of users) {
-          if (u.role !== 'recycler' || !u.user_id) continue;
-          try {
-            await createNotification({
-              user_id: u.user_id,
-              title: notifTitle,
-              content: notifMsg,
-              type: 'admin',
-              user_name: u.name,
-              user_email: u.email
-            });
-          } catch (err) {
-            console.error('[NOTIF][ERROR] Falló envío a reciclador', u.user_id, err);
-          }
-        }
-        setNotifStatus('Notificación enviada a todos los recicladores');
-      } else if (selectedUser) {
-        // Verifica que el usuario seleccionado existe en el estado
-        const validUser = users.find(u => u.id === selectedUser.id);
-        if (!validUser) {
-          setNotifStatus('El usuario seleccionado ya no existe.');
-          setSelectedUser(null);
-          return;
-        }
+      let filteredUsers = users;
+
+      // Filtrar usuarios según el tipo de notificación seleccionado
+      if (notifType === 'Recicladores') {
+        filteredUsers = users.filter(user => user.role === 'recycler');
+      } else if (notifType === 'Residentes') {
+        filteredUsers = users.filter(user => user.role === 'resident');
+      } else if (notifType === 'Individual' && selectedUser) {
+        filteredUsers = [selectedUser];
+      }
+
+      for (const u of filteredUsers) {
+        if (!u.user_id) continue; // Usar user_id (UUID)
         try {
           await createNotification({
-            user_id: validUser.user_id, // Usar user_id (UUID)
+            user_id: u.user_id,
             title: notifTitle,
             content: notifMsg,
             type: 'admin',
-            user_name: validUser.name,
-            user_email: validUser.email
+            user_name: u.name,
+            user_email: u.email
           });
-          setNotifStatus('Notificación enviada al usuario');
         } catch (err) {
-          setNotifStatus('El usuario fue notificado, pero no se pudo registrar la notificación en la base de datos.');
-          console.error('[NOTIF][ERROR] Falló envío individual a', validUser.user_id, err);
+          console.error('[NOTIF][ERROR] Falló envío a', u.user_id, err);
         }
       }
+
+      await refreshUsers();
+      setNotifTitle('');
+      setNotifMsg('');
     } catch (err) {
-      setNotifStatus('Error al enviar notificaciones');
-      console.error('[NOTIF][ERROR] Error global al enviar notificaciones:', err);
+      console.error('[NOTIF][ERROR] Error al enviar notificaciones:', err);
     }
-    setNotifTitle('');
-    setNotifMsg('');
   };
 
   // Cargar recicladores para asignación
@@ -296,366 +205,463 @@ const AdminPanel: React.FC = () => {
     fetchRecyclers();
   }, []);
 
-  // Mostrar puntos de recolección de un usuario
-  const handleShowPoints = async (user: UserRow) => {
-    setSelectedUser(user);
-    setShowPointsModal(true);
-    setPointsLoading(true);
-    setPointsError(null);
-    const { data, error } = await supabase.from('collection_points').select('*').eq('user_id', user.user_id);
-    if (error) setPointsError('Error al cargar puntos');
-    setPoints(data || []);
-    setPointsLoading(false);
-  };
-
   // Eliminar punto de recolección
-  const handleDeletePoint = async (pointId: string) => {
-    if (!selectedUser) return;
-    if (!window.confirm('¿Eliminar este punto de recolección?')) return;
-    try {
-      await deleteCollectionPoint(pointId, selectedUser.user_id);
-      setPoints(points.filter(p => p.id !== pointId));
-    } catch {
-      alert('Error al eliminar el punto');
-    }
-  };
 
   // Asignar punto a reciclador
-  const handleAssignRecycler = async (pointId: string, recyclerId: string) => {
-    setAssigningPointId(pointId);
-    const { error } = await supabase.from('collection_points').update({ recycler_id: recyclerId, status: 'claimed' }).eq('id', pointId);
-    setAssigningPointId(null);
-    if (error) {
-      alert('Error al asignar reciclador');
-    } else {
-      setPoints(points.map(p => p.id === pointId ? { ...p, recycler_id: recyclerId, status: 'claimed' } : p));
+  const assignCollectionPointToRecycler = async (recyclerId: string, pointId: string) => {
+    try {
+      const { error } = await supabase
+        .from('collection_points')
+        .update({ recycler_id: recyclerId })
+        .eq('id', pointId);
+
+      if (error) {
+        console.error('Error al asignar punto de recolección:', error);
+        alert('No se pudo asignar el punto de recolección.');
+      } else {
+        alert('Punto de recolección asignado exitosamente.');
+        const updatedPoints = collectionPoints.map(point =>
+          point.id === pointId ? { ...point, recycler_id: recyclerId } : point
+        );
+        setCollectionPoints(updatedPoints);
+      }
+    } catch (err) {
+      console.error('Error inesperado al asignar punto de recolección:', err);
     }
   };
 
-  // Cargar sugerencias y reclamos
-  useEffect(() => {
-    const fetchFeedbacks = async () => {
-      setFeedbackLoading(true);
-      setFeedbackError(null);
-      const { data, error } = await supabase.from('feedback').select('*').order('created_at', { ascending: false });
-      if (error) setFeedbackError('Error al cargar feedback');
-      setFeedbacks(data || []);
-      setFeedbackLoading(false);
-    };
-    fetchFeedbacks();
-  }, []);
-
-  const handleCloseZonesModal = () => {
-    setShowZonesModal(false);
-    if (mapComponentRef.current) {
-      mapComponentRef.current.clearDraw();
-    }
-    setPendingZone(null);
+  const handleSelectUser = (user: UserRow) => {
+    setSelectedUser(user);
+    setShowModal(false); // Cerrar el modal después de seleccionar
   };
 
-  // Drag to scroll para el carrusel de pestañas
+  const handleAssignPoint = async (recyclerId: string, pointId: string) => {
+    await assignCollectionPointToRecycler(recyclerId, pointId);
+  };
+
+  const fetchResidentPoints = async (userId: string) => {
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mfnvzijeanxvmolrprzj.supabase.co/rest/v1';
+      const url = `${baseUrl}/collection_points?user_id=eq.${userId}`;
+      console.log('Fetching resident points from URL:', url);
+
+      const apiKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!apiKey) {
+        throw new Error('La clave API no está configurada. Verifica la variable de entorno VITE_SUPABASE_ANON_KEY.');
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': apiKey,
+        },
+      });
+
+      const responseText = await response.text();
+      console.log('Raw response text:', responseText);
+
+      if (!response.ok) {
+        throw new Error(`Error en la respuesta del servidor: ${response.status} ${response.statusText}`);
+      }
+
+      const data = JSON.parse(responseText);
+      setResidentPoints(data);
+    } catch (error) {
+      console.error('Error fetching resident points:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      alert(errorMessage);
+    }
+  };
+
+  const handleShowPoints = async (userId: string) => {
+    await fetchResidentPoints(userId);
+    setShowPointsModal(true);
+  };
+
+  // Efecto para cargar feedback cuando la pestaña 'Feedback' está activa
   useEffect(() => {
-    const el = tabCarouselRef.current;
-    if (!el) return;
-    let isDown = false;
-    let startX = 0;
-    let scrollLeft = 0;
-    const onMouseDown = (e: MouseEvent) => {
-      isDown = true;
-      el.classList.add('cursor-grabbing');
-      startX = e.pageX - el.offsetLeft;
-      scrollLeft = el.scrollLeft;
-    };
-    const onMouseLeave = () => {
-      isDown = false;
-      el.classList.remove('cursor-grabbing');
-    };
-    const onMouseUp = () => {
-      isDown = false;
-      el.classList.remove('cursor-grabbing');
-    };
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDown) return;
-      e.preventDefault();
-      const x = e.pageX - el.offsetLeft;
-      const walk = (x - startX) * 1.2; // velocidad
-      el.scrollLeft = scrollLeft - walk;
-    };
-    el.addEventListener('mousedown', onMouseDown);
-    el.addEventListener('mouseleave', onMouseLeave);
-    el.addEventListener('mouseup', onMouseUp);
-    el.addEventListener('mousemove', onMouseMove);
-    // Touch events para mobile
-    let touchStartX = 0;
-    let touchScrollLeft = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      touchStartX = e.touches[0].pageX;
-      touchScrollLeft = el.scrollLeft;
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      const x = e.touches[0].pageX;
-      const walk = (x - touchStartX) * 1.2;
-      el.scrollLeft = touchScrollLeft - walk;
-    };
-    el.addEventListener('touchstart', onTouchStart);
-    el.addEventListener('touchmove', onTouchMove);
-    return () => {
-      el.removeEventListener('mousedown', onMouseDown);
-      el.removeEventListener('mouseleave', onMouseLeave);
-      el.removeEventListener('mouseup', onMouseUp);
-      el.removeEventListener('mousemove', onMouseMove);
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-    };
-  }, []);
+    if (activeTab === 'feedback') {
+      const fetchFeedback = async () => {
+        const { data, error } = await supabase.from('feedback').select('*');
+        if (error) {
+          console.error('Error al cargar feedback:', error);
+        } else {
+          setFeedbackData(data);
+        }
+      };
+      fetchFeedback();
+    }
+  }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <h1 className="text-3xl font-bold text-green-700 mb-6">Panel de Administrador</h1>
-      <div className="mb-8">
-        {/* Carrusel de pestañas responsive con drag-scroll */}
-        <div className="relative">
-          <div
-            ref={tabCarouselRef}
-            className="overflow-x-auto whitespace-nowrap flex gap-4 mb-6 px-1 sm:px-0 scrollbar-hide cursor-grab select-none"
-            style={{ WebkitOverflowScrolling: 'touch' }}
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold">Panel de Administración</h1>
+      </div>
+      <div className="mb-4">
+        <div className="flex space-x-2 overflow-auto hide-scrollbar" ref={tabCarouselRef}>
+          <button
+            onClick={() => setActiveTab('usuarios')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all flex-shrink-0 ${activeTab === 'usuarios' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'}`}
           >
-            <button onClick={() => setActiveTab('usuarios')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'usuarios' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Usuarios Registrados</button>
-            <button onClick={() => setActiveTab('notificaciones')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'notificaciones' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Enviar Notificaciones</button>
-            <button onClick={() => setActiveTab('feedback')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'feedback' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Sugerencias y Reclamos</button>
-            <button onClick={() => setActiveTab('publicidades')} className={`px-4 py-4 rounded-t-lg font-semibold border-b-2 min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs ${activeTab === 'publicidades' ? 'border-green-600 text-green-700 bg-white' : 'border-transparent text-gray-500 bg-green-100 hover:bg-white'}`}>Gestionar Publicidades</button>
-            <button onClick={() => setShowZonesModal(true)} className="px-4 py-4 rounded-t-lg font-semibold border-b-2 border-transparent text-gray-500 bg-green-100 hover:bg-white min-w-[160px] sm:min-w-[auto] text-base sm:text-lg truncate max-w-[90vw] sm:max-w-xs">Zonas del Mapa</button>
-          </div>
-          {/* Fade visual para efecto carrusel */}
-          <div className="pointer-events-none absolute left-0 top-0 h-full w-6 bg-gradient-to-r from-gray-50 to-transparent" />
-          <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-gray-50 to-transparent" />
+            Usuarios
+          </button>
+          <button
+            onClick={() => setActiveTab('notificaciones')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all flex-shrink-0 ${activeTab === 'notificaciones' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'}`}
+          >
+            Notificaciones
+          </button>
+          <button
+            onClick={() => setActiveTab('feedback')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all flex-shrink-0 ${activeTab === 'feedback' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'}`}
+          >
+            Feedback
+          </button>
+          <button
+            onClick={() => setActiveTab('publicidades')}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all flex-shrink-0 ${activeTab === 'publicidades' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'}`}
+          >
+            Publicidades
+          </button>
         </div>
-        {activeTab === 'usuarios' && (
-          <>
-            <h2 className="text-xl font-semibold mb-2">Estadísticas de usuarios</h2>
-            <ul className="flex gap-6">
-              {Object.entries(stats).map(([role, count]) => (
-                <li key={role} className="bg-white rounded shadow px-4 py-2">
-                  <span className="font-bold text-green-700">{role}</span>: {count}
+      </div>
+      {activeTab === 'usuarios' && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Usuarios</h2>
+          {users.length === 0 ? (
+            <p className="text-gray-500">No hay usuarios registrados.</p>
+          ) : (
+            <div className="bg-white shadow rounded-lg p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {users.map(user => (
+                  <div key={user.id} className="border rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center space-x-4">
+                    <img src={user.avatar_url || '/default-avatar.png'} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-lg font-semibold truncate">{user.name}</p>
+                      <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                      <p className="text-sm font-medium" style={{ color: user.role === 'admin' ? 'blue' : user.role === 'recycler' ? 'green' : 'orange' }}>
+                        {user.role === 'admin' ? 'Administrador' : user.role === 'recycler' ? 'Reciclador' : 'Residente'}
+                      </p>
+                      {user.role === 'resident' && (
+                        <div className="mt-2">
+                          <h4 className="text-sm font-semibold">Puntos de Recolección:</h4>
+                          <ul className="list-disc pl-5">
+                            {collectionPoints.filter(point => point.user_id === user.id).map(point => (
+                              <li key={point.id}>{point.location}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 space-y-2">
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="px-3 py-1 text-sm rounded-lg bg-red-600 text-white font-semibold transition-all flex items-center space-x-2"
+                      >
+                        <span>Eliminar Usuario</span>
+                      </button>
+                      {user.role === 'resident' && (
+                        <button
+                          onClick={() => handleShowPoints(user.user_id)}
+                          className="px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
+                        >
+                          <span>Puntos</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {activeTab === 'notificaciones' && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Notificaciones</h2>
+          <form onSubmit={handleSendNotification} className="mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                <input
+                  type="text"
+                  value={notifTitle}
+                  onChange={e => setNotifTitle(e.target.value)}
+                  className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje</label>
+                <textarea
+                  value={notifMsg}
+                  onChange={e => setNotifMsg(e.target.value)}
+                  className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                  rows={3}
+                  required
+                />
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-lg font-semibold mb-4">Opciones de Notificación</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setNotifType('Global')} // Cambiar a notifType
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Global' ? 'bg-blue-800 text-white' : 'bg-blue-600 text-gray-200'}`}
+                >
+                  <span>Global</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setNotifType('Individual');
+                    setShowModal(true); // Mostrar el modal
+                  }}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Individual' ? 'bg-gray-800 text-white' : 'bg-gray-600 text-gray-200'}`}
+                >
+                  <span>Individual</span>
+                </button>
+                <button
+                  onClick={() => setNotifType('Recicladores')} // Cambiar a notifType
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Recicladores' ? 'bg-green-800 text-white' : 'bg-green-600 text-gray-200'}`}
+                >
+                  <span>Recicladores</span>
+                </button>
+                <button
+                  onClick={() => setNotifType('Residentes')} // Cambiar a notifType
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Residentes' ? 'bg-orange-800 text-white' : 'bg-orange-600 text-gray-200'}`}
+                >
+                  <span>Residentes</span>
+                </button>
+              </div>
+              <div className="mt-4">
+                <p className="text-sm text-gray-700 font-semibold">Destinatario seleccionado: <span className="text-blue-600">{notifType}</span></p>
+              </div>
+              <div className="mt-4">
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
+                  </svg>
+                  <span>Enviar</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+      {activeTab === 'feedback' && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Feedback</h2>
+          {feedbackData.length === 0 ? (
+            <p className="text-gray-500">No hay feedback registrado.</p>
+          ) : (
+            <div className="bg-white shadow rounded-lg p-4">
+              <ul className="space-y-4">
+                {feedbackData.map((item) => (
+                  <li key={item.id} className="border rounded-lg p-4">
+                    <p className="text-lg font-semibold">{item.name}</p>
+                    <p className="text-sm text-gray-500">{item.email}</p>
+                    <p className="text-sm text-gray-700">{item.message}</p>
+                    <p className="text-xs text-gray-400">{new Date(item.created_at).toLocaleString()}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+      {activeTab === 'publicidades' && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Publicidades</h2>
+          <p className="text-gray-500">Aquí puedes gestionar las publicidades.</p>
+          <AdminAds />
+        </div>
+      )}
+      {selectedUser && (
+        <div className="mt-8 p-4 bg-white shadow rounded-lg">
+          <h3 className="text-lg font-semibold mb-4">Detalles del Usuario</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center mb-4">
+            <img src={selectedUser.avatar_url || '/default-avatar.png'} alt={selectedUser.name} className="w-16 h-16 rounded-full object-cover mr-4" />
+            <div className="flex-1 min-w-0">
+              <p className="text-lg font-semibold truncate">{selectedUser.name}</p>
+              <p className="text-sm text-gray-500 truncate">{selectedUser.email}</p>
+              <p className="text-sm font-medium" style={{ color: selectedUser.role === 'admin' ? 'blue' : selectedUser.role === 'recycler' ? 'green' : 'orange' }}>
+                {selectedUser.role === 'admin' ? 'Administrador' : selectedUser.role === 'recycler' ? 'Reciclador' : 'Residente'}
+              </p>
+            </div>
+          </div>
+          <div className="mb-4">
+            <h4 className="text-md font-semibold mb-2">Puntos de Recolección Asignados</h4>
+            {/* Aquí se mostrarán los puntos de recolección asignados al usuario seleccionado */}
+          </div>
+          <div className="mt-4">
+            <h4 className="text-md font-semibold mb-2">Asignar Punto de Recolección</h4>
+            <div className="flex flex-col space-y-2">
+              {collectionPoints.map(point => (
+                <div key={point.id} className="flex items-center justify-between p-2 border rounded-lg">
+                  <span>{point.location}</span>
+                  <button
+                    onClick={() => handleAssignPoint(selectedUser?.id || '', point.id)}
+                    className="px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold"
+                  >
+                    Asignar a {selectedUser?.name || 'Reciclador'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:space-x-4">
+            <button
+              onClick={() => handleDeleteUser(selectedUser.id)}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold transition-all flex items-center space-x-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Eliminar Usuario</span>
+            </button>
+            <button
+              onClick={() => setSelectedUser(null)}
+              className="px-4 py-2 rounded-lg bg-gray-300 text-gray-800 font-semibold transition-all flex items-center space-x-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
+              </svg>
+              <span>Cancelar</span>
+            </button>
+          </div>
+        </div>
+      )}
+      {showModal && (
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Seleccionar Usuario</h3>
+            <ul className="space-y-2">
+              {users.map(user => (
+                <li
+                  key={user.id}
+                  className="flex items-center justify-between p-2 border rounded-lg hover:bg-gray-100 cursor-pointer"
+                  onClick={() => handleSelectUser(user)}
+                >
+                  <span>{user.name || 'Usuario sin nombre'}</span>
+                  <span className="text-sm text-gray-500">{user.email}</span>
                 </li>
               ))}
             </ul>
-            <h2 className="text-xl font-semibold mb-2 mt-8">Usuarios registrados</h2>
-            <div className="mb-2">
-              <label className="mr-2">Filtrar por rol:</label>
-              <select className="border rounded px-2 py-1" value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
-                <option value="">Todos</option>
-                <option value="admin">Admin</option>
-                <option value="recycler">Reciclador</option>
-                <option value="resident">Residente</option>
+            <button
+              onClick={() => setShowModal(false)}
+              className="mt-4 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Asignar Punto de Recolección</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar Reciclador</label>
+              <select
+                value={selectedRecycler?.id || ''}
+                onChange={e => setSelectedRecycler(users.find(user => user.id === e.target.value) || null)}
+                className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                required
+              >
+                <option value="">-- Seleccionar Reciclador --</option>
+                {users.filter(user => user.role === 'recycler').map(recycler => (
+                  <option key={recycler.id} value={recycler.id}>
+                    {recycler.name}
+                  </option>
+                ))}
               </select>
             </div>
-            <div className="overflow-x-auto w-full rounded-lg shadow-sm bg-white/80 border border-gray-200">
-              {loading ? <p className="p-4">Cargando...</p> : error ? <p className="text-red-600 p-4">{error}</p> : (
-                <table className="min-w-[600px] w-full text-sm md:text-base">
-                  <thead className="sticky top-0 bg-green-100 z-10">
-                    <tr>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Nombre</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Rol</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">User ID</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.filter(u => !roleFilter || u.role === roleFilter).length === 0 ? (
-                      <tr><td colSpan={5} className="text-center text-gray-500 p-4">No hay usuarios para mostrar.</td></tr>
-                    ) : (
-                      users.filter(u => !roleFilter || u.role === roleFilter).map(u => (
-                        <tr key={u.id} className={`border-b hover:bg-green-50 transition-colors ${!u.user_id || !u.role ? 'bg-yellow-100' : ''}`}>
-                          <td className="p-2 whitespace-nowrap">
-                            {u.avatar_url ? (
-                              <img src={u.avatar_url} alt="avatar" className="w-8 h-8 rounded-full object-cover border border-green-300 inline-block mr-2 align-middle" />
-                            ) : (
-                              <span className="inline-block w-8 h-8 rounded-full bg-gray-200 border border-green-100 mr-2 align-middle"></span>
-                            )}
-                            {u.name || <span className="text-red-600">Sin nombre</span>}
-                          </td>
-                          <td className="p-2 whitespace-nowrap">{u.email || <span className="text-red-600">Sin email</span>}</td>
-                          <td className="p-2 capitalize whitespace-nowrap">{u.role || <span className="text-red-600">Sin rol</span>}</td>
-                          <td className="p-2 max-w-[160px] whitespace-nowrap overflow-x-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-green-50" style={{ WebkitOverflowScrolling: 'touch' }}>
-                            <div className="min-w-[120px] flex items-center">
-                              {u.user_id || <span className="text-red-600">Sin user_id</span>}
-                            </div>
-                          </td>
-                          <td className="p-2 flex flex-col md:flex-row gap-2 items-start md:items-center">
-                            <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => handleDeleteUser(u.id)}>Eliminar</button>
-                            {u.user_id && (
-                              <button className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto" onClick={() => { setNotifTarget('individual'); setSelectedUser(u); }}>Notificar</button>
-                            )}
-                            {u.user_id && (
-                              <button className={`relative px-3 py-2 rounded text-xs md:text-sm w-full md:w-auto flex items-center justify-center font-semibold transition-colors
-        ${userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0
-          ? 'bg-green-500 hover:bg-green-600 text-white border-2 border-green-700'
-          : 'bg-gray-200 hover:bg-green-200 text-green-700'}`}
-                                onClick={() => handleShowPoints(u)}
-                              >
-                                Ver puntos
-                                {/* Marca visual: check verde si tiene puntos activos */}
-                                {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
-                                  <span className="ml-2 text-green-700 font-bold text-lg" title="Tiene puntos activos">✔</span>
-                                )}
-                                {/* También muestra la cantidad */}
-                                {userPointsCount && typeof userPointsCount[u.user_id] !== 'undefined' && userPointsCount[u.user_id] > 0 && (
-                                  <span className="ml-1 text-xs font-bold">({userPointsCount[u.user_id]})</span>
-                                )}
-                                {/* Acción realizada */}
-                                {selectedUser && selectedUser.id === u.id && showPointsModal && (
-                                  <span className="ml-2 text-xs text-blue-700 font-semibold">(Viendo puntos)</span>
-                                )}
-                              </button>
-                            )}
-                            {(!u.user_id || !u.role) && (
-                              <span className="text-xs text-yellow-800 bg-yellow-200 rounded px-2 py-1 mt-1">Perfil incompleto</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              )}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar Punto</label>
+              <select
+                value={selectedPoint?.id || ''}
+                onChange={e => setSelectedPoint(collectionPoints.find(point => point.id === e.target.value) || null)}
+                className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                required
+              >
+                <option value="">-- Seleccionar Punto --</option>
+                {collectionPoints.map(point => (
+                  <option key={point.id} value={point.id}>
+                    {point.location}
+                  </option>
+                ))}
+              </select>
             </div>
-          </>
-        )}
-        {activeTab === 'notificaciones' && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-2">Enviar notificación</h2>
-            <form onSubmit={handleSendNotification} className="flex flex-col gap-2 max-w-md">
-              <div className="flex gap-4 mb-2">
-                <label className="flex gap-2 items-center">
-                  <input type="radio" checked={notifTarget==='global'} onChange={() => setNotifTarget('global')} /> Global
-                </label>
-                <label className="flex gap-2 items-center">
-                  <input type="radio" checked={notifTarget==='residentes'} onChange={() => setNotifTarget('residentes')} /> Todos los residentes
-                </label>
-                <label className="flex gap-2 items-center">
-                  <input type="radio" checked={notifTarget==='recicladores'} onChange={() => setNotifTarget('recicladores')} /> Todos los recicladores
-                </label>
-                <label className="flex gap-2 items-center">
-                  <input type="radio" checked={notifTarget==='individual'} onChange={() => setNotifTarget('individual')} /> Individual
-                  {notifTarget==='individual' && selectedUser && (
-                    <span className="ml-2 text-green-700">{selectedUser.email}</span>
-                  )}
-                </label>
-              </div>
-              <input className="border rounded px-2 py-1" placeholder="Título" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} required />
-              <textarea className="border rounded px-2 py-1" placeholder="Mensaje" value={notifMsg} onChange={e => setNotifMsg(e.target.value)} required />
-              <button className="bg-green-600 text-white px-4 py-2 rounded mt-2" type="submit">Enviar notificación</button>
-              {notifStatus && <p className="text-green-700 mt-2">{notifStatus}</p>}
-            </form>
-          </div>
-        )}
-        {activeTab === 'feedback' && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-2">Sugerencias y Reclamos de Usuarios</h2>
-            {feedbackLoading ? <p>Cargando...</p> : feedbackError ? <p className="text-red-600">{feedbackError}</p> : (
-              <div className="overflow-x-auto w-full rounded-lg shadow-sm bg-white/80 border border-gray-200">
-                <table className="min-w-[600px] w-full text-sm md:text-base">
-                  <thead className="sticky top-0 bg-green-100 z-10">
-                    <tr>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Tipo</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Nombre</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Email</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Mensaje</th>
-                      <th className="p-2 font-semibold text-gray-700 whitespace-nowrap">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {feedbacks.length === 0 ? (
-                      <tr><td colSpan={5} className="text-center text-gray-500 p-4">No hay sugerencias ni reclamos.</td></tr>
-                    ) : (
-                      feedbacks.map(fb => (
-                        <tr key={fb.id} className="border-b hover:bg-green-50 transition-colors">
-                          <td className="p-2 whitespace-nowrap capitalize">{fb.type}</td>
-                          <td className="p-2 whitespace-nowrap">{fb.name}</td>
-                          <td className="p-2 whitespace-nowrap">{fb.email}</td>
-                          <td className="p-2 whitespace-pre-line max-w-xs break-words">{fb.message}</td>
-                          <td className="p-2 whitespace-nowrap">{new Date(fb.created_at).toLocaleString()}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-        {activeTab === 'publicidades' && (
-          <div className="mb-12">
-            <AdminAds />
-          </div>
-        )}
-        {showZonesModal && (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg shadow-lg w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2 sm:p-4 md:p-6 max-h-[90vh] overflow-y-auto relative">
-              <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={handleCloseZonesModal}>✕</button>
-              <h3 className="text-lg font-bold mb-2">Gestión de Zonas del Mapa</h3>
-              {zonesLoading ? (
-                <p>Cargando zonas...</p>
-              ) : (
-                <AdminZonesMap
-                  zones={zones.map(z => ({
-                    type: 'Feature',
-                    geometry: {
-                      type: 'Polygon',
-                      coordinates: z.coordinates,
-                    },
-                    properties: {
-                      id: z.id,
-                      name: z.name,
-                      color: z.color ?? '', // Ensure color is always a string
-                      ...Object.fromEntries(Object.entries(z).filter(([k]) => !['id', 'name', 'color', 'coordinates'].includes(k))),
-                    },
-                  }))}
-                  onZoneSaved={() => { /* Opcional: recargar zonas si usas SWR o similar */ }}
-                />
-              )}
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  if (selectedRecycler && selectedPoint) {
+                    assignCollectionPointToRecycler(selectedRecycler.id, selectedPoint.id);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
+                </svg>
+                <span>Asignar Punto</span>
+              </button>
+            </div>
+            <div className="mt-4">
+              <button
+                onClick={() => setShowAssignModal(false)}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold transition-all flex items-center space-x-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span>Cancelar</span>
+              </button>
             </div>
           </div>
-        )}
-      </div>
-      {/* Modal de puntos de recolección */}
-      {showPointsModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl relative">
-            <button className="absolute top-2 right-2 text-gray-500 hover:text-red-600" onClick={() => setShowPointsModal(false)}>✕</button>
-            <h3 className="text-lg font-bold mb-2">Puntos de {selectedUser.name || selectedUser.email}</h3>
-            {pointsLoading ? <p>Cargando...</p> : pointsError ? <p className="text-red-600">{pointsError}</p> : points.length === 0 ? <p>No hay puntos.</p> : (
-              <table className="w-full text-sm mb-2">
-                <thead>
-                  <tr>
-                    <th>Dirección</th>
-                    <th>Estado</th>
-                    <th>Reciclador</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {points.map(point => (
-                    <tr key={point.id}>
-                      <td>{point.address}</td>
-                      <td>{point.status}</td>
-                      <td>{point.recycler_id ? (recyclers.find(r => r.user_id === point.recycler_id)?.name || point.recycler_id) : 'Sin asignar'}</td>
-                      <td className="flex gap-2">
-                        <button className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" onClick={() => handleDeletePoint(point.id)}>Eliminar</button>
-                        <select className="border rounded px-1 py-0.5 text-xs" value={point.recycler_id || ''} disabled={assigningPointId === point.id} onChange={e => handleAssignRecycler(point.id, e.target.value)}>
-                          <option value="">Asignar reciclador</option>
-                          {recyclers.map(r => (
-                            <option key={r.user_id} value={r.user_id}>{r.name || r.email}</option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        </div>
+      )}
+      {showPointsModal && (
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Puntos de Recolección</h3>
+            {residentPoints.length === 0 ? (
+              <p className="text-gray-500">No hay puntos de recolección creados por este residente.</p>
+            ) : (
+              <ul className="space-y-2">
+                {residentPoints.map(point => (
+                  <li key={point.id} className="flex items-center justify-between p-2 border rounded-lg">
+                    <span>{point.address}</span>
+                    <select
+                      onChange={e => setSelectedRecycler(users.find(user => user.id === e.target.value) || null)}
+                      className="px-3 py-1 text-sm rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    >
+                      <option value="">-- Seleccionar Reciclador --</option>
+                      {users.filter(user => user.role === 'recycler').map(recycler => (
+                        <option key={recycler.id} value={recycler.id}>{recycler.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => selectedRecycler && handleAssignPoint(selectedRecycler.id, point.id)}
+                      className="px-3 py-1 text-sm rounded-lg bg-green-600 text-white font-semibold"
+                    >
+                      Asignar
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
+            <button
+              onClick={() => setShowPointsModal(false)}
+              className="mt-4 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold"
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       )}

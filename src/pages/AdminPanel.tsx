@@ -1,8 +1,11 @@
-import React, { useEffect, useState, useRef, ReactNode } from 'react';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import React, { useEffect, useState, useRef, ReactNode, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
+import { TerraDraw } from "terra-draw";
+import { TerraDrawMapboxGLAdapter } from "terra-draw-mapbox-gl-adapter";
+import mapboxgl from "mapbox-gl";
+import { TerraDrawPolygonMode, TerraDrawLineStringMode, TerraDrawPointMode, TerraDrawCircleMode, TerraDrawRectangleMode } from "terra-draw";
 
 interface UserRow {
   avatar_url: string | null;
@@ -47,11 +50,14 @@ const AdminPanel: React.FC = () => {
   // Ref para drag-scroll en el carrusel de pestañas
   const tabCarouselRef = useRef<HTMLDivElement>(null);
   const [showModal, setShowModal] = useState(false); // Estado para mostrar el modal
-  const [showAssignModal, setShowAssignModal] = useState(false); // Estado para mostrar el modal de asignación
   const [selectedRecycler, setSelectedRecycler] = useState<UserRow | null>(null);
-  const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
   const [showPointsModal, setShowPointsModal] = useState(false);
   const [residentPoints, setResidentPoints] = useState<CollectionPoint[]>([]);
+  const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
+  const [terraDrawInstance, setTerraDrawInstance] = useState<TerraDraw | null>(null);
+  const [selectedTool, setSelectedTool] = useState<string>("Polygon");
+  const [zoneName, setZoneName] = useState("");
+  const [zoneColor, setZoneColor] = useState("#FF0000");
 
   // Drag to scroll para el carrusel de pestañas
   useEffect(() => {
@@ -112,15 +118,22 @@ const AdminPanel: React.FC = () => {
   // Cargar usuarios y puntos de recolección
   useEffect(() => {
     const fetchUsersAndPoints = async () => {
-      const { data: usersData, error: usersError } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
-      if (!usersError && usersData) {
-        setUsers(usersData);
-        // Si no hay un usuario seleccionado o el usuario seleccionado ya no está en la lista, deseleccionar
-        if (!usersData.find(u => u.id === selectedUser?.id)) {
-          setSelectedUser(null);
+      try {
+        const { data: usersData, error: usersError } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
+        if (usersError) {
+          console.error('Error al cargar usuarios:', usersError.message);
+          alert(`Error al cargar usuarios: ${usersError.message}`);
+          return;
         }
-      } else {
-        alert('Error al cargar usuarios');
+        if (usersData) {
+          setUsers(usersData);
+          if (!usersData.find(u => u.id === selectedUser?.id)) {
+            setSelectedUser(null);
+          }
+        }
+      } catch (err) {
+        console.error('Error inesperado al cargar usuarios:', err);
+        alert('Error inesperado al cargar usuarios. Verifique la conexión con el servidor.');
       }
     };
     fetchUsersAndPoints();
@@ -129,11 +142,19 @@ const AdminPanel: React.FC = () => {
   // Cargar puntos de recolección
   useEffect(() => {
     const fetchCollectionPoints = async () => {
-      const { data, error } = await supabase.from('collection_points').select('*');
-      if (error) {
-        console.error('Error al cargar puntos de recolección:', error);
-      } else {
-        setCollectionPoints(data);
+      try {
+        const { data, error } = await supabase.from('collection_points').select('*');
+        if (error) {
+          console.error('Error al cargar puntos de recolección:', error.message);
+          alert(`Error al cargar puntos de recolección: ${error.message}`);
+          return;
+        }
+        if (data) {
+          setCollectionPoints(data);
+        }
+      } catch (err) {
+        console.error('Error inesperado al cargar puntos de recolección:', err);
+        alert('Error inesperado al cargar puntos de recolección. Verifique la conexión con el servidor.');
       }
     };
     fetchCollectionPoints();
@@ -241,32 +262,16 @@ const AdminPanel: React.FC = () => {
 
   const fetchResidentPoints = async (userId: string) => {
     try {
-      const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://mfnvzijeanxvmolrprzj.supabase.co/rest/v1';
-      const url = `${baseUrl}/collection_points?user_id=eq.${userId}`;
-      console.log('Fetching resident points from URL:', url);
+      const { data, error } = await supabase
+        .from('collection_points')
+        .select('*')
+        .eq('user_id', userId);
 
-      const apiKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      if (!apiKey) {
-        throw new Error('La clave API no está configurada. Verifica la variable de entorno VITE_SUPABASE_ANON_KEY.');
+      if (error) {
+        throw new Error(`Error al obtener puntos de recolección: ${error.message}`);
       }
 
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': apiKey,
-        },
-      });
-
-      const responseText = await response.text();
-      console.log('Raw response text:', responseText);
-
-      if (!response.ok) {
-        throw new Error(`Error en la respuesta del servidor: ${response.status} ${response.statusText}`);
-      }
-
-      const data = JSON.parse(responseText);
-      setResidentPoints(data);
+      setResidentPoints(data || []);
     } catch (error) {
       console.error('Error fetching resident points:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
@@ -283,14 +288,191 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'feedback') {
       const fetchFeedback = async () => {
-        const { data, error } = await supabase.from('feedback').select('*');
-        if (error) {
-          console.error('Error al cargar feedback:', error);
-        } else {
-          setFeedbackData(data);
+        try {
+          const { data, error } = await supabase.from('feedback').select('*');
+          if (error) {
+            console.error('Error al cargar feedback:', error.message);
+            alert(`Error al cargar feedback: ${error.message}`);
+            return;
+          }
+          if (data) {
+            setFeedbackData(data);
+          }
+        } catch (err) {
+          console.error('Error inesperado al cargar feedback:', err);
+          alert('Error inesperado al cargar feedback. Verifique la conexión con el servidor.');
         }
       };
       fetchFeedback();
+    }
+  }, [activeTab]);
+
+  const handleSaveZones = useCallback(async (geojson: GeoJSON.FeatureCollection) => {
+    try {
+      // Convertir polígonos a puntos GeoJSON
+      const pointsGeoJSON: GeoJSON.FeatureCollection = {
+        type: "FeatureCollection",
+        features: geojson.features.flatMap((feature) => {
+          if (feature.geometry.type === "Polygon") {
+            const coordinates = feature.geometry.coordinates[0]; // Obtener los vértices del polígono
+            return coordinates.map((coord) => ({
+              type: "Feature" as const,
+              geometry: {
+                type: "Point" as const,
+                coordinates: coord,
+              },
+              properties: feature.properties || {},
+            }));
+          }
+          return [feature]; // Mantener otros tipos de geometría sin cambios
+        }).flat(),
+      };
+
+      const { error } = await supabase.from("zones").insert({
+        coordinates: pointsGeoJSON,
+        name: zoneName || "Zona generada",
+        color: zoneColor || "#FF0000",
+        user_id: "a2a423a1-ac51-4a6b-8588-34918d8d81df", // ID de usuario por defecto
+      });
+
+      if (error) {
+        console.error("Error al guardar zonas como puntos GeoJSON:", error);
+        alert("No se pudo guardar las zonas como puntos GeoJSON.");
+      } else {
+        alert("Zonas guardadas exitosamente como puntos GeoJSON.");
+      }
+    } catch (err) {
+      console.error("Error inesperado al guardar zonas como puntos GeoJSON:", err);
+    }
+  }, [zoneName, zoneColor]);
+
+  mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN; // Usar el token desde las variables de entorno
+
+  const handleDrawZones = useCallback(() => {
+    const container = document.getElementById("map-container");
+    if (!container) {
+      console.error("No se encontró el contenedor del mapa.");
+      return;
+    }
+
+    container.style.width = "100%";
+    container.style.height = "400px";
+
+    if (!mapInstanceRef.current) {
+      try {
+        const map = new mapboxgl.Map({
+          container: container,
+          style: "mapbox://styles/mapbox/streets-v11",
+          center: [-64.2667, -27.7833],
+          zoom: 13,
+        });
+
+        map.on("style.load", () => {
+          const mapboxAdapter = new TerraDrawMapboxGLAdapter({
+            map: map,
+          });
+
+          const terraDraw = new TerraDraw({
+            adapter: mapboxAdapter,
+            modes: [
+              new TerraDrawPolygonMode(),
+              new TerraDrawLineStringMode(),
+              new TerraDrawPointMode(),
+              new TerraDrawCircleMode(),
+              new TerraDrawRectangleMode(),
+            ],
+          });
+
+          terraDraw.start();
+          setTerraDrawInstance(terraDraw);
+          mapInstanceRef.current = map;
+        });
+      } catch (error) {
+        console.error("Error al inicializar el mapa:", error);
+      }
+    } else {
+      console.log("El mapa ya está inicializado.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "mapa") {
+      console.log("Activando la pestaña 'Mapa de Zonas'. Inicializando el mapa...");
+      handleDrawZones();
+
+      // Forzar la visibilidad del mapa
+      const container = document.getElementById("map-container");
+      if (container) {
+        container.style.display = "block";
+      }
+    } else {
+      // Ocultar el mapa cuando se cambia de sección
+      const container = document.getElementById("map-container");
+      if (container) {
+        container.style.display = "none";
+      }
+    }
+  }, [activeTab, handleDrawZones]);
+
+  useEffect(() => {
+    if (terraDrawInstance && selectedTool) {
+      try {
+        terraDrawInstance.setMode(selectedTool.toLowerCase());
+      } catch (error) {
+        console.error(`Error al cambiar el modo de dibujo a ${selectedTool}:`, error);
+      }
+    }
+  }, [selectedTool, terraDrawInstance]);
+
+  // Agregar efecto para cargar zonas desde Supabase y mostrarlas en el mapa
+  useEffect(() => {
+    const fetchZones = async () => {
+        try {
+            const { data, error } = await supabase.from("zones").select("coordinates, name, color");
+            if (error) {
+                console.error("Error al cargar zonas desde Supabase:", error.message);
+                return;
+            }
+
+            if (data && mapInstanceRef.current) {
+                data.forEach((zone) => {
+                    if (mapInstanceRef.current) {
+                        try {
+                            const geojsonSource: mapboxgl.GeoJSONSourceSpecification = {
+                                type: "geojson",
+                                data: JSON.parse(zone.coordinates), // Asegurar que los datos sean JSON válidos
+                            };
+
+                            // Verificar si la fuente ya existe
+                            if (!mapInstanceRef.current.getSource(zone.name)) {
+                                mapInstanceRef.current.addSource(zone.name, geojsonSource);
+
+                                // Agregar capa con visibilidad asegurada
+                                mapInstanceRef.current.addLayer({
+                                    id: zone.name,
+                                    type: "fill",
+                                    source: zone.name,
+                                    paint: {
+                                        "fill-color": zone.color || "#0000FF", // Color por defecto si no se especifica
+                                        "fill-opacity": 0.5,
+                                    },
+                                });
+                            } else {
+                                console.warn(`La fuente con el nombre ${zone.name} ya existe.`);
+                            }
+                        } catch (err) {
+                            console.error(`Error al procesar la zona ${zone.name}:`, err);
+                        }
+                    }
+                });
+            }
+        } catch (err) {
+            console.error("Error inesperado al cargar zonas desde Supabase:", err);
+        }
+    };
+
+    if (activeTab === "mapa" && mapInstanceRef.current) {
+        fetchZones();
     }
   }, [activeTab]);
 
@@ -325,6 +507,12 @@ const AdminPanel: React.FC = () => {
           >
             Publicidades
           </button>
+          <button
+            onClick={() => setActiveTab("mapa")}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all flex-shrink-0 ${activeTab === "mapa" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}
+          >
+            Mapa de Zonas
+          </button>
         </div>
       </div>
       {activeTab === 'usuarios' && (
@@ -348,7 +536,7 @@ const AdminPanel: React.FC = () => {
                         <div className="mt-2">
                           <h4 className="text-sm font-semibold">Puntos de Recolección:</h4>
                           <ul className="list-disc pl-5">
-                            {collectionPoints.filter(point => point.user_id === user.id).map(point => (
+                            {collectionPoints.filter(point => point.user_id === user.user_id).map(point => (
                               <li key={point.id}>{point.location}</li>
                             ))}
                           </ul>
@@ -365,9 +553,14 @@ const AdminPanel: React.FC = () => {
                       {user.role === 'resident' && (
                         <button
                           onClick={() => handleShowPoints(user.user_id)}
-                          className="px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
+                          className="relative px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
                         >
                           <span>Puntos</span>
+                          {collectionPoints.filter(point => point.user_id === user.user_id).length > 0 && (
+                            <span className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 shadow-lg z-50">
+                              {collectionPoints.filter(point => point.user_id === user.user_id).length}
+                            </span>
+                          )}
                         </button>
                       )}
                     </div>
@@ -481,6 +674,58 @@ const AdminPanel: React.FC = () => {
           <AdminAds />
         </div>
       )}
+      {activeTab === "mapa" && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Mapa de Zonas</h2>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la Zona</label>
+            <input
+              type="text"
+              value={zoneName}
+              onChange={(e) => setZoneName(e.target.value)}
+              className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              placeholder="Ejemplo: Zona Norte"
+              required
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Color de la Zona</label>
+            <input
+              type="color"
+              value={zoneColor}
+              onChange={(e) => setZoneColor(e.target.value)}
+              className="block w-16 h-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+            />
+          </div>
+          <div className="flex space-x-4 mb-4">
+            {["Polygon", "LineString", "Point", "Circle", "Rectangle"].map((tool) => (
+              <button
+                key={tool}
+                onClick={() => setSelectedTool(tool)}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${selectedTool === tool ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}
+              >
+                {tool}
+              </button>
+            ))}
+          </div>
+          <div id="map-container" className="w-full h-96 border rounded-lg"></div>
+          <button
+            id="save-zones-button"
+            onClick={() => {
+              if (terraDrawInstance) {
+                const geojson: GeoJSON.FeatureCollection = {
+                  type: "FeatureCollection",
+                  features: terraDrawInstance.getSnapshot(),
+                };
+                handleSaveZones(geojson);
+              }
+            }}
+            className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all"
+          >
+            Guardar Zonas
+          </button>
+        </div>
+      )}
       {selectedUser && (
         <div className="mt-8 p-4 bg-white shadow rounded-lg">
           <h3 className="text-lg font-semibold mb-4">Detalles del Usuario</h3>
@@ -561,94 +806,29 @@ const AdminPanel: React.FC = () => {
           </div>
         </div>
       )}
-      {showAssignModal && (
-        <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Asignar Punto de Recolección</h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar Reciclador</label>
-              <select
-                value={selectedRecycler?.id || ''}
-                onChange={e => setSelectedRecycler(users.find(user => user.id === e.target.value) || null)}
-                className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                required
-              >
-                <option value="">-- Seleccionar Reciclador --</option>
-                {users.filter(user => user.role === 'recycler').map(recycler => (
-                  <option key={recycler.id} value={recycler.id}>
-                    {recycler.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Seleccionar Punto</label>
-              <select
-                value={selectedPoint?.id || ''}
-                onChange={e => setSelectedPoint(collectionPoints.find(point => point.id === e.target.value) || null)}
-                className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                required
-              >
-                <option value="">-- Seleccionar Punto --</option>
-                {collectionPoints.map(point => (
-                  <option key={point.id} value={point.id}>
-                    {point.location}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mt-4">
-              <button
-                onClick={() => {
-                  if (selectedRecycler && selectedPoint) {
-                    assignCollectionPointToRecycler(selectedRecycler.id, selectedPoint.id);
-                  }
-                }}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
-                </svg>
-                <span>Asignar Punto</span>
-              </button>
-            </div>
-            <div className="mt-4">
-              <button
-                onClick={() => setShowAssignModal(false)}
-                className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold transition-all flex items-center space-x-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span>Cancelar</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {showPointsModal && (
         <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 w-96">
+          <div className="bg-white rounded-lg p-4 w-96 sm:w-[32rem]">
             <h3 className="text-lg font-semibold mb-4">Puntos de Recolección</h3>
             {residentPoints.length === 0 ? (
-              <p className="text-gray-500">No hay puntos de recolección creados por este residente.</p>
+              <p className="text-sm text-gray-500">No hay puntos de recolección creados por este residente.</p>
             ) : (
               <ul className="space-y-2">
                 {residentPoints.map(point => (
-                  <li key={point.id} className="flex items-center justify-between p-2 border rounded-lg">
-                    <span>{point.address}</span>
+                  <li key={point.id} className="flex items-center justify-between p-1 border rounded-lg text-sm">
+                    <span className="truncate w-4/5 h-6">{point.address}</span>
                     <select
                       onChange={e => setSelectedRecycler(users.find(user => user.id === e.target.value) || null)}
-                      className="px-3 py-1 text-sm rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      className="px-0.5 py-2 text-xs rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-600 w-1/5"
                     >
-                      <option value="">-- Seleccionar Reciclador --</option>
+                      <option value="">--Reciclador--</option>
                       {users.filter(user => user.role === 'recycler').map(recycler => (
                         <option key={recycler.id} value={recycler.id}>{recycler.name}</option>
                       ))}
                     </select>
                     <button
                       onClick={() => selectedRecycler && handleAssignPoint(selectedRecycler.id, point.id)}
-                      className="px-3 py-1 text-sm rounded-lg bg-green-600 text-white font-semibold"
+                      className="px-2 py-1 text-xs rounded-lg bg-green-600 text-white font-semibold"
                     >
                       Asignar
                     </button>
@@ -658,7 +838,7 @@ const AdminPanel: React.FC = () => {
             )}
             <button
               onClick={() => setShowPointsModal(false)}
-              className="mt-4 px-4 py-2 rounded-lg bg-red-600 text-white font-semibold"
+              className="mt-4 px-3 py-1 text-sm rounded-lg bg-red-600 text-white font-semibold"
             >
               Cerrar
             </button>

@@ -33,6 +33,7 @@
     "react-toastify": "^11.0.5",
     "react-webcam": "^7.2.0",
     "terra-draw": "^1.8.0",
+    "terra-draw-mapbox-gl-adapter": "^1.1.0",
     "terra-draw-maplibre-gl-adapter": "^1.1.1"
   },
   "devDependencies": {

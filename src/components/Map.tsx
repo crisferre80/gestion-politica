@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import Map, { Marker, NavigationControl } from 'react-map-gl';
+import Map, { Marker, NavigationControl, MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '../lib/supabase';
 
@@ -34,6 +34,10 @@ export interface MapboxPolygonProps {
   showAdminZonesButton?: boolean;
   onMapClick?: (event: { lng: number; lat: number }) => void;
   disableDraw?: boolean;
+  hideDrawControls?: boolean;
+  showRoute?: boolean;
+  route?: Array<{ lat: number; lng: number }>;
+
 }
 
 const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
@@ -48,16 +52,16 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [showAdminZones, setShowAdminZones] = useState(false);
   const [adminZones, setAdminZones] = useState<AdminZone[]>([]);
-  const mapRef = React.useRef<any>(null);
+  const mapRef = React.useRef<MapRef | null>(null);
 
   // Cargar zonas desde supabase
   const fetchAdminZones = useCallback(async () => {
     const { data, error } = await supabase.from('zones').select('*');
     if (!error && data) {
-      const zonas: AdminZone[] = data.map((z: { id: string; name: any; coordinates: any; color?: string }) => {
-        let coords = z.coordinates;
-        if (typeof coords === 'string') {
-          try { coords = JSON.parse(coords); } catch { coords = null; }
+      const zonas: AdminZone[] = data.map((z: { id: string; name: string; coordinates: string | number[][][]; color?: string }) => {
+        let coords: number[][][] | null = Array.isArray(z.coordinates) ? z.coordinates : null;
+        if (typeof z.coordinates === 'string') {
+          try { coords = JSON.parse(z.coordinates); } catch { coords = null; }
         }
         if (!Array.isArray(coords) || !Array.isArray(coords[0]) || !Array.isArray(coords[0][0])) {
           coords = null;
@@ -65,7 +69,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
         return {
           id: z.id,
           name: z.name,
-          coordinates: coords,
+          coordinates: coords || [],
           color: z.color || undefined,
         };
       });
@@ -97,7 +101,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   const zonasParaMostrar = useMemo(() => showAdminZones ? adminZones : zones, [showAdminZones, adminZones, zones]);
 
   // Handler para click en el mapa
-  const handleMapClick = useCallback((event: any) => {
+  const handleMapClick = useCallback((event: mapboxgl.MapMouseEvent) => {
     if (onMapClick) {
       onMapClick({ lng: event.lngLat.lng, lat: event.lngLat.lat });
     }

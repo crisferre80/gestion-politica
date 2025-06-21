@@ -328,18 +328,49 @@ const AdminPanel: React.FC = () => {
         }).flat(),
       };
 
-      const { error } = await supabase.from("zones").insert({
+      const { data, error } = await supabase.from("zones").insert({
         coordinates: pointsGeoJSON,
         name: zoneName || "Zona generada",
         color: zoneColor || "#FF0000",
         user_id: "a2a423a1-ac51-4a6b-8588-34918d8d81df", // ID de usuario por defecto
-      });
+      }).select("coordinates, name, color");
 
       if (error) {
         console.error("Error al guardar zonas como puntos GeoJSON:", error);
         alert("No se pudo guardar las zonas como puntos GeoJSON.");
       } else {
         alert("Zonas guardadas exitosamente como puntos GeoJSON.");
+
+        // Agregar la zona recién creada al mapa
+        if (data && mapInstanceRef.current) {
+          const mapInstance = mapInstanceRef.current; // Asegurar que no sea null
+          data.forEach((zone) => {
+            try {
+              const geojsonSource: mapboxgl.GeoJSONSourceSpecification = {
+                type: "geojson",
+                data: JSON.parse(zone.coordinates),
+              };
+
+              if (!mapInstance.getSource(zone.name)) {
+                mapInstance.addSource(zone.name, geojsonSource);
+
+                mapInstance.addLayer({
+                  id: zone.name,
+                  type: "fill",
+                  source: zone.name,
+                  paint: {
+                    "fill-color": zone.color || "#0000FF",
+                    "fill-opacity": 0.5,
+                  },
+                });
+              } else {
+                console.warn(`La fuente con el nombre ${zone.name} ya existe.`);
+              }
+            } catch (err) {
+              console.error(`Error al procesar la zona ${zone.name}:`, err);
+            }
+          });
+        }
       }
     } catch (err) {
       console.error("Error inesperado al guardar zonas como puntos GeoJSON:", err);
@@ -440,20 +471,18 @@ const AdminPanel: React.FC = () => {
                         try {
                             const geojsonSource: mapboxgl.GeoJSONSourceSpecification = {
                                 type: "geojson",
-                                data: JSON.parse(zone.coordinates), // Asegurar que los datos sean JSON válidos
+                                data: JSON.parse(zone.coordinates),
                             };
 
-                            // Verificar si la fuente ya existe
                             if (!mapInstanceRef.current.getSource(zone.name)) {
                                 mapInstanceRef.current.addSource(zone.name, geojsonSource);
 
-                                // Agregar capa con visibilidad asegurada
                                 mapInstanceRef.current.addLayer({
                                     id: zone.name,
                                     type: "fill",
                                     source: zone.name,
                                     paint: {
-                                        "fill-color": zone.color || "#0000FF", // Color por defecto si no se especifica
+                                        "fill-color": zone.color || "#0000FF",
                                         "fill-opacity": 0.5,
                                     },
                                 });
@@ -708,16 +737,60 @@ const AdminPanel: React.FC = () => {
               </button>
             ))}
           </div>
+          <div className="flex space-x-4 mb-4">
+            <button
+              onClick={() => {
+                if (terraDrawInstance) {
+                  terraDrawInstance.setMode("edit");
+                }
+              }}
+              className="px-4 py-2 rounded-lg bg-yellow-600 text-white font-semibold transition-all"
+            >
+              Editar Forma
+            </button>
+            <button
+              onClick={async () => {
+                if (terraDrawInstance && mapInstanceRef.current) {
+                  const selectedFeatureIds = terraDrawInstance.getFeatureId();
+
+                  // Asegurarse de que `selectedFeatureIds` sea un array
+                  const featureIdsArray = Array.isArray(selectedFeatureIds) ? selectedFeatureIds : [selectedFeatureIds];
+
+                  if (featureIdsArray.length > 0) {
+                    terraDrawInstance.removeFeatures(featureIdsArray);
+
+                    // Eliminar de la base de datos
+                    try {
+                      await Promise.all(
+                        featureIdsArray.map((id) =>
+                          supabase.from("zones").delete().eq("id", id.toString())
+                        )
+                      );
+                      alert("Zona(s) eliminada(s) exitosamente.");
+                    } catch (error) {
+                      console.error("Error al eliminar zonas:", error);
+                      alert("No se pudo eliminar la(s) zona(s).");
+                    }
+                  } else {
+                    alert("No hay zonas seleccionadas para eliminar.");
+                  }
+                }
+              }}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold transition-all"
+            >
+              Borrar
+            </button>
+          </div>
           <div id="map-container" className="w-full h-96 border rounded-lg"></div>
           <button
             id="save-zones-button"
             onClick={() => {
               if (terraDrawInstance) {
-                const geojson: GeoJSON.FeatureCollection = {
+                const geojson = terraDrawInstance.getSnapshot();
+                handleSaveZones({
                   type: "FeatureCollection",
-                  features: terraDrawInstance.getSnapshot(),
-                };
-                handleSaveZones(geojson);
+                  features: geojson,
+                });
               }
             }}
             className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all"

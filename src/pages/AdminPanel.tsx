@@ -179,6 +179,13 @@ const AdminPanel: React.FC = () => {
     await refreshUsers();
   };
 
+  const playNotificationSound = () => {
+    const audio = new Audio('/assets/duvan_hincapie3.mp3');
+    audio.play().catch((error) => {
+      console.error('Error al reproducir el sonido de notificación:', error);
+    });
+  };
+
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -212,6 +219,9 @@ const AdminPanel: React.FC = () => {
       await refreshUsers();
       setNotifTitle('');
       setNotifMsg('');
+
+      // Reproducir sonido de notificación
+      playNotificationSound();
     } catch (err) {
       console.error('[NOTIF][ERROR] Error al enviar notificaciones:', err);
     }

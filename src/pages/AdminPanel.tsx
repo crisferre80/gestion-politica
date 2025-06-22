@@ -115,50 +115,51 @@ const AdminPanel: React.FC = () => {
     };
   }, []);
 
-  // Cargar usuarios y puntos de recolección
-  useEffect(() => {
-    const fetchUsersAndPoints = async () => {
-      try {
-        const { data: usersData, error: usersError } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
-        if (usersError) {
-          console.error('Error al cargar usuarios:', usersError.message);
-          alert(`Error al cargar usuarios: ${usersError.message}`);
-          return;
-        }
-        if (usersData) {
-          setUsers(usersData);
-          if (!usersData.find(u => u.id === selectedUser?.id)) {
-            setSelectedUser(null);
-          }
-        }
-      } catch (err) {
-        console.error('Error inesperado al cargar usuarios:', err);
-        alert('Error inesperado al cargar usuarios. Verifique la conexión con el servidor.');
+  const fetchUsersAndPoints = useCallback(async () => {
+    try {
+      const { data: usersData, error: usersError } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
+      if (usersError) {
+        console.error('Error al cargar usuarios:', usersError.message);
+        alert(`Error al cargar usuarios: ${usersError.message}`);
+        return;
       }
-    };
-    fetchUsersAndPoints();
+      if (usersData) {
+        setUsers(usersData);
+        if (!usersData.find(u => u.id === selectedUser?.id)) {
+          setSelectedUser(null);
+        }
+      }
+    } catch (err) {
+      console.error('Error inesperado al cargar usuarios:', err);
+      alert('Error inesperado al cargar usuarios. Verifique la conexión con el servidor.');
+    }
   }, [selectedUser]);
 
-  // Cargar puntos de recolección
-  useEffect(() => {
-    const fetchCollectionPoints = async () => {
-      try {
-        const { data, error } = await supabase.from('collection_points').select('*');
-        if (error) {
-          console.error('Error al cargar puntos de recolección:', error.message);
-          alert(`Error al cargar puntos de recolección: ${error.message}`);
-          return;
-        }
-        if (data) {
-          setCollectionPoints(data);
-        }
-      } catch (err) {
-        console.error('Error inesperado al cargar puntos de recolección:', err);
-        alert('Error inesperado al cargar puntos de recolección. Verifique la conexión con el servidor.');
+  const fetchCollectionPoints = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('collection_points').select('*');
+      if (error) {
+        console.error('Error al cargar puntos de recolección:', error.message);
+        alert(`Error al cargar puntos de recolección: ${error.message}`);
+        return;
       }
-    };
+      if (data) {
+        setCollectionPoints(data);
+      }
+    } catch (err) {
+      console.error('Error inesperado al cargar puntos de recolección:', err);
+      alert('Error inesperado al cargar puntos de recolección. Verifique la conexión con el servidor.');
+    }
+  }, []);
+
+  // Cargar usuarios y puntos de recolección
+  useEffect(() => {
+    fetchUsersAndPoints();
+  }, [selectedUser, fetchUsersAndPoints]);
+
+  useEffect(() => {
     fetchCollectionPoints();
-  }, []); // Asegurar que los puntos se carguen al inicio
+  }, [fetchCollectionPoints]);
 
   // Refrescar usuarios después de enviar notificación global o eliminar usuario
   const refreshUsers = async () => {
@@ -173,10 +174,15 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const refreshData = async () => {
+    await fetchUsersAndPoints();
+    await fetchCollectionPoints();
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar este usuario?')) return;
     await supabase.from('profiles').delete().eq('id', userId);
-    await refreshUsers();
+    await refreshData();
   };
 
   const playNotificationSound = () => {
@@ -268,6 +274,7 @@ const AdminPanel: React.FC = () => {
 
   const handleAssignPoint = async (recyclerId: string, pointId: string) => {
     await assignCollectionPointToRecycler(recyclerId, pointId);
+    await refreshData();
   };
 
   const fetchResidentPoints = async (userId: string) => {

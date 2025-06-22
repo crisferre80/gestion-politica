@@ -180,7 +180,7 @@ const AdminPanel: React.FC = () => {
   };
 
   const playNotificationSound = () => {
-    const audio = new Audio('/assets/duvan_hincapie3.mp3');
+    const audio = new Audio('/assets/alarma econecta.mp3');
     audio.play().catch((error) => {
       console.error('Error al reproducir el sonido de notificación:', error);
     });

@@ -161,6 +161,21 @@ const AdminPanel: React.FC = () => {
     fetchCollectionPoints();
   }, [fetchCollectionPoints]);
 
+  // Agregar suscripción en tiempo real a la tabla collection_points
+  useEffect(() => {
+    const subscription = supabase
+        .channel('collection_points')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_points' }, (payload) => {
+            console.log('Cambio detectado en collection_points:', payload);
+            fetchCollectionPoints(); // Refrescar puntos de recolección
+        })
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(subscription);
+    };
+  }, [fetchCollectionPoints]);
+
   // Refrescar usuarios después de enviar notificación global o eliminar usuario
   const refreshUsers = async () => {
     const { data, error } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url');
@@ -183,13 +198,6 @@ const AdminPanel: React.FC = () => {
     if (!window.confirm('¿Seguro que deseas eliminar este usuario?')) return;
     await supabase.from('profiles').delete().eq('id', userId);
     await refreshData();
-  };
-
-  const playNotificationSound = () => {
-    const audio = new Audio('/assets/alarma econecta.mp3');
-    audio.play().catch((error) => {
-      console.error('Error al reproducir el sonido de notificación:', error);
-    });
   };
 
   const handleSendNotification = async (e: React.FormEvent) => {
@@ -225,9 +233,6 @@ const AdminPanel: React.FC = () => {
       await refreshUsers();
       setNotifTitle('');
       setNotifMsg('');
-
-      // Reproducir sonido de notificación
-      playNotificationSound();
     } catch (err) {
       console.error('[NOTIF][ERROR] Error al enviar notificaciones:', err);
     }

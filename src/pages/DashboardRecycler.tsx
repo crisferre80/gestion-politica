@@ -1045,6 +1045,8 @@ const DashboardRecycler: React.FC = () => {
     );
   }
 
+// (Eliminada la función handleClearCompletedPoints porque no se utiliza)
+
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <HeaderRecycler />
@@ -1535,7 +1537,7 @@ const DashboardRecycler: React.FC = () => {
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3">
                                 <img
-                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png"
+                                  src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de Recoleccion_Marcador_z3nnyy.png"
                                   alt="Punto de Recolección"
                                   className="w-7 h-7 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
                                 />
@@ -1620,15 +1622,12 @@ const DashboardRecycler: React.FC = () => {
                         const retirados = claimedPoints.filter(p => p.claim_status === 'completed');
                         if (retirados.length === 0) return;
                         if (!window.confirm('¿Estás seguro de que deseas vaciar los puntos retirados? Esta acción no se puede deshacer. Los datos para estadísticas se conservarán.')) return;
-                        // Clonar los puntos retirados a una tabla de respaldo antes de eliminar
+                        // Clonar los puntos retirados a una tabla de respaldo
                         for (const punto of retirados) {
-                          // Clonar en tabla 'collection_points_backup' (debe existir en la base de datos)
                           await supabase.from('collection_points_backup').insert({ ...punto, original_id: punto.id, deleted_at: new Date().toISOString() });
-                          // Eliminar de collection_points
-                          await supabase.from('collection_points').delete().eq('id', punto.id);
                         }
-                        // Refrescar datos
-                        fetchData();
+                        // Ocultar puntos retirados de la vista
+                        setClaimedPoints(prev => prev.filter(p => p.claim_status !== 'completed'));
                       }}
                     >
                       Vaciar Puntos

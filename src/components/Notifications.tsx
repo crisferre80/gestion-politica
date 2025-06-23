@@ -1,7 +1,7 @@
 import { useNotifications } from '../context/NotificationsContext';
 import { Recycle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import alarmaAudio from '../../public/assets/alarma-econecta.mp3';
+import alarmaAudio from '/assets/alarma econecta.mp3';
 
 function getClosedIdsFromStorage(userId: string | undefined) {
   if (!userId) return [];
@@ -29,14 +29,49 @@ export default function Notifications() {
   const { notifications, markAsRead } = useNotifications();
   const userId = notifications[0]?.user_id;
   const [closedIds, setClosedIds] = useState<{ id: string; closedAt: number }[]>(() => getClosedIdsFromStorage(userId));
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const [userInteracted, setUserInteracted] = useState(false);
+
+  useEffect(() => {
+    const audioElement = new Audio(alarmaAudio);
+    setAudio(audioElement);
+
+    const handleUserInteraction = () => {
+      setUserInteracted(true);
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+
+    window.addEventListener('click', handleUserInteraction);
+    window.addEventListener('keydown', handleUserInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, []);
 
   useEffect(() => {
     // Reproducir audio al recibir nuevas notificaciones
     if (notifications.length > 0) {
-      const audio = new Audio(alarmaAudio);
-      audio.play().catch(error => console.error('Error al reproducir el audio:', error));
+      const playNotificationSound = () => {
+        if (audio && userInteracted) {
+          audio.play().catch((error) => {
+            console.error('Error al reproducir el audio:', error);
+          });
+        } else if (!userInteracted) {
+          console.warn('El usuario no ha interactuado con la página aún.');
+        }
+      };
+
+      // Simulación de una notificación para probar el audio
+      const timer = setTimeout(() => {
+        playNotificationSound();
+      }, 5000);
+
+      return () => clearTimeout(timer);
     }
-  }, [notifications]);
+  }, [notifications, audio, userInteracted]);
 
   useEffect(() => {
     // Cargar cerradas de storage al cambiar de usuario

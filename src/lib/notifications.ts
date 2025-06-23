@@ -18,7 +18,7 @@ export async function createNotification({
   user_name?: string;
 }) {
   // Asegura que el perfil existe antes de insertar la notificación
-  await ensureUserProfile({ id: user_id, email: user_email, name: user_name });
+  await ensureUserProfile({ id: user_id, email: user_email ?? '', name: user_name ?? '' });
   const { error } = await supabase.from('notifications').insert([
     {
       user_id,

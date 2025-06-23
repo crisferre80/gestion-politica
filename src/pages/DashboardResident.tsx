@@ -616,6 +616,32 @@ useEffect(() => {
     return data?.publicUrl || null;
   }
 
+  // Suscripción a cambios en puntos de recolección
+  useEffect(() => {
+    const pointsSubscription = supabase
+      .channel('collection_points')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_points' }, payload => {
+        console.log('Evento en puntos de recolección:', payload);
+        // Actualizar estado o lógica según sea necesario
+      })
+      .subscribe();
+
+    // Suscripción a cambios en claims
+    const claimsSubscription = supabase
+      .channel('claims')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'claims' }, payload => {
+        console.log('Evento en claims:', payload);
+        // Actualizar estado o lógica según sea necesario
+      })
+      .subscribe();
+
+    // Cleanup de las suscripciones al desmontar el componente
+    return () => {
+      supabase.removeChannel(pointsSubscription);
+      supabase.removeChannel(claimsSubscription);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -1343,25 +1369,21 @@ useEffect(() => {
       </button>
       <div className="flex flex-col items-center">
         <img
-          src={showDonationModal.avatarUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(showDonationModal.recyclerName) + '&background=FACC15&color=fff&size=64'}
+          src={showDonationModal.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(showDonationModal.recyclerName)}&background=FACC15&color=fff&size=64`}
           alt="Avatar reciclador"
           className="w-16 h-16 rounded-full border-2 border-blue-400 object-cover mb-2"
         />
         <h3 className="text-lg font-bold mb-2">Donar a {showDonationModal.recyclerName}</h3>
-        {/* Alias del reciclador */}
         <div className="mb-3 w-full flex flex-col items-center">
           <span className="text-gray-700 text-sm font-semibold">Alias para billetera virtual:</span>
           <div className="flex items-center gap-2 mt-1">
             <span className="bg-gray-100 px-2 py-1 rounded text-blue-700 font-mono select-all" id="alias-donacion">
-              {showDonationModal.alias ? showDonationModal.alias : <span className="text-red-500">Sin alias</span>}
+              {showDonationModal.alias || ""}
             </span>
             {showDonationModal.alias && (
               <button
                 className="text-blue-600 hover:text-blue-900 text-xs border px-2 py-1 rounded"
-                onClick={() => {
-                  navigator.clipboard.writeText(showDonationModal.alias!);
-                  toast.success('Alias copiado al portapapeles');
-                }}
+                onClick={() => navigator.clipboard.writeText(showDonationModal.alias || "")}
                 type="button"
               >
                 Copiar
@@ -1374,7 +1396,7 @@ useEffect(() => {
           min={1}
           className="border rounded px-3 py-2 mb-3 w-full text-center"
           placeholder="Monto a donar (EcoCreditos)"
-          value={donationAmount > 0 ? donationAmount : ''}
+          value={donationAmount > 0 ? donationAmount : ""}
           onChange={e => setDonationAmount(Number(e.target.value))}
         />
         <button
@@ -1391,7 +1413,6 @@ useEffect(() => {
           Confirmar donación
         </button>
         <p className="text-xs text-gray-500 mt-2">Tu saldo actual: {ecoCreditos} EcoCreditos</p>
-        {/* Botones de redirección a billeteras virtuales */}
         <div className="mt-4 w-full flex flex-col gap-2">
           <span className="text-gray-600 text-xs mb-1">¿Quieres donar dinero real? Usa el alias en tu billetera favorita:</span>
           <div className="flex flex-wrap gap-2 justify-center">
@@ -1481,6 +1502,7 @@ useEffect(() => {
             </div>
           </div>
           <div className="w-full mt-10">
+           
             <EstadisticasPanel userId={user.id} />
           </div>
         </div>

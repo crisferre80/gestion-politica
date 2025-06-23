@@ -1,6 +1,7 @@
 import { useNotifications } from '../context/NotificationsContext';
 import { Recycle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import alarmaAudio from '../../public/assets/alarma-econecta.mp3';
 
 function getClosedIdsFromStorage(userId: string | undefined) {
   if (!userId) return [];
@@ -28,6 +29,14 @@ export default function Notifications() {
   const { notifications, markAsRead } = useNotifications();
   const userId = notifications[0]?.user_id;
   const [closedIds, setClosedIds] = useState<{ id: string; closedAt: number }[]>(() => getClosedIdsFromStorage(userId));
+
+  useEffect(() => {
+    // Reproducir audio al recibir nuevas notificaciones
+    if (notifications.length > 0) {
+      const audio = new Audio(alarmaAudio);
+      audio.play().catch(error => console.error('Error al reproducir el audio:', error));
+    }
+  }, [notifications]);
 
   useEffect(() => {
     // Cargar cerradas de storage al cambiar de usuario

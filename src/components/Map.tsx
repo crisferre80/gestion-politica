@@ -174,8 +174,8 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
           <Marker key={marker.id} longitude={marker.lng} latitude={marker.lat}>
             <div
               style={{
-                width: 24,
-                height: 24,
+                width: 40,
+                height: 40,
                 backgroundImage: `url(${marker.iconUrl || (marker.role === 'available' ? '/assets/Punto_de_Recoleccion_Verde.png' : '/assets/Punto_de_Recoleccion_Amarillo.png')})`,
                 backgroundSize: 'contain',
                 backgroundRepeat: 'no-repeat',

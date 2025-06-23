@@ -5,7 +5,8 @@ import AdminAds from './AdminAds';
 import { TerraDraw } from "terra-draw";
 import { TerraDrawMapboxGLAdapter } from "terra-draw-mapbox-gl-adapter";
 import mapboxgl from "mapbox-gl";
-import { TerraDrawPolygonMode, TerraDrawLineStringMode, TerraDrawPointMode, TerraDrawCircleMode, TerraDrawRectangleMode } from "terra-draw";
+import { TerraDrawPolygonMode, TerraDrawLineStringMode, TerraDrawPointMode, TerraDrawCircleMode, TerraDrawRectangleMode, TerraDrawSelectMode } from "terra-draw";
+import type { Feature, FeatureCollection, Polygon } from "geojson";
 
 interface UserRow {
   avatar_url: string | null;
@@ -329,6 +330,149 @@ const AdminPanel: React.FC = () => {
     }
   }, [activeTab]);
 
+  // --- INICIO CAMBIO: función para limpiar y recargar zonas ---
+  const renderZonePolygon = (
+    map: mapboxgl.Map,
+    terraDrawInstance: TerraDraw,
+    zone: { coordinates: any; name: string; color: string },
+    idx: number
+  ) => {
+    let geojsonData = typeof zone.coordinates === "string"
+      ? JSON.parse(zone.coordinates)
+      : zone.coordinates;
+    let polygonGeoJSON: FeatureCollection<Polygon> | null = null;
+    if (
+      geojsonData &&
+      geojsonData.type === "FeatureCollection" &&
+      Array.isArray(geojsonData.features) &&
+      geojsonData.features.length > 2 &&
+      geojsonData.features.every((f: Feature) => f.geometry.type === "Point")
+    ) {
+      const coords = geojsonData.features.map((f: Feature) =>
+        f.geometry.type === 'Point' ? (f.geometry.coordinates as [number, number]) : null
+      ).filter(Boolean) as [number, number][];
+      if (
+        coords.length > 0 &&
+        (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1])
+      ) {
+        coords.push(coords[0]);
+      }
+      polygonGeoJSON = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Polygon",
+              coordinates: [coords],
+            },
+            properties: { name: zone.name, color: zone.color },
+            id: zone.name || `zona-${idx}`,
+          },
+        ],
+      };
+    } else if (
+      geojsonData &&
+      geojsonData.type === "FeatureCollection" &&
+      Array.isArray(geojsonData.features) &&
+      geojsonData.features.length > 0 &&
+      geojsonData.features[0].geometry.type === "Polygon"
+    ) {
+      polygonGeoJSON = geojsonData as FeatureCollection<Polygon>;
+    }
+    if (polygonGeoJSON && polygonGeoJSON.features.length > 0) {
+      // Limpiar fuente/capa si existe
+      if (map.getSource(zone.name)) map.removeSource(zone.name);
+      if (map.getLayer(zone.name)) map.removeLayer(zone.name);
+      if (map.getLayer(`${zone.name}-label`)) map.removeLayer(`${zone.name}-label`);
+      // Agregar fuente/capa
+      map.addSource(zone.name, {
+        type: "geojson",
+        data: polygonGeoJSON,
+      });
+      map.addLayer({
+        id: zone.name,
+        type: "fill",
+        source: zone.name,
+        paint: {
+          "fill-color": zone.color || "#0000FF",
+          "fill-opacity": 0.5,
+        },
+      });
+      // Capa de símbolo para el nombre de la zona
+      map.addLayer({
+        id: `${zone.name}-label`,
+        type: "symbol",
+        source: zone.name,
+        layout: {
+          "text-field": ["get", "name"],
+          "text-size": 16,
+          "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+          "text-anchor": "center",
+        },
+        paint: {
+          "text-color": "#222",
+          "text-halo-color": "#fff",
+          "text-halo-width": 2,
+        },
+        filter: ["==", "$type", "Polygon"],
+      });
+      // Importar solo features tipo Polygon a TerraDraw
+      const polygonFeatures = polygonGeoJSON.features.filter((f: Feature) => f.geometry.type === 'Polygon') as Feature<Polygon>[];
+      if (polygonFeatures.length > 0) {
+        terraDrawInstance.addFeatures(
+          polygonFeatures.map((f, i) => ({
+            ...f,
+            id: f.id || `${zone.name || 'zona'}-${i}`,
+            properties: { ...f.properties, name: zone.name, color: zone.color },
+          }))
+        );
+      }
+    }
+  };
+
+  const reloadZonesOnMap = useCallback(async () => {
+    if (!mapInstanceRef.current || !terraDrawInstance) return;
+    const map = mapInstanceRef.current;
+    try {
+      // Obtener nombres de zonas existentes en la base
+      const { data, error } = await supabase.from("zones").select("coordinates, name, color");
+      if (error) {
+        console.error("Error al cargar zonas desde Supabase:", error.message);
+        return;
+      }
+      // Limpiar solo capas/fuentes de zonas (no internas de Mapbox ni de TerraDraw)
+      if (data) {
+        const zoneNames = data.map((zone: { name: string }) => zone.name);
+        const style = map.getStyle();
+        if (style && style.layers) {
+          // Eliminar primero las capas de zona
+          style.layers.forEach((layer) => {
+            if (zoneNames.includes(layer.id) && map.getLayer(layer.id)) {
+              map.removeLayer(layer.id);
+            }
+          });
+          // Luego eliminar las fuentes de zona
+          Object.keys(style.sources).forEach((sourceName) => {
+            if (zoneNames.includes(sourceName) && map.getSource(sourceName)) {
+              map.removeSource(sourceName);
+            }
+          });
+        }
+        terraDrawInstance.clear();
+        data.forEach((zone: { coordinates: any; name: string; color: string }, idx: number) => {
+          try {
+            renderZonePolygon(map, terraDrawInstance, zone, idx);
+          } catch (err) {
+            console.error(`Error al procesar la zona ${zone.name}:`, err);
+          }
+        });
+      }
+    } catch (err) {
+      console.error("Error inesperado al recargar zonas:", err);
+    }
+  }, [terraDrawInstance]);
+
   const handleSaveZones = useCallback(async (geojson: GeoJSON.FeatureCollection) => {
     try {
       // Convertir polígonos a puntos GeoJSON
@@ -350,7 +494,7 @@ const AdminPanel: React.FC = () => {
         }).flat(),
       };
 
-      const { data, error } = await supabase.from("zones").insert({
+      const { error } = await supabase.from("zones").insert({
         coordinates: pointsGeoJSON,
         name: zoneName || "Zona generada",
         color: zoneColor || "#FF0000",
@@ -362,42 +506,14 @@ const AdminPanel: React.FC = () => {
         alert("No se pudo guardar las zonas como puntos GeoJSON.");
       } else {
         alert("Zonas guardadas exitosamente como puntos GeoJSON.");
-
-        // Agregar la zona recién creada al mapa
-        if (data && mapInstanceRef.current) {
-          const mapInstance = mapInstanceRef.current; // Asegurar que no sea null
-          data.forEach((zone) => {
-            try {
-              const geojsonSource: mapboxgl.GeoJSONSourceSpecification = {
-                type: "geojson",
-                data: JSON.parse(zone.coordinates),
-              };
-
-              if (!mapInstance.getSource(zone.name)) {
-                mapInstance.addSource(zone.name, geojsonSource);
-
-                mapInstance.addLayer({
-                  id: zone.name,
-                  type: "fill",
-                  source: zone.name,
-                  paint: {
-                    "fill-color": zone.color || "#0000FF",
-                    "fill-opacity": 0.5,
-                  },
-                });
-              } else {
-                console.warn(`La fuente con el nombre ${zone.name} ya existe.`);
-              }
-            } catch (err) {
-              console.error(`Error al procesar la zona ${zone.name}:`, err);
-            }
-          });
-        }
+        // --- INICIO CAMBIO: recargar zonas sin cambiar pestaña ---
+        await reloadZonesOnMap();
+        // --- FIN CAMBIO ---
       }
     } catch (err) {
       console.error("Error inesperado al guardar zonas como puntos GeoJSON:", err);
     }
-  }, [zoneName, zoneColor]);
+  }, [zoneName, zoneColor, reloadZonesOnMap]);
 
   mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN; // Usar el token desde las variables de entorno
 
@@ -421,9 +537,7 @@ const AdminPanel: React.FC = () => {
         });
 
         map.on("style.load", () => {
-          const mapboxAdapter = new TerraDrawMapboxGLAdapter({
-            map: map,
-          });
+          const mapboxAdapter = new TerraDrawMapboxGLAdapter({ map });
 
           const terraDraw = new TerraDraw({
             adapter: mapboxAdapter,
@@ -433,12 +547,47 @@ const AdminPanel: React.FC = () => {
               new TerraDrawPointMode(),
               new TerraDrawCircleMode(),
               new TerraDrawRectangleMode(),
+              new TerraDrawSelectMode(),
             ],
           });
 
           terraDraw.start();
           setTerraDrawInstance(terraDraw);
           mapInstanceRef.current = map;
+
+          // Cargar zonas desde Supabase y dibujarlas en el mapa tras inicialización
+          (async () => {
+            const { data, error } = await supabase.from("zones").select("coordinates, name, color");
+            if (error) {
+              console.error("Error al cargar zonas desde Supabase:", error.message);
+              return;
+            }
+            if (data && mapInstanceRef.current && terraDraw) {
+              // Limpiar capas y fuentes existentes
+              const map = mapInstanceRef.current;
+              const style = map.getStyle();
+              if (style && style.layers) {
+                style.layers.forEach((layer) => {
+                  if (layer.type === 'fill' && map.getLayer(layer.id)) {
+                    map.removeLayer(layer.id);
+                  }
+                });
+                Object.keys(style.sources).forEach((sourceName) => {
+                  if (map.getSource(sourceName)) {
+                    map.removeSource(sourceName);
+                  }
+                });
+              }
+              terraDraw.clear();
+              data.forEach((zone: { coordinates: any; name: string; color: string }, idx: number) => {
+                try {
+                  renderZonePolygon(map, terraDraw, zone, idx);
+                } catch (err) {
+                  console.error(`Error al procesar la zona ${zone.name}:`, err);
+                }
+              });
+            }
+          })();
         });
       } catch (error) {
         console.error("Error al inicializar el mapa:", error);
@@ -470,6 +619,7 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     if (terraDrawInstance && selectedTool) {
       try {
+        // Los modos select y edit deben estar en minúsculas
         terraDrawInstance.setMode(selectedTool.toLowerCase());
       } catch (error) {
         console.error(`Error al cambiar el modo de dibujo a ${selectedTool}:`, error);
@@ -479,52 +629,62 @@ const AdminPanel: React.FC = () => {
 
   // Agregar efecto para cargar zonas desde Supabase y mostrarlas en el mapa
   useEffect(() => {
+    let styleLoadListener: (() => void) | null = null;
     const fetchZones = async () => {
-        try {
-            const { data, error } = await supabase.from("zones").select("coordinates, name, color");
-            if (error) {
-                console.error("Error al cargar zonas desde Supabase:", error.message);
-                return;
-            }
-
-            if (data && mapInstanceRef.current) {
-                data.forEach((zone) => {
-                    if (mapInstanceRef.current) {
-                        try {
-                            const geojsonSource: mapboxgl.GeoJSONSourceSpecification = {
-                                type: "geojson",
-                                data: JSON.parse(zone.coordinates),
-                            };
-
-                            if (!mapInstanceRef.current.getSource(zone.name)) {
-                                mapInstanceRef.current.addSource(zone.name, geojsonSource);
-
-                                mapInstanceRef.current.addLayer({
-                                    id: zone.name,
-                                    type: "fill",
-                                    source: zone.name,
-                                    paint: {
-                                        "fill-color": zone.color || "#0000FF",
-                                        "fill-opacity": 0.5,
-                                    },
-                                });
-                            } else {
-                                console.warn(`La fuente con el nombre ${zone.name} ya existe.`);
-                            }
-                        } catch (err) {
-                            console.error(`Error al procesar la zona ${zone.name}:`, err);
-                        }
-                    }
-                });
-            }
-        } catch (err) {
-            console.error("Error inesperado al cargar zonas desde Supabase:", err);
+      try {
+        const { data, error } = await supabase.from("zones").select("coordinates, name, color");
+        if (error) {
+          console.error("Error al cargar zonas desde Supabase:", error.message);
+          return;
         }
+        if (data && mapInstanceRef.current && terraDrawInstance) {
+          const map = mapInstanceRef.current;
+          const style = map.getStyle();
+          if (style && style.layers) {
+            // Eliminar capas
+            map.getStyle().layers.forEach((layer) => {
+              if (layer.type === 'fill' && map.getLayer(layer.id)) {
+                map.removeLayer(layer.id);
+              }
+            });
+            // Eliminar fuentes
+            Object.keys(map.getStyle().sources).forEach((sourceName) => {
+              if (sourceName && map.getSource(sourceName)) {
+                map.removeSource(sourceName);
+              }
+            });
+          }
+          terraDrawInstance.clear();
+          data.forEach((zone: { coordinates: any; name: string; color: string }, idx: number) => {
+            try {
+              renderZonePolygon(map, terraDrawInstance, zone, idx);
+            } catch (err) {
+              console.error(`Error al procesar la zona ${zone.name}:`, err);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Error inesperado al cargar zonas desde Supabase:", err);
+      }
     };
 
     if (activeTab === "mapa" && mapInstanceRef.current) {
+      // Escuchar el evento style.load para asegurar que el mapa esté listo
+      const map = mapInstanceRef.current;
+      styleLoadListener = () => {
         fetchZones();
+      };
+      map.on("style.load", styleLoadListener);
+      // Si el estilo ya está cargado, cargar zonas inmediatamente
+      if (map.isStyleLoaded()) {
+        fetchZones();
+      }
     }
+    return () => {
+      if (mapInstanceRef.current && styleLoadListener) {
+        mapInstanceRef.current.off("style.load", styleLoadListener);
+      }
+    };
   }, [activeTab]);
 
   return (
@@ -749,11 +909,19 @@ const AdminPanel: React.FC = () => {
             />
           </div>
           <div className="flex space-x-4 mb-4">
-            {["Polygon", "LineString", "Point", "Circle", "Rectangle"].map((tool) => (
+            {[
+              "Polygon",
+              "LineString",
+              "Point",
+              "Circle",
+              "Rectangle",
+              "Select",
+              "Edit",
+            ].map((tool) => (
               <button
                 key={tool}
-                onClick={() => setSelectedTool(tool)}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${selectedTool === tool ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}
+                onClick={() => setSelectedTool(tool === "Edit" ? "Select" : tool)}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all ${selectedTool === tool || (tool === "Edit" && selectedTool === "Select") ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"}`}
               >
                 {tool}
               </button>
@@ -761,27 +929,20 @@ const AdminPanel: React.FC = () => {
           </div>
           <div className="flex space-x-4 mb-4">
             <button
-              onClick={() => {
-                if (terraDrawInstance) {
-                  terraDrawInstance.setMode("edit");
-                }
-              }}
-              className="px-4 py-2 rounded-lg bg-yellow-600 text-white font-semibold transition-all"
-            >
-              Editar Forma
-            </button>
-            <button
               onClick={async () => {
                 if (terraDrawInstance && mapInstanceRef.current) {
+                  // Solo borrar features que existen en TerraDraw
+                  const allFeatures = terraDrawInstance.getSnapshot();
+                  const allIds = allFeatures.map((f: any) => f.id);
                   const selectedFeatureIds = terraDrawInstance.getFeatureId();
-
-                  // Asegurarse de que `selectedFeatureIds` sea un array
                   const featureIdsArray = Array.isArray(selectedFeatureIds) ? selectedFeatureIds : [selectedFeatureIds];
-
+                  // Filtrar solo los IDs que existen en TerraDraw
+                  const validIds = featureIdsArray.filter((id) => allIds.includes(id));
+                  if (validIds.length > 0) {
+                    terraDrawInstance.removeFeatures(validIds);
+                  }
+                  // Borrar de la base de datos aunque no existan en TerraDraw (por si el usuario quiere borrar zonas persistidas)
                   if (featureIdsArray.length > 0) {
-                    terraDrawInstance.removeFeatures(featureIdsArray);
-
-                    // Eliminar de la base de datos
                     try {
                       await Promise.all(
                         featureIdsArray.map((id) =>
@@ -824,55 +985,16 @@ const AdminPanel: React.FC = () => {
       {selectedUser && (
         <div className="mt-8 p-4 bg-white shadow rounded-lg">
           <h3 className="text-lg font-semibold mb-4">Detalles del Usuario</h3>
-          <div className="flex flex-col sm:flex-row sm:items-center mb-4">
-            <img src={selectedUser.avatar_url || '/default-avatar.png'} alt={selectedUser.name} className="w-16 h-16 rounded-full object-cover mr-4" />
-            <div className="flex-1 min-w-0">
-              <p className="text-lg font-semibold truncate">{selectedUser.name}</p>
-              <p className="text-sm text-gray-500 truncate">{selectedUser.email}</p>
-              <p className="text-sm font-medium" style={{ color: selectedUser.role === 'admin' ? 'blue' : selectedUser.role === 'recycler' ? 'green' : 'orange' }}>
-                {selectedUser.role === 'admin' ? 'Administrador' : selectedUser.role === 'recycler' ? 'Reciclador' : 'Residente'}
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+            <div className="flex-1">
+              <p><span className="font-semibold">Nombre:</span> {selectedUser.name}</p>
+              <p><span className="font-semibold">Email:</span> {selectedUser.email}</p>
+              <p><span className="font-semibold">Rol:</span> {selectedUser.role}</p>
+              {/* Otros detalles relevantes */}
             </div>
-          </div>
-          <div className="mb-4">
-            <h4 className="text-md font-semibold mb-2">Puntos de Recolección Asignados</h4>
-            {/* Aquí se mostrarán los puntos de recolección asignados al usuario seleccionado */}
-          </div>
-          <div className="mt-4">
-            <h4 className="text-md font-semibold mb-2">Asignar Punto de Recolección</h4>
-            <div className="flex flex-col space-y-2">
-              {collectionPoints.map(point => (
-                <div key={point.id} className="flex items-center justify-between p-2 border rounded-lg">
-                  <span>{point.location}</span>
-                  <button
-                    onClick={() => handleAssignPoint(selectedUser?.id || '', point.id)}
-                    className="px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold"
-                  >
-                    Asignar a {selectedUser?.name || 'Reciclador'}
-                  </button>
-                </div>
-              ))}
+            <div className="flex flex-col gap-2">
+              <button onClick={() => setSelectedUser(null)} className="px-3 py-1 rounded-lg bg-blue-600 text-white">Cerrar</button>
             </div>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:space-x-4">
-            <button
-              onClick={() => handleDeleteUser(selectedUser.id)}
-              className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold transition-all flex items-center space-x-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              <span>Eliminar Usuario</span>
-            </button>
-            <button
-              onClick={() => setSelectedUser(null)}
-              className="px-4 py-2 rounded-lg bg-gray-300 text-gray-800 font-semibold transition-all flex items-center space-x-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
-              </svg>
-              <span>Cancelar</span>
-            </button>
           </div>
         </div>
       )}
@@ -881,7 +1003,7 @@ const AdminPanel: React.FC = () => {
           <div className="bg-white rounded-lg p-6 w-96">
             <h3 className="text-lg font-semibold mb-4">Seleccionar Usuario</h3>
             <ul className="space-y-2">
-              {users.map(user => (
+              {users.map((user: UserRow) => (
                 <li
                   key={user.id}
                   className="flex items-center justify-between p-2 border rounded-lg hover:bg-gray-100 cursor-pointer"
@@ -909,15 +1031,15 @@ const AdminPanel: React.FC = () => {
               <p className="text-sm text-gray-500">No hay puntos de recolección creados por este residente.</p>
             ) : (
               <ul className="space-y-2">
-                {residentPoints.map(point => (
+                {residentPoints.map((point: CollectionPoint) => (
                   <li key={point.id} className="flex items-center justify-between p-1 border rounded-lg text-sm">
                     <span className="truncate w-4/5 h-6">{point.address}</span>
                     <select
-                      onChange={e => setSelectedRecycler(users.find(user => user.id === e.target.value) || null)}
+                      onChange={e => setSelectedRecycler(users.find((user: UserRow) => user.id === e.target.value) || null)}
                       className="px-0.5 py-2 text-xs rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-600 w-1/5"
                     >
                       <option value="">--Reciclador--</option>
-                      {users.filter(user => user.role === 'recycler').map(recycler => (
+                      {users.filter((user: UserRow) => user.role === 'recycler').map((recycler: UserRow) => (
                         <option key={recycler.id} value={recycler.id}>{recycler.name}</option>
                       ))}
                     </select>

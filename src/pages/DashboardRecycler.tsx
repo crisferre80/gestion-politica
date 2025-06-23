@@ -1077,6 +1077,7 @@ const DashboardRecycler: React.FC = () => {
                     avatar_url: p.creator_avatar || undefined,
                     iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
                     status: 'disponible',
+                    iconsize: [96, 96]
                   })),
                   ...claimedPoints.map(p => ({
                     id: p.id,
@@ -1086,6 +1087,8 @@ const DashboardRecycler: React.FC = () => {
                     avatar_url: p.creator_avatar || undefined,
                     iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750101287/Punto_de_Recoleccion_reclamado_Marcador_m3c4rd.png',
                     status: p.claim_status,
+                    iconsize: [96, 96]
+                    // iconsize: [60, 60] // Uncomment and use this if your Map component supports iconSize as an array
                   })),
                 ]}
                 showUserLocation={true}
@@ -1737,7 +1740,8 @@ const DashboardRecycler: React.FC = () => {
                           lat: Number(selectedPoint.lat),
                           lng: Number(selectedPoint.lng),
                           title: selectedPoint.address,
-                          avatar_url: selectedPoint.creator_avatar
+                          avatar_url: selectedPoint.creator_avatar,
+                          // iconSize: [50, 50] // Ajuste del tamaño del ícono (eliminado porque no es una propiedad válida)
                         }
                       ]}
                       showUserLocation={true}
@@ -2112,8 +2116,11 @@ const DashboardRecycler: React.FC = () => {
                                 lng: Number(p!.lng),
                                 title: String(p!.address || 'Punto'),
                                 avatar_url: p!.creator_avatar || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png',
-                                role: 'point',
-                                online: true,
+                                iconUrl: p!.claim_status === 'claimed' 
+                                  ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750101287/Punto_de_Recoleccion_reclamado_Marcador_m3c4rd.png' 
+                                  : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+                                iconsize: [96, 96],
+                                status: p!.claim_status,
                               }));
                               // Array de lat/lng para el trazado de la ruta
                               const routeLine = routePoints.map(p => ({ lat: Number(p!.lat), lng: Number(p!.lng) }));

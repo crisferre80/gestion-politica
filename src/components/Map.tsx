@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import Map, { Marker, NavigationControl, MapRef } from 'react-map-gl';
+import Map, { Marker, NavigationControl, MapRef, Layer, Source, Popup } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '../lib/supabase';
 
@@ -47,11 +47,14 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   showAdminZonesButton = false,
   onMapClick,
   disableDraw = false,
+  route = [],
 }) => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [showAdminZones, setShowAdminZones] = useState(false);
   const [adminZones, setAdminZones] = useState<AdminZone[]>([]);
+  const [optimizedRoute, setOptimizedRoute] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [hoveredMarker, setHoveredMarker] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const mapRef = React.useRef<MapRef | null>(null);
 
   // Cargar zonas desde supabase
@@ -107,6 +110,22 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
     }
   }, [onMapClick]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fetchRoute = async (coordinates: any[]) => {
+    const query = coordinates.map(coord => `${coord.lng},${coord.lat}`).join(';');
+    const response = await fetch(`https://api.mapbox.com/directions/v5/mapbox/driving/${query}?geometries=geojson&access_token=${MAPBOX_TOKEN}`);
+    const data = await response.json();
+    return data.routes[0]?.geometry.coordinates.map(([lng, lat]: [number, number]) => ({ lng, lat }));
+  };
+
+  useEffect(() => {
+    if (route && route.length > 1) {
+      fetchRoute(route).then((optimizedRoute) => {
+        setOptimizedRoute(optimizedRoute);
+      });
+    }
+  }, [route]);
+
   return (
     <div style={{ width: '100%', height: 500, position: 'relative' }}>
       {showAdminZonesButton && (
@@ -153,7 +172,31 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
         {/* Marcadores personalizados */}
         {markers.map(marker => (
           <Marker key={marker.id} longitude={marker.lng} latitude={marker.lat}>
-            <div title={marker.title} style={{ width: 48, height: 48, backgroundImage: `url(${marker.iconUrl || '/assets/Punto de Recoleccion Marcador.png'})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                backgroundImage: `url(${marker.iconUrl || (marker.role === 'available' ? '/assets/Punto_de_Recoleccion_Verde.png' : '/assets/Punto_de_Recoleccion_Amarillo.png')})`,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                borderRadius: '50%',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              }}
+              onMouseEnter={() => setHoveredMarker(marker)}
+              onMouseLeave={() => setHoveredMarker(null)}
+            />
+            {hoveredMarker?.id === marker.id && (
+              <Popup
+                longitude={marker.lng}
+                latitude={marker.lat}
+                closeButton={false}
+                closeOnClick={false}
+                anchor="top"
+              >
+                <div style={{ whiteSpace: 'pre-wrap' }}>{marker.title}</div>
+              </Popup>
+            )}
           </Marker>
         ))}
         {/* Zonas como polígonos */}
@@ -162,6 +205,29 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
             <></>
           )
         ))}
+        {/* Ruta como línea */}
+        {optimizedRoute && optimizedRoute.length > 1 && (
+          <Source id="optimized-route" type="geojson" data={{
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: optimizedRoute.map(point => [point.lng, point.lat])
+            }
+          }}>
+            <Layer
+              id="optimized-route-layer"
+              type="line"
+              paint={{
+                'line-color': '#3b82f6',
+                'line-width': 8 // Incrementar el grosor de la línea
+              }}
+              layout={{
+                'line-cap': 'round', // Hacer los extremos de la línea redondeados
+                'line-join': 'round' // Hacer las esquinas de la línea redondeadas
+              }}
+            />
+          </Source>
+        )}
       </Map>
       {locationError && (
         <div className="absolute bottom-4 left-4 right-4 bg-red-50 border-l-4 border-red-400 p-4 rounded shadow-md">

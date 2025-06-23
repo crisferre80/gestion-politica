@@ -2,6 +2,7 @@ import { useNotifications } from '../context/NotificationsContext';
 import { Recycle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import alarmaAudio from '/assets/alarma econecta.mp3';
+import { supabase } from '../lib/supabase';
 
 function getClosedIdsFromStorage(userId: string | undefined) {
   if (!userId) return [];
@@ -76,6 +77,31 @@ export default function Notifications() {
   useEffect(() => {
     // Cargar cerradas de storage al cambiar de usuario
     setClosedIds(getClosedIdsFromStorage(userId));
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // Suscripción en tiempo real a cambios en los paneles de residentes y recicladores
+    const channelPanelChanges = supabase.channel('panel-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_panels',
+        filter: `user_id=eq.${userId}`,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }, (payload: { new: any }) => {
+        if (payload.new) {
+          console.log('Actualización en panel:', payload.new);
+          // Aquí puedes actualizar el estado local o realizar acciones necesarias
+        }
+      });
+
+    channelPanelChanges.subscribe();
+
+    return () => {
+      supabase.removeChannel(channelPanelChanges);
+    };
   }, [userId]);
 
   // Solo mostrar las no leídas y que no estén cerradas en los últimos 48h

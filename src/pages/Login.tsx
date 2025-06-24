@@ -42,6 +42,8 @@ const Login: React.FC = () => {
         window.localStorage.setItem('eco_user_email', data.user.email!);
         if (email === 'cristianferreyra8076@gmail.com') {
           navigate('/admin-panel');
+        } else if (profile.type === 'resident_institutional') {
+          navigate('/dashboard-institutional');
         } else {
           navigate('/dashboard');
         }

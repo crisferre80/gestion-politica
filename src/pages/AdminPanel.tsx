@@ -740,8 +740,8 @@ const AdminPanel: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-lg font-semibold truncate">{user.name}</p>
                       <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                      <p className="text-sm font-medium" style={{ color: user.role === 'admin' ? 'blue' : user.role === 'recycler' ? 'green' : 'orange' }}>
-                        {user.role === 'admin' ? 'Administrador' : user.role === 'recycler' ? 'Reciclador' : 'Residente'}
+                      <p className="text-sm font-medium" style={{ color: user.role === 'admin' ? 'blue' : user.role === 'recycler' ? 'green' : user.role === 'resident_institutional' ? 'purple' : 'orange' }}>
+                        {user.role === 'admin' ? 'Administrador' : user.role === 'recycler' ? 'Reciclador' : user.role === 'resident_institutional' ? 'Residente Institucional' : 'Residente'}
                       </p>
                       {user.role === 'resident' && (
                         <div className="mt-2">
@@ -749,6 +749,16 @@ const AdminPanel: React.FC = () => {
                           <ul className="list-disc pl-5">
                             {collectionPoints.filter(point => point.user_id === user.user_id).map(point => (
                               <li key={point.id}>{point.location}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {user.role === 'resident_institutional' && (
+                        <div className="mt-2">
+                          <h4 className="text-sm font-semibold">Punto Colectivo:</h4>
+                          <ul className="list-disc pl-5">
+                            {collectionPoints.filter(point => point.user_id === user.user_id).map(point => (
+                              <li key={point.id}>{point.address}</li>
                             ))}
                           </ul>
                         </div>
@@ -761,7 +771,7 @@ const AdminPanel: React.FC = () => {
                       >
                         <span>Eliminar Usuario</span>
                       </button>
-                      {user.role === 'resident' && (
+                      {(user.role === 'resident' || user.role === 'resident_institutional') && (
                         <button
                           onClick={() => handleShowPoints(user.user_id)}
                           className="relative px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"

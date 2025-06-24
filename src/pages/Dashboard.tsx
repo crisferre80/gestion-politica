@@ -4,6 +4,7 @@ import { useUser } from '../context/UserContext';
 import DashboardRecycler from './DashboardRecycler';
 import DashboardResident from './DashboardResident';
 import AdminPanel from './AdminPanel';
+import DashboardInstitutional from './DashboardInstitutional';
 
 const Dashboard: React.FC = () => {
   const { user } = useUser();
@@ -24,6 +25,9 @@ const Dashboard: React.FC = () => {
   }
   if (user.type === 'recycler') {
     return <DashboardRecycler />;
+  }
+  if (user.type === 'resident_institutional') {
+    return <DashboardInstitutional />;
   }
   return <DashboardResident />;
 };

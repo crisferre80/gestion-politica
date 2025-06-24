@@ -12,7 +12,7 @@ const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [userType, setUserType] = useState<'recycler' | 'resident'>('resident');
+  const [userType, setUserType] = useState<'recycler' | 'resident' | 'resident_institutional'>('resident');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
@@ -23,6 +23,9 @@ const Register: React.FC = () => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [dni, setDni] = useState('');
+  const [institutionName, setInstitutionName] = useState('');
+  const [institutionAddress, setInstitutionAddress] = useState('');
+  const [isInstitutional, setIsInstitutional] = useState(false);
   
   const { login } = useUser();
   const navigate = useNavigate();
@@ -42,17 +45,23 @@ const Register: React.FC = () => {
       setError('El DNI es obligatorio para recicladores.');
       return;
     }
+    if (userType === 'resident_institutional' && (!institutionName.trim() || !institutionAddress.trim())) {
+      setError('Nombre y dirección de la institución son obligatorios.');
+      return;
+    }
     setLoading(true);
     try {
+      // Si es institucional, el type será 'resident_institutional'
+      const typeToSend = userType === 'resident_institutional' ? 'resident_institutional' : userType;
       const { data, error } = await signUpUser(email, password, {
-        name,
-        type: userType,
+        name: userType === 'resident_institutional' ? institutionName : name,
+        type: typeToSend,
         email,
         bio,
+        address: userType === 'resident_institutional' ? institutionAddress : undefined,
         materials: materials.split(',').map((m) => m.trim()).filter(Boolean),
         experience_years: userType === 'recycler' ? experienceYears : undefined,
         dni: userType === 'recycler' ? dni.trim() : undefined,
-        // alias se actualizará después si es reciclador
       });
       if (error) {
         // Manejo robusto de errores de usuario ya registrado
@@ -177,16 +186,12 @@ const Register: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700">
                 Tipo de usuario
               </label>
-              <div className="mt-2 grid grid-cols-2 gap-3">
+              <div className="mt-2 grid grid-cols-3 gap-3">
                 <div>
                   <button
                     type="button"
-                    onClick={() => setUserType('resident')}
-                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
-                      userType === 'resident'
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
+                    onClick={() => { setUserType('resident'); setIsInstitutional(false); }}
+                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${userType === 'resident' && !isInstitutional ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                   >
                     Residente
                   </button>
@@ -195,13 +200,18 @@ const Register: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setUserType('recycler')}
-                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${
-                      userType === 'recycler'
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${userType === 'recycler' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                   >
                     Reciclador
+                  </button>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => { setUserType('resident_institutional'); setIsInstitutional(true); }}
+                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 ${userType === 'resident_institutional' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    Residente Institucional
                   </button>
                 </div>
               </div>
@@ -383,6 +393,41 @@ const Register: React.FC = () => {
                   </div>
                 </div>
               </>
+            )}
+            {userType === 'resident_institutional' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Nombre de la institución o empresa <span className="text-red-600">*</span></label>
+                  <input
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    value={institutionName}
+                    onChange={e => setInstitutionName(e.target.value)}
+                    placeholder="Ej: Edificio Las Palmas, Empresa XYZ"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Dirección del punto colectivo <span className="text-red-600">*</span></label>
+                  <input
+                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    value={institutionAddress}
+                    onChange={e => setInstitutionAddress(e.target.value)}
+                    placeholder="Ej: Calle 123 #45-67, Barrio Centro"
+                    required
+                  />
+                </div>
+              </>
+            )}
+            {userType === 'resident' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">¿Vives en un edificio/institución? Escribe la dirección colectiva (opcional)</label>
+                <input
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  value={institutionAddress}
+                  onChange={e => setInstitutionAddress(e.target.value)}
+                  placeholder="Si tu edificio ya tiene punto colectivo, escribe la dirección exacta"
+                />
+              </div>
             )}
 
             <div className="flex items-center">

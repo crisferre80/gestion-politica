@@ -125,15 +125,27 @@ const AddCollectionPoint: React.FC = () => {
 
   // Memoizar los markers para evitar renders innecesarios del mapa
   const mapMarkers = useMemo(() => {
-    if (!selectedLocation) return [];
-    return [{
-      id: 'nuevo-punto',
-      lat: selectedLocation.lat,
-      lng: selectedLocation.lng,
-      title: 'Nuevo Punto de Recolección',
-      iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
-    }];
-  }, [selectedLocation]);
+    const markers = [];
+    if (user?.lat && user?.lng) {
+      markers.push({
+        id: 'ubicacion-residente',
+        lat: typeof user.lat === 'string' ? parseFloat(user.lat) : user.lat,
+        lng: typeof user.lng === 'string' ? parseFloat(user.lng) : user.lng,
+        title: 'Tu ubicación',
+        iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
+      });
+    }
+    if (selectedLocation) {
+      markers.push({
+        id: 'nuevo-punto',
+        lat: selectedLocation.lat,
+        lng: selectedLocation.lng,
+        title: 'Nuevo Punto de Recolección',
+        iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+      });
+    }
+    return markers;
+  }, [selectedLocation, user]);
 
   // Memoizar handleMapClick para evitar refrescos innecesarios del mapa
   const handleMapClick = useCallback((event: { lng: number; lat: number }) => {
@@ -330,6 +342,7 @@ const AddCollectionPoint: React.FC = () => {
                   markers={mapMarkers}
                   onMapClick={handleMapClick}
                   disableDraw={true}      // Fuerza desactivar lógica de dibujo
+                  showUserLocation={true}
                 />
               </div>
 

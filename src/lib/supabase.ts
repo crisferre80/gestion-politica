@@ -17,7 +17,7 @@ export interface User {
   email: string;
   phone?: string;
   address?: string;
-  type: 'resident' | 'recycler';
+  type: 'resident' | 'recycler' | 'resident_institutional';
   avatar_url?: string;
   online?: boolean;
   materials?: string[];

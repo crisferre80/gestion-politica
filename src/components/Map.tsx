@@ -100,6 +100,16 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
     }
   }, [showUserLocation]);
 
+  useEffect(() => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [userLocation.longitude, userLocation.latitude],
+        zoom: 15,
+        duration: 1000
+      });
+    }
+  }, [userLocation]);
+
   // Memoizar zonas a mostrar
   const zonasParaMostrar = useMemo(() => showAdminZones ? adminZones : zones, [showAdminZones, adminZones, zones]);
 

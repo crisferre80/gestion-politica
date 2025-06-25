@@ -191,7 +191,14 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                 style={{
                   width: '100%',
                   height: '100%',
-                  backgroundImage: `url(${marker.iconUrl || (marker.role === 'available' ? '/assets/Punto_de_Recoleccion_Verde.png' : '/assets/Punto_de_Recoleccion_Amarillo.png')})`,
+                  backgroundImage: `url(${marker.iconUrl ||
+                    (marker.role === 'resident_institutional'
+                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png'
+                      : marker.role === 'collection_point'
+                      ? '/assets/recycling-marker.svg' // Icono para punto colectivo genérico
+                      : marker.role === 'available'
+                      ? '/assets/Punto_de_Recoleccion_Verde.png'
+                      : '/assets/Punto_de_Recoleccion_Amarillo.png')})`,
                   backgroundSize: 'contain',
                   backgroundRepeat: 'no-repeat',
                   backgroundPosition: 'center',

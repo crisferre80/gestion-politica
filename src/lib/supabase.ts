@@ -11,6 +11,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export interface User {
+  role: string;
   user_id: string;
   id: string;
   name: string;

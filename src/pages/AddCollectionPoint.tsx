@@ -231,7 +231,8 @@ const AddCollectionPoint: React.FC = () => {
             schedule: formattedSchedule,
             additional_info: additionalInfo,
             lat: selectedLocation.lat,
-            lng: selectedLocation.lng
+            lng: selectedLocation.lng,
+            ...(user.type === 'resident_institutional' ? { type: 'colective_point' } : {})
           }
         ])
         .select()

@@ -141,7 +141,10 @@ const AddCollectionPoint: React.FC = () => {
         lat: selectedLocation.lat,
         lng: selectedLocation.lng,
         title: 'Nuevo Punto de Recolección',
-        iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+        iconUrl:
+          user?.type === 'resident_institutional'
+            ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+            : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
       });
     }
     return markers;

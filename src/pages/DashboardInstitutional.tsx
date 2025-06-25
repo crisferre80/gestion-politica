@@ -184,6 +184,12 @@ const DashboardInstitutional: React.FC = () => {
           <p className="text-lg text-gray-500">Panel Institucional</p>
         </div>
       </div>
+      {/* Botón Agregar Punto Colectivo arriba y visible */}
+      <div className="flex gap-4 mb-6">
+        <Link to="/add-collection-point" className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2">
+          <Plus className="w-4 h-4" /> Agregar Punto Colectivo
+        </Link>
+      </div>
       {loading ? (
         <div>Cargando...</div>
       ) : (
@@ -191,28 +197,36 @@ const DashboardInstitutional: React.FC = () => {
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Punto Colectivo</h2>
             {collectivePoint ? (
-                            <div className="space-y-4">
-                            <div className="flex items-center">
-                              <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png" alt="Icono de Punto Colectivo" className="w-8 h-8 mr-3" />
-                              <p className="text-gray-600">{collectivePoint.address}</p>
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-gray-700 mb-2">Materiales clasificados:</h3>
-                              <div className="flex flex-wrap gap-2">
-                                {collectivePoint.materials?.map((material) => (
-                                  <span key={material} className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                                    {material}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="flex items-center">
-                               <h3 className="font-semibold text-gray-700 mr-2">Estado:</h3>
-                               <span className="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded-full">
-                                 Disponible
-                               </span>
-                            </div>
-                          </div>
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <img
+                    src={
+                      collectivePoint.type === 'colective_point'
+                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png'
+                    }
+                    alt="Icono de Punto Colectivo"
+                    className="w-12 h-12 mr-4"
+                  />
+                  <p className="text-gray-600">{collectivePoint.address}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-700 mb-2">Materiales clasificados:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {collectivePoint.materials?.map((material) => (
+                      <span key={material} className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        {material}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center">
+                   <h3 className="font-semibold text-gray-700 mr-2">Estado:</h3>
+                   <span className="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded-full">
+                     Disponible
+                   </span>
+                </div>
+              </div>
             ) : (
               <p className="text-gray-500">No tienes un punto colectivo registrado.</p>
             )}
@@ -255,8 +269,11 @@ const DashboardInstitutional: React.FC = () => {
                         lat: Number(collectivePoint.lat),
                         lng: Number(collectivePoint.lng),
                         title: collectivePoint.address || 'Punto Colectivo',
-                        role: 'collection_point',
-                        iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png',
+                        role: collectivePoint.type === 'colective_point' ? 'colective_point' : 'collection_point',
+                        iconUrl:
+                          collectivePoint.type === 'colective_point'
+                            ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                            : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png',
                       },
                     ]
                   : []),
@@ -291,11 +308,6 @@ const DashboardInstitutional: React.FC = () => {
                 ))
               )}
             </div>
-          </div>
-          <div className="flex gap-4">
-            <Link to="/add-collection-point" className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Editar Punto Colectivo
-            </Link>
           </div>
         </>
       )}

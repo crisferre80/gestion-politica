@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Plus, User as UserIcon, Star, Mail, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Map from '../components/Map';
@@ -59,11 +59,43 @@ export type User = {
 };
 
 const DashboardResident: React.FC = () => {
-  const { user, login } = useUser();
+  const { user, login, logout } = useUser();
+  const navigate = useNavigate();
   const location = useLocation();
   // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
    
+  // Cierre de sesión por inactividad
+  useEffect(() => {
+    let inactivityTimer: NodeJS.Timeout;
+
+    const handleLogout = () => {
+      supabase.auth.signOut();
+      if (logout) logout();
+      navigate('/login', { state: { message: 'Tu sesión ha expirado por inactividad.' } });
+    };
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(handleLogout, 30 * 60 * 1000); // 30 minutos
+    };
+
+    const activityEvents: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    resetTimer(); // Iniciar el temporizador
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [logout, navigate]);
+
   // const [] = useState(false);
    
   // const [someState, setSomeState] = useState(false); // Removed invalid empty array destructuring
@@ -103,6 +135,57 @@ const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
   }
   return [];
 });
+
+// --- Carga inicial de recicladores ---
+useEffect(() => {
+  const fetchInitialRecyclers = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'recycler')
+      .eq('online', true);
+
+    if (error) {
+      console.error('Error fetching initial recyclers:', error);
+      return;
+    }
+    
+    if (data) {
+      const formattedRecyclers: Recycler[] = data.map(rec => {
+        const normalizedMaterials = Array.isArray(rec.materials)
+          ? rec.materials
+          : (typeof rec.materials === 'string' && rec.materials.length > 0
+              ? [rec.materials]
+              : []);
+        const normalizedLat = rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined;
+        const normalizedLng = rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined;
+
+        return {
+          id: String(rec.id),
+          user_id: rec.user_id,
+          role: 'recycler',
+          profiles: {
+            avatar_url: rec.avatar_url,
+            name: rec.name,
+            email: rec.email,
+            phone: rec.phone,
+            dni: rec.dni,
+          },
+          rating_average: rec.rating_average,
+          total_ratings: rec.total_ratings,
+          materials: normalizedMaterials,
+          bio: rec.bio,
+          lat: normalizedLat,
+          lng: normalizedLng,
+          online: true,
+        };
+      });
+      setRecyclers(formattedRecyclers);
+    }
+  };
+
+  fetchInitialRecyclers();
+}, []);
 
 // --- Persistencia de estado del tab activo ---
 const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>(() => {
@@ -1033,11 +1116,11 @@ useEffect(() => {
       {activeTab === 'recicladores' && (
         <div className="w-full max-w-4xl bg-white shadow-md rounded-lg p-6">
           <h2 className="text-2xl font-bold mb-6 text-center">Recicladores</h2>
-          {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).length === 0 ? (
-            <p className="text-gray-500 text-center">No hay recicladores en línea con ubicación disponible.</p>
+          {recyclers.filter(r => r.role === 'recycler' && r.online === true).length === 0 ? (
+            <p className="text-gray-500 text-center">No hay recicladores en línea.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map((rec) => (
+              {recyclers.filter(r => r.role === 'recycler' && r.online === true).map((rec) => (
                 <div key={rec.id} className="border rounded-lg p-4 flex flex-col items-center bg-gray-50 shadow-sm relative">
                   {/* Badge rojo en la tarjeta si hay mensajes no leídos de este reciclador */}
                   {rec.user_id && unreadMessagesByRecycler[rec.user_id] > 0 && (
@@ -1098,13 +1181,7 @@ useEffect(() => {
                       className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none relative"
                       onClick={() => clearUnreadForRecycler(rec.user_id!)}
                     >
-                      Enviar mensaje
-                      {/* Badge rojo SOLO en el botón, persiste hasta abrir el chat */}
-                      {unreadMessagesByRecycler[rec.user_id || ''] > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white animate-pulse z-10">
-                          {unreadMessagesByRecycler[rec.user_id || '']}
-                        </span>
-                      )}
+                      Chatear
                     </Link>
                   ) : (
                     <button

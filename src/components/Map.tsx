@@ -174,8 +174,8 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
         {/* Marcador de usuario */}
         {userLocation && (
           <Marker longitude={userLocation.longitude} latitude={userLocation.latitude}>
-            <div className="w-10 h-10 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center animate-pulse">
-              <div className="w-3 h-3 bg-white rounded-full"></div>
+            <div className="w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center animate-pulse">
+              <div className="w-2 h-2 bg-white rounded-full"></div>
             </div>
           </Marker>
         )}
@@ -183,19 +183,38 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
         {markers.map(marker => (
           <Marker key={marker.id} longitude={marker.lng} latitude={marker.lat}>
             <div
-              style={{
-                width: 40,
-                height: 40,
-                backgroundImage: `url(${marker.iconUrl || (marker.role === 'available' ? '/assets/Punto_de_Recoleccion_Verde.png' : '/assets/Punto_de_Recoleccion_Amarillo.png')})`,
-                backgroundSize: 'contain',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center',
-                borderRadius: '50%',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              }}
               onMouseEnter={() => setHoveredMarker(marker)}
               onMouseLeave={() => setHoveredMarker(null)}
-            />
+              style={{ position: 'relative', width: 60, height: 60, cursor: 'pointer' }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundImage: `url(${marker.iconUrl || (marker.role === 'available' ? '/assets/Punto_de_Recoleccion_Verde.png' : '/assets/Punto_de_Recoleccion_Amarillo.png')})`,
+                  backgroundSize: 'contain',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'center',
+                }}
+              />
+              {marker.avatar_url && (
+                <img
+                  src={marker.avatar_url}
+                  alt="Avatar del reciclador"
+                  style={{
+                    position: 'absolute',
+                    top: '4px',
+                    left: '22px',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    border: '1px solid #fff',
+                    boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                    objectFit: 'cover',
+                  }}
+                />
+              )}
+            </div>
             {hoveredMarker?.id === marker.id && (
               <Popup
                 longitude={marker.lng}

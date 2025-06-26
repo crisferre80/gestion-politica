@@ -16,7 +16,7 @@ import MapComponent from '../components/Map';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 const DashboardRecycler: React.FC = () => {
-  const { user, login } = useUser();
+  const { user } = useUser();
   const navigate = useNavigate();
   // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -450,33 +450,26 @@ const DashboardRecycler: React.FC = () => {
   // --- PRESENCIA EN TIEMPO REAL ---
   useEffect(() => {
     if (!user?.id) return;
-
-    const channel = supabase
-      .channel('recycler-presence')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          if (
-            payload.new &&
-            typeof payload.new.online === 'boolean' &&
-            payload.new.online !== user.online // Solo si cambia el estado online
-          ) {
-            login({ ...user, online: payload.new.online });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    // Marcar online al entrar
+    supabase.from('profiles').update({ online: true }).eq('user_id', user.id);
+    // Timer de inactividad: 60 minutos
+    let inactivityTimeout: NodeJS.Timeout | null = null;
+    const resetInactivityTimer = () => {
+      if (inactivityTimeout) clearTimeout(inactivityTimeout);
+      inactivityTimeout = setTimeout(async () => {
+        await supabase.from('profiles').update({ online: false }).eq('user_id', user.id);
+        window.location.href = '/login';
+      }, 60 * 60 * 1000); // 60 minutos
     };
-  }, [user, login]);
+    // Eventos de actividad
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetInactivityTimer));
+    resetInactivityTimer();
+    return () => {
+      if (inactivityTimeout) clearTimeout(inactivityTimeout);
+      events.forEach(e => window.removeEventListener(e, resetInactivityTimer));
+    };
+  }, [user]);
 
   useEffect(() => {
     const handleUnload = async () => {

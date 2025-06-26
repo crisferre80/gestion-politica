@@ -54,6 +54,7 @@ export type CollectionPoint = {
   claim_status?: string; // <-- Agregado para el estado real del claim
   pickup_time?: string | null;
   pickup_extra?: string | null; // Nuevo campo agregado
+  type?: string; // <-- Añadido para distinguir puntos colectivos
   // otros campos...
 };
 

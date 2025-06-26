@@ -27,6 +27,7 @@ import Estadisticas from './pages/Estadisticas';
 import EstadisticasPanel from './components/EstadisticasPanel';
 import FeedbackForm from './pages/FeedbackForm';
 import DashboardInstitutional from './pages/DashboardInstitutional';
+import JoinPoint from './pages/JoinPoint';
 
 // ErrorBoundary para redirigir al inicio en caso de error
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -88,6 +89,7 @@ function App() {
                   <Route path="/mi-historial" element={<MiHistorialRoute />} />
                   <Route path="/feedback" element={<FeedbackForm />} />
                   <Route path="/dashboard-institutional" element={<DashboardInstitutional />} />
+                  <Route path="/join-point/:pointId" element={<JoinPoint />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </main>

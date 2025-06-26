@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
-import { Plus, User as UserIcon, Mail, Phone } from 'lucide-react';
+import { Plus, User as UserIcon, Mail, Phone, Trash2, QrCode } from 'lucide-react';
 import Map from '../components/Map';
+import QRCode from 'react-qr-code';
 
 // Tipo para el payload de realtime de perfiles (igual que en DashboardResident.tsx)
 type ProfileRealtimePayload = {
@@ -62,6 +63,7 @@ const DashboardInstitutional: React.FC = () => {
     online?: boolean;
   };
   const [recyclers, setRecyclers] = useState<Recycler[]>([]);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   useEffect(() => {
     if (!user || user.type !== 'resident_institutional') return;
@@ -86,6 +88,19 @@ const DashboardInstitutional: React.FC = () => {
     };
     fetchData();
   }, [user]);
+
+  const handleDeletePoint = async () => {
+    if (!collectivePoint) return;
+    if (window.confirm('¿Estás seguro de que quieres eliminar este punto colectivo? Esta acción es irreversible.')) {
+      const { error } = await supabase.from('collection_points').delete().eq('id', collectivePoint.id);
+      if (error) {
+        alert('Error al eliminar el punto: ' + error.message);
+      } else {
+        setCollectivePoint(null);
+        setAssociatedResidents([]);
+      }
+    }
+  };
 
   // Suscripción realtime a recicladores online
   useEffect(() => {
@@ -197,34 +212,52 @@ const DashboardInstitutional: React.FC = () => {
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Punto Colectivo</h2>
             {collectivePoint ? (
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <img
-                    src={
-                      collectivePoint.type === 'colective_point'
-                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png'
-                    }
-                    alt="Icono de Punto Colectivo"
-                    className="w-12 h-12 mr-4"
-                  />
-                  <p className="text-gray-600">{collectivePoint.address}</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-700 mb-2">Materiales clasificados:</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {collectivePoint.materials?.map((material) => (
-                      <span key={material} className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                        {material}
-                      </span>
-                    ))}
+              <div>
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <img
+                      src={
+                        collectivePoint.type === 'colective_point'
+                          ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                          : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png'
+                      }
+                      alt="Icono de Punto Colectivo"
+                      className="w-12 h-12 mr-4"
+                    />
+                    <p className="text-gray-600">{collectivePoint.address}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-700 mb-2">Materiales clasificados:</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {collectivePoint.materials?.map((material) => (
+                        <span key={material} className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                          {material}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <h3 className="font-semibold text-gray-700 mr-2">Estado:</h3>
+                    <span className="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded-full">
+                      Disponible
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center">
-                   <h3 className="font-semibold text-gray-700 mr-2">Estado:</h3>
-                   <span className="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded-full">
-                     Disponible
-                   </span>
+                <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end gap-2">
+                  <button
+                    onClick={() => setShowQrModal(true)}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Invitar con QR
+                  </button>
+                  <button
+                    onClick={handleDeletePoint}
+                    className="px-3 py-2 bg-red-600 text-white rounded-md flex items-center gap-2 hover:bg-red-700 transition-colors text-sm font-semibold shadow-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Eliminar
+                  </button>
                 </div>
               </div>
             ) : (
@@ -309,6 +342,38 @@ const DashboardInstitutional: React.FC = () => {
               )}
             </div>
           </div>
+          {/* Modal para mostrar el QR */}
+          {showQrModal && collectivePoint && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+              <div className="bg-white p-8 rounded-lg shadow-xl text-center max-w-md mx-4">
+                <h3 className="text-2xl font-bold mb-4">Adhesión al Punto Colectivo</h3>
+                <p className="mb-6 text-gray-600">Pide al residente que escanee este código QR para asociarse a tu punto de recolección.</p>
+                <div style={{ background: 'white', padding: '16px', display: 'inline-block' }}>
+                  <QRCode
+                    value={`${window.location.origin}/join-point/${collectivePoint.id}`}
+                    size={256}
+                  />
+                </div>
+                <p className="mt-4 text-xs text-gray-500 break-all">
+                  O comparte este enlace: <br/>
+                  <a 
+                    href={`${window.location.origin}/join-point/${collectivePoint.id}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    {`${window.location.origin}/join-point/${collectivePoint.id}`}
+                  </a>
+                </p>
+                <button
+                  onClick={() => setShowQrModal(false)}
+                  className="mt-8 px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors w-full"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

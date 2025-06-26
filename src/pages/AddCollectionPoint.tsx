@@ -27,11 +27,14 @@ const AddCollectionPoint: React.FC = () => {
   const { user } = useUser();
   const navigate = useNavigate();
   
+  // Estado para verificar si está asociado a un punto colectivo
+  const [isAssociatedToCollectivePoint, setIsAssociatedToCollectivePoint] = useState<boolean>(false);
+  const [collectivePointInfo, setCollectivePointInfo] = useState<{ address: string; institutionalName: string } | null>(null);
+  
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('');
   const [materials, setMaterials] = useState<string[]>([]);
-  // eslint-disable-next-line no-empty-pattern
-  const [] = useState('');
+  const [bultos, setBultos] = useState<number>(1);
   const [collectionDate, setCollectionDate] = useState<Date | null>(null);
   const [collectionTimeStart, setCollectionTimeStart] = useState<Date | null>(null);
   const [collectionTimeEnd, setCollectionTimeEnd] = useState<Date | null>(null);
@@ -152,6 +155,11 @@ const AddCollectionPoint: React.FC = () => {
 
   // Memoizar handleMapClick para evitar refrescos innecesarios del mapa
   const handleMapClick = useCallback((event: { lng: number; lat: number }) => {
+    // No permitir clics en el mapa si está asociado a un punto colectivo
+    if (isAssociatedToCollectivePoint) {
+      return;
+    }
+    
     // Solo actualiza si la ubicación realmente cambió
     if (
       !selectedLocation ||
@@ -183,7 +191,7 @@ const AddCollectionPoint: React.FC = () => {
           console.error('Error in reverse geocoding:', err);
         });
     }
-  }, [selectedLocation, address, district]);
+  }, [selectedLocation, address, district, isAssociatedToCollectivePoint]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,8 +206,20 @@ const AddCollectionPoint: React.FC = () => {
       return;
     }
     
-    if (!address || !district || materials.length === 0 || !collectionDate || !collectionTimeStart || !collectionTimeEnd) {
-      setError('Por favor completa todos los campos requeridos');
+    // Validación condicional del distrito: no es obligatorio si está asociado a punto colectivo
+    const districtRequired = !isAssociatedToCollectivePoint;
+    if (!address || (districtRequired && !district) || materials.length === 0 || bultos < 1 || !collectionDate || !collectionTimeStart || !collectionTimeEnd) {
+      if (!address) {
+        setError('Por favor ingresa una dirección');
+      } else if (districtRequired && !district) {
+        setError('Por favor ingresa el distrito/zona');
+      } else if (materials.length === 0) {
+        setError('Por favor selecciona al menos un material');
+      } else if (bultos < 1) {
+        setError('La cantidad de bultos debe ser al menos 1');
+      } else if (!collectionDate || !collectionTimeStart || !collectionTimeEnd) {
+        setError('Por favor completa todos los campos de horario');
+      }
       return;
     }
     
@@ -216,6 +236,7 @@ const AddCollectionPoint: React.FC = () => {
       address,
       district,
       materials,
+      bultos,
       schedule: formattedSchedule,
       additional_info: additionalInfo,
       lat: selectedLocation.lat,
@@ -231,6 +252,7 @@ const AddCollectionPoint: React.FC = () => {
             address,
             district,
             materials,
+            bultos,
             schedule: formattedSchedule,
             additional_info: additionalInfo,
             lat: selectedLocation.lat,
@@ -297,6 +319,101 @@ const AddCollectionPoint: React.FC = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Verificar si el residente está asociado a un punto colectivo
+  useEffect(() => {
+    async function checkCollectivePointAssociation() {
+      if (!user?.id || !user?.address) {
+        setIsAssociatedToCollectivePoint(false);
+        setCollectivePointInfo(null);
+        return;
+      }
+
+      // Buscar si existe un punto colectivo con la misma dirección del usuario
+      const { data: collectivePoint, error } = await supabase
+        .from('collection_points')
+        .select(`
+          id, 
+          address, 
+          type,
+          lat,
+          lng,
+          profiles!collection_points_user_id_fkey(name)
+        `)
+        .eq('address', user.address)
+        .eq('type', 'colective_point')
+        .single();
+
+      if (!error && collectivePoint) {
+        setIsAssociatedToCollectivePoint(true);
+        const profileData = Array.isArray(collectivePoint.profiles) 
+          ? collectivePoint.profiles[0] 
+          : collectivePoint.profiles;
+        setCollectivePointInfo({
+          address: collectivePoint.address,
+          institutionalName: profileData?.name || 'Institución'
+        });
+        
+        // Bloquear la dirección y ubicación del punto colectivo
+        setAddress(collectivePoint.address);
+        if (collectivePoint.lat && collectivePoint.lng) {
+          setSelectedLocation({
+            lat: Number(collectivePoint.lat),
+            lng: Number(collectivePoint.lng)
+          });
+        }
+        
+        // Extraer el distrito de la dirección usando geocoding reverso
+        if (collectivePoint.lat && collectivePoint.lng) {
+          fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${collectivePoint.lng},${collectivePoint.lat}.json?access_token=${MAPBOX_TOKEN}`
+          )
+            .then(response => response.json())
+            .then(data => {
+              if (data.features && data.features.length > 0) {
+                const feature = data.features[0];
+                type ContextType = { id: string; text: string };
+                
+                // Intentar extraer distrito de diferentes contextos (orden de prioridad)
+                const districtContext = feature.context?.find((ctx: ContextType) => 
+                  ctx.id.startsWith('neighborhood') || 
+                  ctx.id.startsWith('locality') ||
+                  ctx.id.startsWith('place') ||
+                  ctx.id.startsWith('district')
+                );
+                
+                if (districtContext) {
+                  setDistrict(districtContext.text);
+                } else {
+                  // Si no se encuentra en el contexto, usar parte de la dirección
+                  const addressParts = collectivePoint.address.split(',');
+                  if (addressParts.length > 1) {
+                    setDistrict(addressParts[addressParts.length - 2].trim());
+                  } else {
+                    setDistrict('Centro'); // Valor por defecto
+                  }
+                }
+              }
+            })
+            .catch(err => {
+              console.error('Error in reverse geocoding for collective point:', err);
+              // Fallback: extraer de la dirección
+              const addressParts = collectivePoint.address.split(',');
+              if (addressParts.length > 1) {
+                setDistrict(addressParts[addressParts.length - 2].trim());
+              } else {
+                setDistrict('Centro');
+              }
+            });
+        }
+      } else {
+        setIsAssociatedToCollectivePoint(false);
+        setCollectivePointInfo(null);
+      }
+    }
+
+    checkCollectivePointAssociation();
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -337,10 +454,37 @@ const AddCollectionPoint: React.FC = () => {
               </div>
             )}
             
+            {/* Aviso para residentes asociados a punto colectivo */}
+            {isAssociatedToCollectivePoint && collectivePointInfo && (
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">
+                      Punto asociado a colectivo
+                    </h3>
+                    <div className="mt-2 text-sm text-blue-700">
+                      <p>
+                        Estás asociado al punto colectivo gestionado por <strong>{collectivePointInfo.institutionalName}</strong>. 
+                        La dirección de tus nuevos puntos se establecerá automáticamente en: <strong>{collectivePointInfo.address}</strong>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Selecciona la ubicación en el mapa <span className="text-red-500">*</span>
+                  {isAssociatedToCollectivePoint 
+                    ? 'Ubicación del punto colectivo (bloqueada)' 
+                    : 'Selecciona la ubicación en el mapa'} 
+                  <span className="text-red-500">*</span>
                 </label>
                 <Map
                   markers={mapMarkers}
@@ -348,6 +492,11 @@ const AddCollectionPoint: React.FC = () => {
                   disableDraw={true}      // Fuerza desactivar lógica de dibujo
                   showUserLocation={true}
                 />
+                {isAssociatedToCollectivePoint && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    La ubicación está establecida automáticamente en la dirección del punto colectivo.
+                  </p>
+                )}
               </div>
 
               <div className="relative">
@@ -361,10 +510,13 @@ const AddCollectionPoint: React.FC = () => {
                   onChange={handleAddressChange}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowAddressSuggestions(true);
+                    if (!isAssociatedToCollectivePoint) {
+                      setShowAddressSuggestions(true);
+                    }
                   }}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Ej: Av. Siempreviva 742"
+                  disabled={isAssociatedToCollectivePoint} // Deshabilitar si está asociado a un punto colectivo
                 />
                 {showAddressSuggestions && addressSuggestions.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
@@ -388,7 +540,8 @@ const AddCollectionPoint: React.FC = () => {
               
               <div className="relative">
                 <label htmlFor="district" className="block text-sm font-medium text-gray-700">
-                  Distrito/Zona <span className="text-red-500">*</span>
+                  Distrito/Zona {!isAssociatedToCollectivePoint && <span className="text-red-500">*</span>}
+                  {isAssociatedToCollectivePoint && <span className="text-gray-500">(automático)</span>}
                 </label>
                 <input
                   type="text"
@@ -397,10 +550,13 @@ const AddCollectionPoint: React.FC = () => {
                   onChange={handleDistrictChange}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowDistrictSuggestions(true);
+                    if (!isAssociatedToCollectivePoint) {
+                      setShowDistrictSuggestions(true);
+                    }
                   }}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                  placeholder="Ej: Centro"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  placeholder={isAssociatedToCollectivePoint ? "Se completará automáticamente" : "Ej: Centro"}
+                  disabled={isAssociatedToCollectivePoint} // Deshabilitar si está asociado a un punto colectivo
                 />
                 {showDistrictSuggestions && districtSuggestions.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
@@ -419,6 +575,11 @@ const AddCollectionPoint: React.FC = () => {
                       ))}
                     </ul>
                   </div>
+                )}
+                {isAssociatedToCollectivePoint && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    El distrito se extraerá automáticamente de la ubicación del punto colectivo.
+                  </p>
                 )}
               </div>
               
@@ -442,6 +603,25 @@ const AddCollectionPoint: React.FC = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+              
+              <div>
+                <label htmlFor="bultos" className="block text-sm font-medium text-gray-700 mb-2">
+                  Cantidad de bultos <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  id="bultos"
+                  min="1"
+                  max="50"
+                  value={bultos}
+                  onChange={(e) => setBultos(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  placeholder="Ej: 5"
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Número de bultos o bolsas de materiales reciclables (mínimo 1, máximo 50)
+                </p>
               </div>
               
               <div>

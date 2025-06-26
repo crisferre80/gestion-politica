@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, User as UserIcon, Star, Mail, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Map from '../components/Map';
@@ -59,43 +59,11 @@ export type User = {
 };
 
 const DashboardResident: React.FC = () => {
-  const { user, login, logout } = useUser();
-  const navigate = useNavigate();
+  const { user, login } = useUser();
   const location = useLocation();
   // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
    
-  // Cierre de sesión por inactividad
-  useEffect(() => {
-    let inactivityTimer: NodeJS.Timeout;
-
-    const handleLogout = () => {
-      supabase.auth.signOut();
-      if (logout) logout();
-      navigate('/login', { state: { message: 'Tu sesión ha expirado por inactividad.' } });
-    };
-
-    const resetTimer = () => {
-      clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(handleLogout, 30 * 60 * 1000); // 30 minutos
-    };
-
-    const activityEvents: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
-
-    activityEvents.forEach(event => {
-      window.addEventListener(event, resetTimer);
-    });
-
-    resetTimer(); // Iniciar el temporizador
-
-    return () => {
-      clearTimeout(inactivityTimer);
-      activityEvents.forEach(event => {
-        window.removeEventListener(event, resetTimer);
-      });
-    };
-  }, [logout, navigate]);
-
   // const [] = useState(false);
    
   // const [someState, setSomeState] = useState(false); // Removed invalid empty array destructuring
@@ -135,57 +103,6 @@ const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
   }
   return [];
 });
-
-// --- Carga inicial de recicladores ---
-useEffect(() => {
-  const fetchInitialRecyclers = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'recycler')
-      .eq('online', true);
-
-    if (error) {
-      console.error('Error fetching initial recyclers:', error);
-      return;
-    }
-    
-    if (data) {
-      const formattedRecyclers: Recycler[] = data.map(rec => {
-        const normalizedMaterials = Array.isArray(rec.materials)
-          ? rec.materials
-          : (typeof rec.materials === 'string' && rec.materials.length > 0
-              ? [rec.materials]
-              : []);
-        const normalizedLat = rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined;
-        const normalizedLng = rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined;
-
-        return {
-          id: String(rec.id),
-          user_id: rec.user_id,
-          role: 'recycler',
-          profiles: {
-            avatar_url: rec.avatar_url,
-            name: rec.name,
-            email: rec.email,
-            phone: rec.phone,
-            dni: rec.dni,
-          },
-          rating_average: rec.rating_average,
-          total_ratings: rec.total_ratings,
-          materials: normalizedMaterials,
-          bio: rec.bio,
-          lat: normalizedLat,
-          lng: normalizedLng,
-          online: true,
-        };
-      });
-      setRecyclers(formattedRecyclers);
-    }
-  };
-
-  fetchInitialRecyclers();
-}, []);
 
 // --- Persistencia de estado del tab activo ---
 const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>(() => {
@@ -725,6 +642,50 @@ useEffect(() => {
     };
   }, []);
 
+  // --- Estado para verificar si está asociado a un punto colectivo ---
+  const [isAssociatedToCollectivePoint, setIsAssociatedToCollectivePoint] = useState<boolean>(false);
+  const [collectivePointInfo, setCollectivePointInfo] = useState<{ address: string; institutionalName: string } | null>(null);
+
+  // --- Verificar si el residente está asociado a un punto colectivo ---
+  useEffect(() => {
+    async function checkCollectivePointAssociation() {
+      if (!user?.id || !user?.address) {
+        setIsAssociatedToCollectivePoint(false);
+        setCollectivePointInfo(null);
+        return;
+      }
+
+      // Buscar si existe un punto colectivo con la misma dirección del usuario
+      const { data: collectivePoint, error } = await supabase
+        .from('collection_points')
+        .select(`
+          id, 
+          address, 
+          type,
+          profiles!collection_points_user_id_fkey(name)
+        `)
+        .eq('address', user.address)
+        .eq('type', 'colective_point')
+        .single();
+
+      if (!error && collectivePoint) {
+        setIsAssociatedToCollectivePoint(true);
+        const profileData = Array.isArray(collectivePoint.profiles) 
+          ? collectivePoint.profiles[0] 
+          : collectivePoint.profiles;
+        setCollectivePointInfo({
+          address: collectivePoint.address,
+          institutionalName: profileData?.name || 'Institución'
+        });
+      } else {
+        setIsAssociatedToCollectivePoint(false);
+        setCollectivePointInfo(null);
+      }
+    }
+
+    checkCollectivePointAssociation();
+  }, [user]);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -750,6 +711,22 @@ useEffect(() => {
         <div>
           <h2 className="text-xl font-bold text-green-700">{user?.name || 'Residente'}</h2>
           <p className="text-gray-500 capitalize">{user?.type === 'resident' ? 'Residente' : user?.type || 'Usuario'}</p>
+          
+          {/* Etiqueta de asociación a punto colectivo */}
+          {isAssociatedToCollectivePoint && collectivePointInfo && (
+            <div className="mt-2">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Asociado a punto colectivo
+              </span>
+              <p className="text-xs text-gray-600 mt-1">
+                Gestionado por: {collectivePointInfo.institutionalName}
+              </p>
+            </div>
+          )}
+          
           {/* Menú desplegable de usuario */}
           <div className="relative mt-2">
             <details className="group">
@@ -763,6 +740,39 @@ useEffect(() => {
                     Mi Perfil
                   </button>
                 </li>
+                {isAssociatedToCollectivePoint && (
+                  <li>
+                    <button
+                      className="w-full text-left px-4 py-2 text-orange-600 hover:bg-orange-50"
+                      onClick={async () => {
+                        if (window.confirm('¿Estás seguro de que quieres desvincularte del punto colectivo? Podrás volver a asociarte usando el código QR de la institución.')) {
+                          try {
+                            const { error } = await supabase
+                              .from('profiles')
+                              .update({ address: null })
+                              .eq('user_id', user?.id);
+                            
+                            if (error) {
+                              toast.error('Error al desvincularse: ' + error.message);
+                            } else {
+                              setIsAssociatedToCollectivePoint(false);
+                              setCollectivePointInfo(null);
+                              // Actualizar el contexto del usuario para reflejar el cambio
+                              if (user) {
+                                login({ ...user, address: undefined });
+                              }
+                              toast.success('Te has desvinculado del punto colectivo exitosamente.');
+                            }
+                          } catch (err) {
+                            toast.error('Error inesperado al desvincularse.');
+                          }
+                        }
+                      }}
+                    >
+                      Desvincular del punto colectivo
+                    </button>
+                  </li>
+                )}
                 <li>
                   <button
                     className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
@@ -1116,11 +1126,11 @@ useEffect(() => {
       {activeTab === 'recicladores' && (
         <div className="w-full max-w-4xl bg-white shadow-md rounded-lg p-6">
           <h2 className="text-2xl font-bold mb-6 text-center">Recicladores</h2>
-          {recyclers.filter(r => r.role === 'recycler' && r.online === true).length === 0 ? (
-            <p className="text-gray-500 text-center">No hay recicladores en línea.</p>
+          {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).length === 0 ? (
+            <p className="text-gray-500 text-center">No hay recicladores en línea con ubicación disponible.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {recyclers.filter(r => r.role === 'recycler' && r.online === true).map((rec) => (
+              {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map((rec) => (
                 <div key={rec.id} className="border rounded-lg p-4 flex flex-col items-center bg-gray-50 shadow-sm relative">
                   {/* Badge rojo en la tarjeta si hay mensajes no leídos de este reciclador */}
                   {rec.user_id && unreadMessagesByRecycler[rec.user_id] > 0 && (
@@ -1181,7 +1191,13 @@ useEffect(() => {
                       className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none relative"
                       onClick={() => clearUnreadForRecycler(rec.user_id!)}
                     >
-                      Chatear
+                      Enviar mensaje
+                      {/* Badge rojo SOLO en el botón, persiste hasta abrir el chat */}
+                      {unreadMessagesByRecycler[rec.user_id || ''] > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white animate-pulse z-10">
+                          {unreadMessagesByRecycler[rec.user_id || '']}
+                        </span>
+                      )}
                     </Link>
                   ) : (
                     <button

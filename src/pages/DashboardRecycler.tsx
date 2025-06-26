@@ -268,7 +268,39 @@ const DashboardRecycler: React.FC = () => {
       const trulyAvailablePointsRaw = availablePointsRaw.filter(p => !penalizedPointIds.includes(p.id));
       // Debug: mostrar cuántos puntos quedan tras el filtro de penalización
       console.log('DEBUG: Puntos disponibles tras filtro de penalización:', trulyAvailablePointsRaw.length, trulyAvailablePointsRaw.map(p => p.id));
-      const userIds = [...new Set(trulyAvailablePointsRaw.map(p => p.user_id))];
+      
+      // NUEVO FILTRO: Excluir puntos de residentes asociados a puntos colectivos
+      // Primero obtener todos los puntos colectivos existentes
+      const { data: collectivePoints, error: collectiveError } = await supabase
+        .from('collection_points')
+        .select('address, type')
+        .eq('type', 'colective_point');
+      
+      let filteredAvailablePoints = trulyAvailablePointsRaw;
+      
+      if (!collectiveError && collectivePoints && collectivePoints.length > 0) {
+        // Obtener las direcciones de todos los puntos colectivos
+        const collectiveAddresses = collectivePoints.map(cp => cp.address);
+        console.log('DEBUG: Direcciones de puntos colectivos:', collectiveAddresses);
+        
+        // Filtrar puntos que NO son de tipo colectivo pero están en la misma dirección que un punto colectivo
+        filteredAvailablePoints = trulyAvailablePointsRaw.filter(p => {
+          // Mantener los puntos colectivos
+          if (p.type === 'colective_point') {
+            return true;
+          }
+          // Excluir puntos individuales que están en la misma dirección que un punto colectivo
+          const isAtCollectiveAddress = collectiveAddresses.includes(p.address);
+          if (isAtCollectiveAddress) {
+            console.log('DEBUG: Excluyendo punto individual en dirección colectiva:', p.id, p.address);
+          }
+          return !isAtCollectiveAddress;
+        });
+        
+        console.log('DEBUG: Puntos tras filtro de asociación a colectivos:', filteredAvailablePoints.length, filteredAvailablePoints.map(p => p.id));
+      }
+      
+      const userIds = [...new Set(filteredAvailablePoints.map(p => p.user_id))];
       if (userIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
@@ -284,7 +316,7 @@ const DashboardRecycler: React.FC = () => {
         };
       }
       setClaimedPoints(claimed);
-      setAvailablePoints(trulyAvailablePointsRaw.map(point => {
+      setAvailablePoints(filteredAvailablePoints.map(point => {
         const profile = profilesById[point.user_id] || {};
         // Asegura que point.materials sea siempre un array
         let materials: string[] = [];

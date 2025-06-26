@@ -65,6 +65,12 @@ const DashboardInstitutional: React.FC = () => {
   const [recyclers, setRecyclers] = useState<Recycler[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
 
+  // Estado para detalle de residente seleccionado
+  const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+  const [residentPoint, setResidentPoint] = useState<CollectionPoint | null>(null);
+  const [residentLoading, setResidentLoading] = useState(false);
+  const [totals, setTotals] = useState<{ materiales: Record<string, number>; bultos: number }>({ materiales: {}, bultos: 0 });
+
   useEffect(() => {
     if (!user || user.type !== 'resident_institutional') return;
     const fetchData = async () => {
@@ -182,6 +188,90 @@ const DashboardInstitutional: React.FC = () => {
     };
   }, []);
 
+  // Carga inicial de recicladores online con coordenadas válidas
+  useEffect(() => {
+    const fetchRecyclers = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'recycler')
+        .eq('online', true);
+      if (error) {
+        console.error('[INSTITUTIONAL] Error al cargar recicladores:', error);
+        return;
+      }
+      if (data && Array.isArray(data)) {
+        const filtered = data.filter(r => {
+          const lat = typeof r.lat === 'number' ? r.lat : (r.lat !== null && r.lat !== undefined ? Number(r.lat) : undefined);
+          const lng = typeof r.lng === 'number' ? r.lng : (r.lng !== null && r.lng !== undefined ? Number(r.lng) : undefined);
+          return r.online === true && typeof lat === 'number' && typeof lng === 'number';
+        }).map(r => ({
+          id: String(r.id),
+          user_id: r.user_id,
+          avatar_url: r.avatar_url,
+          name: r.name,
+          email: r.email,
+          phone: r.phone,
+          rating_average: r.rating_average,
+          total_ratings: r.total_ratings,
+          materials: Array.isArray(r.materials) ? r.materials : (typeof r.materials === 'string' && r.materials.length > 0 ? [r.materials] : []),
+          bio: r.bio,
+          lat: typeof r.lat === 'number' ? r.lat : (r.lat !== null && r.lat !== undefined ? Number(r.lat) : undefined),
+          lng: typeof r.lng === 'number' ? r.lng : (r.lng !== null && r.lng !== undefined ? Number(r.lng) : undefined),
+          online: r.online === true || r.online === 'true' || r.online === 1,
+        }));
+        setRecyclers(filtered);
+        // console.log('[INSTITUTIONAL] Recyclers iniciales cargados:', filtered);
+      }
+    };
+    fetchRecyclers();
+  }, []);
+
+  // Calcular totales de materiales y bultos de todos los residentes asociados
+  useEffect(() => {
+    const fetchTotals = async () => {
+      if (associatedResidents.length === 0) {
+        setTotals({ materiales: {}, bultos: 0 });
+        return;
+      }
+      // Buscar todos los puntos de recolección de los residentes asociados
+      const ids = associatedResidents.map(r => r.id);
+      const { data: points } = await supabase
+        .from('collection_points')
+        .select('*')
+        .in('user_id', ids);
+      // Sumar materiales y bultos
+      const materiales: Record<string, number> = {};
+      let bultos = 0;
+      (points || []).forEach((p: any) => {
+        if (Array.isArray(p.materials)) {
+          p.materials.forEach((mat: string) => {
+            materiales[mat] = (materiales[mat] || 0) + 1;
+          });
+        }
+        if (typeof p.bultos === 'number') {
+          bultos += p.bultos;
+        }
+      });
+      setTotals({ materiales, bultos });
+    };
+    fetchTotals();
+  }, [associatedResidents]);
+
+  // Al seleccionar un residente, buscar su punto de recolección
+  const handleSelectResident = async (res: Resident) => {
+    setSelectedResident(res);
+    setResidentLoading(true);
+    setResidentPoint(null);
+    const { data: points } = await supabase
+      .from('collection_points')
+      .select('*')
+      .eq('user_id', res.id)
+      .limit(1);
+    setResidentPoint(points && points.length > 0 ? points[0] : null);
+    setResidentLoading(false);
+  };
+
   if (!user || user.type !== 'resident_institutional') {
     return <div className="p-8 text-center text-red-600">Acceso solo para usuarios institucionales.</div>;
   }
@@ -269,15 +359,67 @@ const DashboardInstitutional: React.FC = () => {
             {associatedResidents.length > 0 ? (
               <ul className="divide-y">
                 {associatedResidents.map(res => (
-                  <li key={res.id} className="py-2 flex items-center gap-2">
+                  <li key={res.id} className="py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded transition"
+                    onClick={() => handleSelectResident(res)}
+                  >
                     <img src={res.avatar_url || '/default-avatar.png'} alt={res.name} className="w-8 h-8 rounded-full" />
                     <span>{res.name} ({res.email})</span>
+                    <button
+                      className="ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs flex items-center gap-1"
+                      title="Eliminar residente"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (window.confirm('¿Eliminar la asociación de este residente?')) {
+                          const { error } = await supabase
+                            .from('profiles')
+                            .update({ address: null })
+                            .eq('id', res.id);
+                          if (error) {
+                            alert('Error al eliminar la asociación: ' + error.message);
+                          } else {
+                            setAssociatedResidents(prev => prev.filter(r => r.id !== res.id));
+                          }
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </li>
                 ))}
               </ul>
             ) : (
               <div>No hay residentes asociados a este punto colectivo.</div>
             )}
+            {/* Detalle del residente seleccionado */}
+            {selectedResident && (
+              <div className="mt-4 p-4 bg-gray-50 rounded shadow">
+                <h3 className="font-bold text-lg mb-2">Detalle de {selectedResident.name}</h3>
+                {residentLoading ? (
+                  <div>Cargando punto de recolección...</div>
+                ) : residentPoint ? (
+                  <div>
+                    <div className="mb-2"><b>Dirección:</b> {residentPoint.address}</div>
+                    <div className="mb-2"><b>Materiales:</b> {Array.isArray(residentPoint.materials) ? residentPoint.materials.join(', ') : 'N/A'}</div>
+                    <div className="mb-2"><b>Bultos:</b> {typeof residentPoint.bultos === 'number' ? residentPoint.bultos : 0}</div>
+                  </div>
+                ) : (
+                  <div>Este residente no tiene punto de recolección propio.</div>
+                )}
+                <button className="mt-2 px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm" onClick={() => setSelectedResident(null)}>Cerrar</button>
+              </div>
+            )}
+            {/* Totales de materiales y bultos de todos los residentes */}
+            <div className="mt-4 p-4 bg-green-50 rounded shadow">
+              <h3 className="font-bold text-lg mb-2">Totales del Punto Colectivo</h3>
+              <div className="mb-2"><b>Bultos totales:</b> {totals.bultos}</div>
+              <div><b>Materiales totales:</b> {Object.keys(totals.materiales).length === 0 ? 'N/A' : (
+                <ul className="list-disc ml-6">
+                  {Object.entries(totals.materiales).map(([mat, count]) => (
+                    <li key={mat}>{mat}: {count}</li>
+                  ))}
+                </ul>
+              )}</div>
+            </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4 mb-6">
             <h2 className="text-xl font-semibold mb-2">Recicladores Online</h2>

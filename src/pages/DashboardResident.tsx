@@ -144,6 +144,52 @@ useEffect(() => {
 
   // Suscripción realtime SIEMPRE (no depende del tab)
   useEffect(() => {
+    // --- Lógica mejorada: fetch inmediato tras cualquier cambio relevante (INSERT, UPDATE, DELETE) ---
+    // IMPORTANTE: Esta suscripción + polling garantiza que los recicladores en línea se actualicen en tiempo real en el panel del residente.
+    // Si alguna vez se pierde la actualización inmediata de recicladores, restaurar este bloque con polling + fetch tras cada evento realtime.
+    // Esta es la forma más robusta para reflejar cambios de sesión de recicladores sin recargar la página.
+    let isMounted = true;
+    const fetchOnlineRecyclers = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'recycler')
+        .eq('online', true);
+      if (!error && Array.isArray(data) && isMounted) {
+        setRecyclers(
+          data.map((rec: any) => ({
+            id: String(rec.id),
+            user_id: rec.user_id,
+            role: rec.role,
+            profiles: {
+              avatar_url: rec.avatar_url,
+              name: rec.name,
+              email: rec.email,
+              phone: rec.phone,
+              dni: rec.dni,
+            },
+            rating_average: rec.rating_average,
+            total_ratings: rec.total_ratings,
+            materials: Array.isArray(rec.materials)
+              ? rec.materials
+              : (typeof rec.materials === 'string' && rec.materials.length > 0
+                  ? [rec.materials]
+                  : []),
+            bio: rec.bio,
+            lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
+            lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
+            online: rec.online === true || rec.online === 'true' || rec.online === 1,
+          }))
+        );
+      } else if (isMounted) {
+        setRecyclers([]);
+      }
+    };
+
+    // Fetch inicial
+    fetchOnlineRecyclers();
+
+    // Suscripción realtime: cualquier cambio relevante en profiles dispara fetch
     const channel = supabase.channel('recyclers-profiles')
       .on(
         'postgres_changes',
@@ -154,82 +200,19 @@ useEffect(() => {
           filter: 'role=eq.recycler',
         },
         (payload) => {
-          const newRec = payload.new as ProfileRealtimePayload;
-          const oldRec = payload.old as ProfileRealtimePayload;
-          if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
-            setRecyclers((prev) => {
-              // --- Solo actualiza si cambia online, lat, lng o info relevante ---
-              const exists = prev.find(r => r.id === String(newRec.id));
-              const normalizedMaterials = Array.isArray(newRec.materials)
-                ? newRec.materials
-                : (typeof newRec.materials === 'string' && newRec.materials.length > 0
-                    ? [newRec.materials]
-                    : []);
-              const normalizedOnline = newRec.online === true || newRec.online === 'true' || newRec.online === 1;
-              const normalizedLat = typeof newRec.lat === 'number' ? newRec.lat : (newRec.lat !== null && newRec.lat !== undefined ? Number(newRec.lat) : undefined);
-              const normalizedLng = typeof newRec.lng === 'number' ? newRec.lng : (newRec.lng !== null && newRec.lng !== undefined ? Number(newRec.lng) : undefined);
-              const safeRole = typeof newRec.role === 'string' ? newRec.role : 'recycler';
-              if (exists) {
-                // Solo actualiza si cambia online, lat, lng o info relevante
-                return prev.map(r =>
-                  r.id === String(newRec.id)
-                    ? {
-                        ...r,
-                        online: normalizedOnline,
-                        lat: normalizedLat,
-                        lng: normalizedLng,
-                        materials: normalizedMaterials,
-                        profiles: {
-                          ...r.profiles,
-                          ...newRec,
-                          avatar_url: newRec.avatar_url || r.profiles?.avatar_url,
-                          name: newRec.name || r.profiles?.name,
-                          email: newRec.email || r.profiles?.email,
-                          phone: newRec.phone || r.profiles?.phone,
-                          dni: newRec.dni || r.profiles?.dni, // Agrega el campo dni al objeto de perfiles
-                        },
-                      }
-                    : r
-                ).filter(r => r.online === true); // Solo deja online
-              } else {
-                // Solo agrega si está online
-                if (normalizedOnline) {
-                  return [
-                    ...prev,
-                    {
-                      id: String(newRec.id),
-                      user_id: newRec.user_id,
-                      role: safeRole,
-                      profiles: {
-                        avatar_url: newRec.avatar_url,
-                        name: newRec.name,
-                        email: newRec.email,
-                        phone: newRec.phone,
-                        dni: newRec.dni, // Agrega el campo dni al objeto de perfiles
-                      },
-                      rating_average: newRec.rating_average,
-                      total_ratings: newRec.total_ratings,
-                      materials: normalizedMaterials,
-                      bio: newRec.bio,
-                      lat: normalizedLat,
-                      lng: normalizedLng,
-                      online: normalizedOnline,
-                    },
-                  ];
-                } else {
-                  return prev;
-                }
-              }
-            });
-          }
-          if (payload.eventType === 'DELETE' && oldRec && oldRec.role && oldRec.role.toLowerCase() === 'recycler') {
-            setRecyclers((prev) => prev.filter((r) => r.id !== String(oldRec.id)));
-          }
+          // Forzar fetch incluso en UPDATE y DELETE
+          fetchOnlineRecyclers();
         }
       )
       .subscribe();
+
+    // Además, polling cada 2 segundos como fallback para máxima inmediatez
+    const interval = setInterval(fetchOnlineRecyclers, 2000);
+
     return () => {
+      isMounted = false;
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, []);
 

@@ -13,6 +13,7 @@ export type User = {
   address?: string;
   bio?: string;
   avatar_url?: string;
+  header_image_url?: string; // <-- Añadido para imagen de cabecera
   materials?: string[];
   online?: boolean;
   type?: string;
@@ -54,7 +55,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let sub: any;
     try {
       import('../lib/supabase').then(({ supabase }) => {
-        sub = supabase.auth.onAuthStateChange((event, session) => {
+        sub = supabase.auth.onAuthStateChange((_, session) => {
           if (!session) {
             setUser(null);
             console.log('[UserContext] Sesión de Supabase terminada, usuario deslogueado');

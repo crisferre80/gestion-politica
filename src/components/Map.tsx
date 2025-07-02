@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import Map, { Marker, NavigationControl, MapRef, Layer, Source, Popup } from 'react-map-gl';
+import Map, { Marker, NavigationControl, MapRef, Layer, Source, Popup, MapMouseEvent } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '../lib/supabase';
+import { Zone } from '../types/supabase';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 
@@ -11,11 +12,11 @@ const SANTIAGO_CENTER = {
   zoom: 13
 };
 
-export interface AdminZone {
-  name: string;
-  id?: string;
-  coordinates: number[][][];
-  color?: string;
+// Log para verificar configuración
+if (!MAPBOX_TOKEN) {
+  console.error('❌ MAPBOX_TOKEN no está configurado');
+} else {
+  console.log('✅ MAPBOX_TOKEN configurado:', MAPBOX_TOKEN.substring(0, 10) + '...');
 }
 
 export interface MapboxPolygonProps {
@@ -30,7 +31,7 @@ export interface MapboxPolygonProps {
     iconUrl?: string;
   }>;
   showUserLocation?: boolean;
-  zones?: AdminZone[];
+  zones?: Zone[];
   showAdminZonesButton?: boolean;
   onMapClick?: (event: { lng: number; lat: number }) => void;
   disableDraw?: boolean;
@@ -52,31 +53,297 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [showAdminZones, setShowAdminZones] = useState(false);
-  const [adminZones, setAdminZones] = useState<AdminZone[]>([]);
+  const [adminZones, setAdminZones] = useState<Zone[]>([]);
+  const [loadingZones, setLoadingZones] = useState(false);
+  const [zonesError, setZonesError] = useState<string | null>(null);
   const [optimizedRoute, setOptimizedRoute] = useState<Array<{ lat: number; lng: number }>>([]);
   const [hoveredMarker, setHoveredMarker] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const mapRef = React.useRef<MapRef | null>(null);
 
   // Cargar zonas desde supabase
   const fetchAdminZones = useCallback(async () => {
-    const { data, error } = await supabase.from('zones').select('*');
-    if (!error && data) {
-      const zonas: AdminZone[] = data.map((z: { id: string; name: string; coordinates: string | number[][][]; color?: string }) => {
-        let coords: number[][][] | null = Array.isArray(z.coordinates) ? z.coordinates : null;
-        if (typeof z.coordinates === 'string') {
-          try { coords = JSON.parse(z.coordinates); } catch { coords = null; }
+    setLoadingZones(true);
+    setZonesError(null);
+    
+    try {
+      console.log('🔍 Iniciando carga de zonas desde Supabase...');
+      const { data, error } = await supabase.from('zones').select('*');
+      
+      if (error) {
+        console.error('❌ Error cargando zonas:', error);
+        setZonesError('Error al cargar las zonas de administrador');
+        
+        // Datos de prueba como fallback
+        console.log('🔄 Usando datos de prueba...');
+        const testZones: Zone[] = [
+          {
+            id: 'test-1',
+            name: 'Zona Centro (Prueba)',
+            coordinates: [
+              [
+                [-64.2667, -27.7833],
+                [-64.2600, -27.7833],
+                [-64.2600, -27.7900],
+                [-64.2667, -27.7900],
+                [-64.2667, -27.7833]
+              ]
+            ],
+            color: '#22c55e',
+            created_at: new Date().toISOString()
+          },
+          {
+            id: 'test-2',
+            name: 'Zona Norte (Prueba)',
+            coordinates: [
+              [
+                [-64.2700, -27.7700],
+                [-64.2600, -27.7700],
+                [-64.2600, -27.7750],
+                [-64.2700, -27.7750],
+                [-64.2700, -27.7700]
+              ]
+            ],
+            color: '#3b82f6',
+            created_at: new Date().toISOString()
+          }
+        ];
+        setAdminZones(testZones);
+        console.log('✅ Cargadas zonas de prueba:', testZones);
+        return;
+      }
+      
+      console.log('📦 Datos recibidos de Supabase:', data);
+      
+      if (data && data.length > 0) {
+        const zonas: Zone[] = data.map((z: { 
+          id: string; 
+          name: string; 
+          coordinates: string | number[][][] | { type: string; features?: unknown[]; geometry?: unknown }; 
+          color?: string; 
+          created_at: string; 
+          created_by?: string; 
+          updated_at?: string;
+        }) => {
+          console.log(`🔧 Procesando zona: ${z.name}`);
+          console.log(`🔍 Tipo de coordenadas:`, typeof z.coordinates);
+          console.log(`📦 Estructura completa de coordenadas:`, z.coordinates);
+          
+          let coords: number[][][] = [];
+          
+          // Caso 1: Ya es un array de coordenadas
+          if (Array.isArray(z.coordinates)) {
+            coords = z.coordinates;
+          } 
+          // Caso 2: String JSON que necesita parsing
+          else if (typeof z.coordinates === 'string') {
+            try { 
+              const parsed = JSON.parse(z.coordinates);
+              coords = parsed;
+              console.log(`✅ Coordenadas parseadas desde string para ${z.name}:`, coords);
+            } catch (parseError) { 
+              console.warn(`❌ Error parsing JSON string for zone ${z.id}:`, parseError);
+              coords = [];
+            }
+          }
+          // Caso 3: FeatureCollection de GeoJSON
+          else if (z.coordinates && typeof z.coordinates === 'object' && (z.coordinates as { type?: string }).type === 'FeatureCollection') {
+            try {
+              console.log(`🗺️ Convirtiendo FeatureCollection para ${z.name}`);
+              const featureCollection = z.coordinates as { features?: unknown[] };
+              const features = featureCollection.features;
+              
+              console.log(`📋 Features encontrados:`, features);
+              console.log(`🔢 Número de features:`, features?.length || 0);
+              
+              if (features && features.length > 0) {
+                // Procesar todos los features, no solo el primero
+                const extractedCoords: number[][][] = [];
+                
+                features.forEach((feature: unknown, index: number) => {
+                  console.log(`🔎 Analizando feature ${index}:`, feature);
+                  
+                  const featureObj = feature as { geometry?: { type?: string; coordinates?: unknown } };
+                  if (featureObj && featureObj.geometry) {
+                    console.log(`📐 Geometría del feature ${index}:`, featureObj.geometry);
+                    console.log(`📍 Tipo de geometría: ${featureObj.geometry.type}`);
+                    console.log(`🎯 Coordenadas del feature:`, featureObj.geometry.coordinates);
+                    
+                    if (featureObj.geometry.type === 'Polygon') {
+                      console.log(`🔺 Polígono encontrado en feature ${index}`);
+                      const polygonCoords = featureObj.geometry.coordinates as number[][][];
+                      if (polygonCoords && Array.isArray(polygonCoords)) {
+                        console.log(`📊 Agregando coordenadas de polígono:`, polygonCoords);
+                        // Asegurarse de que cada elemento es un array válido de coordenadas
+                        polygonCoords.forEach(ring => {
+                          if (Array.isArray(ring) && ring.length > 0) {
+                            extractedCoords.push(ring);
+                          }
+                        });
+                      }
+                    } else if (featureObj.geometry.type === 'MultiPolygon') {
+                      console.log(`🔺🔺 MultiPolígono encontrado en feature ${index}`);
+                      const multiCoords = featureObj.geometry.coordinates as number[][][][];
+                      if (Array.isArray(multiCoords)) {
+                        multiCoords.forEach((polygon: number[][][], polyIndex: number) => {
+                          console.log(`📊 Agregando polígono ${polyIndex}:`, polygon);
+                          if (Array.isArray(polygon) && polygon.length > 0) {
+                            polygon.forEach(ring => {
+                              if (Array.isArray(ring) && ring.length > 0) {
+                                extractedCoords.push(ring);
+                              }
+                            });
+                          }
+                        });
+                      }
+                    } else if (featureObj.geometry.type === 'Point') {
+                      console.log(`📍 Punto encontrado en feature ${index}, convirtiendo a polígono circular`);
+                      const pointCoords = featureObj.geometry.coordinates as [number, number];
+                      if (pointCoords && Array.isArray(pointCoords) && pointCoords.length === 2) {
+                        // Crear un polígono circular alrededor del punto
+                        const [lng, lat] = pointCoords;
+                        // Aumentamos el radio para que las áreas sean más visibles
+                        const radius = 0.003; // Radio en grados (aproximadamente 300 metros)
+                        const sides = 32; // Aumentamos el número de lados para un círculo más suave
+                        const circleCoords: [number, number][] = [];
+                        
+                        for (let i = 0; i < sides; i++) {
+                          const angle = (2 * Math.PI * i) / sides;
+                          const x = lng + radius * Math.cos(angle);
+                          const y = lat + radius * Math.sin(angle);
+                          circleCoords.push([x, y] as [number, number]);
+                        }
+                        // Cerrar el polígono
+                        circleCoords.push(circleCoords[0]);
+                        
+                        console.log(`🔴 Polígono circular creado con ${circleCoords.length} puntos:`, circleCoords);
+                        extractedCoords.push(circleCoords);
+                      }
+                    } else {
+                      console.log(`❓ Tipo de geometría no soportado: ${featureObj.geometry.type}`);
+                    }
+                  } else {
+                    console.log(`❌ Feature ${index} no tiene geometría válida:`, feature);
+                  }
+                });
+                
+                coords = extractedCoords;
+                console.log(`✅ Coordenadas extraídas de FeatureCollection para ${z.name}:`, coords);
+                console.log(`🔢 Total de polígonos extraídos: ${coords.length}`);
+              } else {
+                console.log(`❌ Features no es un array válido o está vacío:`, features);
+              }
+            } catch (geoError) {
+              console.warn(`❌ Error processing FeatureCollection for zone ${z.id}:`, geoError);
+              coords = [];
+            }
+          }
+          // Caso 4: Objeto con geometría directa
+          else if (z.coordinates && typeof z.coordinates === 'object' && (z.coordinates as { geometry?: unknown }).geometry) {
+            try {
+              console.log(`🎯 Extrayendo geometría directa para ${z.name}`);
+              const geometry = (z.coordinates as { geometry: { type?: string; coordinates?: unknown } }).geometry;
+              if (geometry.type === 'Polygon' && geometry.coordinates) {
+                coords = geometry.coordinates as number[][][];
+              } else if (geometry.type === 'MultiPolygon' && geometry.coordinates) {
+                const multiCoords = geometry.coordinates as unknown;
+                if (Array.isArray(multiCoords) && Array.isArray(multiCoords[0])) {
+                  coords = multiCoords[0] as number[][][];
+                }
+              }
+              console.log(`✅ Coordenadas extraídas de geometría para ${z.name}:`, coords);
+            } catch (geomError) {
+              console.warn(`❌ Error processing geometry for zone ${z.id}:`, geomError);
+              coords = [];
+            }
+          }
+          
+          // Validar formato final
+          if (!Array.isArray(coords) || coords.length === 0 || !Array.isArray(coords[0]) || !Array.isArray(coords[0][0])) {
+            console.warn(`⚠️ Invalid coordinates format for zone ${z.id}`, coords);
+            return null;
+          }
+          
+          // Validar que las coordenadas son números válidos
+          const isValidCoordinates = coords[0].every(coord => 
+            Array.isArray(coord) && 
+            coord.length === 2 && 
+            typeof coord[0] === 'number' && 
+            typeof coord[1] === 'number' &&
+            !isNaN(coord[0]) && 
+            !isNaN(coord[1])
+          );
+          
+          if (!isValidCoordinates) {
+            console.warn(`⚠️ Invalid coordinate values for zone ${z.id}`, coords[0]);
+            return null;
+          }
+          
+          const zona = {
+            id: z.id,
+            name: z.name,
+            coordinates: coords,
+            color: z.color || '#3B82F6',
+            created_at: z.created_at,
+            created_by: z.created_by,
+            updated_at: z.updated_at
+          };
+          
+          console.log(`✅ Zona procesada correctamente:`, zona.name, 'con', zona.coordinates[0].length, 'puntos');
+          return zona;
+        }).filter(Boolean) as Zone[];
+        
+        setAdminZones(zonas);
+        console.log(`🎉 Cargadas ${zonas.length} zonas de administrador:`, zonas);
+      } else {
+        console.log('⚠️ No hay zonas en la base de datos, usando datos de prueba...');
+        
+        // Datos de prueba si no hay zonas en la BD
+        const testZones: Zone[] = [
+          {
+            id: 'test-1',
+            name: 'Zona Centro (Prueba)',
+            coordinates: [
+              [
+                [-64.2667, -27.7833],
+                [-64.2600, -27.7833],
+                [-64.2600, -27.7900],
+                [-64.2667, -27.7900],
+                [-64.2667, -27.7833]
+              ]
+            ],
+            color: '#22c55e',
+            created_at: new Date().toISOString()
+          }
+        ];
+        setAdminZones(testZones);
+        console.log('✅ Cargadas zonas de prueba:', testZones);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching zones:', error);
+      setZonesError('Error de conexión al cargar las zonas');
+      
+      // Datos de prueba como fallback
+      const testZones: Zone[] = [
+        {
+          id: 'test-1',
+          name: 'Zona Centro (Prueba)',
+          coordinates: [
+            [
+              [-64.2667, -27.7833],
+              [-64.2600, -27.7833],
+              [-64.2600, -27.7900],
+              [-64.2667, -27.7900],
+              [-64.2667, -27.7833]
+            ]
+          ],
+          color: '#22c55e',
+          created_at: new Date().toISOString()
         }
-        if (!Array.isArray(coords) || !Array.isArray(coords[0]) || !Array.isArray(coords[0][0])) {
-          coords = null;
-        }
-        return {
-          id: z.id,
-          name: z.name,
-          coordinates: coords || [],
-          color: z.color || undefined,
-        };
-      });
-      setAdminZones(zonas);
+      ];
+      setAdminZones(testZones);
+      console.log('🔄 Usando datos de prueba por error de conexión');
+    } finally {
+      setLoadingZones(false);
     }
   }, []);
 
@@ -111,10 +378,17 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   }, [userLocation]);
 
   // Memoizar zonas a mostrar
-  const zonasParaMostrar = useMemo(() => showAdminZones ? adminZones : zones, [showAdminZones, adminZones, zones]);
+  const zonasParaMostrar = useMemo(() => {
+    const result = showAdminZones ? adminZones : zones;
+    console.log('🎭 Zonas para mostrar:', result);
+    console.log('🎛️ showAdminZones:', showAdminZones);
+    console.log('📊 adminZones:', adminZones);
+    console.log('🏗️ zones prop:', zones);
+    return result;
+  }, [showAdminZones, adminZones, zones]);
 
   // Handler para click en el mapa
-  const handleMapClick = useCallback((event: mapboxgl.MapMouseEvent) => {
+  const handleMapClick = useCallback((event: MapMouseEvent) => {
     if (onMapClick) {
       onMapClick({ lng: event.lngLat.lng, lat: event.lngLat.lat });
     }
@@ -138,13 +412,29 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
 
   return (
     <div style={{ width: '100%', height: 500, position: 'relative' }}>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      
       {showAdminZonesButton && (
         <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
           <button
             onClick={async () => {
-              if (!showAdminZones) await fetchAdminZones();
-              setShowAdminZones((prev) => !prev);
+              if (showAdminZones) {
+                // Solo ocultar las zonas
+                console.log('🙈 Ocultando zonas');
+                setShowAdminZones(false);
+              } else {
+                // Cargar y mostrar las zonas
+                console.log('👁️ Mostrando zonas');
+                await fetchAdminZones();
+                setShowAdminZones(true);
+              }
             }}
+            disabled={loadingZones}
             style={{
               background: showAdminZones ? '#22c55e' : '#fff',
               color: showAdminZones ? '#fff' : '#22c55e',
@@ -152,12 +442,37 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
               borderRadius: 8,
               padding: '8px 16px',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: loadingZones ? 'not-allowed' : 'pointer',
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
               transition: 'all 0.2s',
+              opacity: loadingZones ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              minWidth: '180px',
+              justifyContent: 'center'
             }}
           >
-            {showAdminZones ? 'Ocultar zonas' : 'Ver zonas del administrador'}
+            {loadingZones ? (
+              <>
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid currentColor',
+                  borderTop: '2px solid transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }} />
+                Cargando...
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7"/>
+                </svg>
+                {showAdminZones ? 'Ocultar Zonas' : 'Ver Zonas Admin'}
+              </>
+            )}
           </button>
         </div>
       )}
@@ -236,11 +551,69 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
           </Marker>
         ))}
         {/* Zonas como polígonos */}
-        {zonasParaMostrar.map((zone) => (
-          zone.coordinates && Array.isArray(zone.coordinates[0]) && Array.isArray(zone.coordinates[0][0]) && (
-            <></>
-          )
-        ))}
+        {zonasParaMostrar.map((zone, index) => {
+          console.log(`🔍 Renderizando zona ${index}:`, zone);
+          
+          if (!zone.coordinates || !Array.isArray(zone.coordinates[0]) || !Array.isArray(zone.coordinates[0][0])) {
+            console.warn(`⚠️ Zona ${zone.name} tiene coordenadas inválidas:`, zone.coordinates);
+            return null;
+          }
+          
+          const zoneId = zone.id || `zone-${index}`;
+          const sourceId = `zone-source-${zoneId}`;
+          const fillLayerId = `zone-fill-${zoneId}`;
+          const strokeLayerId = `zone-stroke-${zoneId}`;
+          
+          console.log(`✅ Creando polígono para zona ${zone.name} con ID ${zoneId}`);
+          
+          // Comprobar si la zona proviene de un punto convertido a círculo
+          const isCircle = zone.coordinates.length === 1 && 
+                           zone.coordinates[0].length >= 16 && 
+                           zone.coordinates[0].length <= 20; // Un círculo generalmente tiene entre 16-20 puntos
+          
+          return (
+            <React.Fragment key={zoneId}>
+              <Source 
+                id={sourceId} 
+                type="geojson" 
+                data={{
+                  type: 'Feature',
+                  properties: {
+                    name: zone.name,
+                    id: zoneId,
+                    color: zone.color || '#3B82F6',
+                    isCircle: isCircle
+                  },
+                  geometry: {
+                    type: 'Polygon',
+                    coordinates: zone.coordinates
+                  }
+                }}
+              >
+                {/* Relleno del polígono */}
+                <Layer
+                  id={fillLayerId}
+                  type="fill"
+                  paint={{
+                    'fill-color': zone.color || '#3B82F6',
+                    'fill-opacity': isCircle ? 0.4 : 0.2, // Mayor opacidad para círculos
+                    'fill-outline-color': zone.color || '#3B82F6'
+                  }}
+                />
+                {/* Borde del polígono */}
+                <Layer
+                  id={strokeLayerId}
+                  type="line"
+                  paint={{
+                    'line-color': zone.color || '#3B82F6',
+                    'line-width': isCircle ? 3 : 2, // Línea más gruesa para círculos
+                    'line-opacity': 0.8
+                  }}
+                />
+              </Source>
+            </React.Fragment>
+          );
+        })}
         {/* Ruta como línea */}
         {optimizedRoute && optimizedRoute.length > 1 && (
           <Source id="optimized-route" type="geojson" data={{
@@ -268,6 +641,20 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
       {locationError && (
         <div className="absolute bottom-4 left-4 right-4 bg-red-50 border-l-4 border-red-400 p-4 rounded shadow-md">
           <p className="text-sm text-red-700">{locationError}</p>
+        </div>
+      )}
+      
+      {zonesError && (
+        <div className="absolute bottom-16 left-4 right-4 bg-red-50 border-l-4 border-red-400 p-4 rounded shadow-md">
+          <p className="text-sm text-red-700">{zonesError}</p>
+        </div>
+      )}
+      
+      {showAdminZones && adminZones.length > 0 && (
+        <div className="absolute bottom-4 left-4 bg-blue-50 border-l-4 border-blue-400 p-3 rounded shadow-md">
+          <p className="text-sm text-blue-700 font-medium">
+            Mostrando {adminZones.length} zona{adminZones.length !== 1 ? 's' : ''} de administrador
+          </p>
         </div>
       )}
     </div>

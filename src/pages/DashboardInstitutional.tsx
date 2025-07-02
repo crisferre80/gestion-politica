@@ -578,6 +578,7 @@ const DashboardInstitutional: React.FC = () => {
                                   console.log('Abriendo WhatsApp:', collectivePointClaim.recycler_phone);
                                   if (collectivePointClaim.recycler_phone) {
                                     // Limpiar el número de teléfono (quitar espacios, guiones, etc.)
+                                    // eslint-disable-next-line no-useless-escape
                                     const cleanPhone = collectivePointClaim.recycler_phone.replace(/[\s\-\(\)]/g, '');
                                     const institutionName = user?.name || 'nuestra institución';
                                     const recyclerName = collectivePointClaim.recycler_name || 'reciclador';

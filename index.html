@@ -7,6 +7,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Asura EcoNecta2 - Conectando Recicladores</title>
     <script charset="UTF-8" src="//web.webpushs.com/js/push/00ffda5dd2927b9c7bf5c5bc36f13660_1.js" async></script>
+    <!-- Firebase service worker para notificaciones -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then(function(registration) {
+            console.log('Service Worker registrado con éxito:', registration.scope);
+          }).catch(function(error) {
+            console.log('Error al registrar el Service Worker:', error);
+          });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

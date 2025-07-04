@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, ReactNode, useCallback } from 'reac
 import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
+import NotificationManager from '../components/NotificationManager';
 import { TerraDraw } from "terra-draw";
 import { TerraDrawMapboxGLAdapter } from "terra-draw-mapbox-gl-adapter";
 import mapboxgl from "mapbox-gl";
@@ -795,76 +796,86 @@ const AdminPanel: React.FC = () => {
       {activeTab === 'notificaciones' && (
         <div>
           <h2 className="text-xl font-semibold mb-4">Notificaciones</h2>
-          <form onSubmit={handleSendNotification} className="mb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
-                <input
-                  type="text"
-                  value={notifTitle}
-                  onChange={e => setNotifTitle(e.target.value)}
-                  className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje</label>
-                <textarea
-                  value={notifMsg}
-                  onChange={e => setNotifMsg(e.target.value)}
-                  className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                  rows={3}
-                  required
-                />
-              </div>
-            </div>
-            <div className="mt-4">
-              <h3 className="text-lg font-semibold mb-4">Opciones de Notificación</h3>
+          
+          {/* Sistema de Notificaciones Avanzado */}
+          <div className="bg-white shadow rounded-lg p-4">
+            <NotificationManager />
+          </div>
+          
+          {/* Sistema de Notificaciones Tradicional */}
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold mb-4">Notificaciones por Base de Datos</h3>
+            <form onSubmit={handleSendNotification} className="mb-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  onClick={() => setNotifType('Global')} // Cambiar a notifType
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Global' ? 'bg-blue-800 text-white' : 'bg-blue-600 text-gray-200'}`}
-                >
-                  <span>Global</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setNotifType('Individual');
-                    setShowModal(true); // Mostrar el modal
-                  }}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Individual' ? 'bg-gray-800 text-white' : 'bg-gray-600 text-gray-200'}`}
-                >
-                  <span>Individual</span>
-                </button>
-                <button
-                  onClick={() => setNotifType('Recicladores')} // Cambiar a notifType
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Recicladores' ? 'bg-green-800 text-white' : 'bg-green-600 text-gray-200'}`}
-                >
-                  <span>Recicladores</span>
-                </button>
-                <button
-                  onClick={() => setNotifType('Residentes')} // Cambiar a notifType
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Residentes' ? 'bg-orange-800 text-white' : 'bg-orange-600 text-gray-200'}`}
-                >
-                  <span>Residentes</span>
-                </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                  <input
+                    type="text"
+                    value={notifTitle}
+                    onChange={e => setNotifTitle(e.target.value)}
+                    className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje</label>
+                  <textarea
+                    value={notifMsg}
+                    onChange={e => setNotifMsg(e.target.value)}
+                    className="block w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                    rows={3}
+                    required
+                  />
+                </div>
               </div>
               <div className="mt-4">
-                <p className="text-sm text-gray-700 font-semibold">Destinatario seleccionado: <span className="text-blue-600">{notifType}</span></p>
+                <h3 className="text-lg font-semibold mb-4">Opciones de Notificación</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setNotifType('Global')} // Cambiar a notifType
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Global' ? 'bg-blue-800 text-white' : 'bg-blue-600 text-gray-200'}`}
+                  >
+                    <span>Global</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNotifType('Individual');
+                      setShowModal(true); // Mostrar el modal
+                    }}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Individual' ? 'bg-gray-800 text-white' : 'bg-gray-600 text-gray-200'}`}
+                  >
+                    <span>Individual</span>
+                  </button>
+                  <button
+                    onClick={() => setNotifType('Recicladores')} // Cambiar a notifType
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Recicladores' ? 'bg-green-800 text-white' : 'bg-green-600 text-gray-200'}`}
+                  >
+                    <span>Recicladores</span>
+                  </button>
+                  <button
+                    onClick={() => setNotifType('Residentes')} // Cambiar a notifType
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Residentes' ? 'bg-orange-800 text-white' : 'bg-orange-600 text-gray-200'}`}
+                  >
+                    <span>Residentes</span>
+                  </button>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm text-gray-700 font-semibold">Destinatario seleccionado: <span className="text-blue-600">{notifType}</span></p>
+                </div>
+                <div className="mt-4">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
+                    </svg>
+                    <span>Enviar</span>
+                  </button>
+                </div>
               </div>
-              <div className="mt-4">
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
-                  </svg>
-                  <span>Enviar</span>
-                </button>
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
       {activeTab === 'feedback' && (

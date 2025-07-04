@@ -1025,7 +1025,7 @@ const DashboardRecycler: React.FC = () => {
     setEditSelectedPoints(prev => prev.includes(pointId) ? prev.filter(id => id !== pointId) : [...prev, pointId]);
   };
 
-  const [showAllPointsMap, setShowAllPointsMap] = useState(true); // Cambiar a true para mostrar el mapa por defecto
+  const [showAllPointsMap, setShowAllPointsMap] = useState(false);
 
   // Si necesitas rutas en el futuro, descomenta y usa estas líneas.
 

@@ -1,4 +1,31 @@
+  // Sube la imagen de header a Supabase Storage y retorna la URL pública
+  // Sube la imagen de cabecera a Supabase Storage y retorna la URL pública
 import React, { useState, useEffect } from 'react';
+
+// (Eliminado: hook useState fuera del componente, esto causa error de hooks)
+
+  // Refactor: ahora retorna { url, error } para mejor manejo desde el componente
+  async function uploadHeaderImage(file: File, userId: string): Promise<{ url: string | null, error: string | null }> {
+    if (!file || !userId) return { url: null, error: 'Archivo o usuario no válido' };
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}_${Date.now()}.${fileExt}`;
+    // Debug log para verificar nombre y tipo
+    console.log('[uploadHeaderImage] fileName:', fileName, 'fileType:', file.type);
+    const { error: uploadError } = await supabase.storage
+      .from('header-img')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        contentType: file.type,
+      });
+    if (uploadError) {
+      console.error('[uploadHeaderImage] Error al subir:', uploadError);
+      return { url: null, error: 'Error al subir la imagen: ' + (uploadError.message || JSON.stringify(uploadError)) };
+    }
+    // Obtiene la URL pública del archivo subido
+    const { data } = supabase.storage.from('header-img').getPublicUrl(fileName);
+    console.log('[uploadHeaderImage] URL pública:', data?.publicUrl);
+    return { url: data?.publicUrl || null, error: null };
+  }
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, User as UserIcon, Star, Mail, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -55,6 +82,7 @@ export type User = {
   type?: string;
   bio?: string;
   role?: string; // 'role' ahora es opcional para compatibilidad
+  header_image_url?: string; // Añadido para evitar error de propiedad inexistente
   // otros campos...
 };
 
@@ -144,6 +172,52 @@ useEffect(() => {
 
   // Suscripción realtime SIEMPRE (no depende del tab)
   useEffect(() => {
+    // --- Lógica mejorada: fetch inmediato tras cualquier cambio relevante (INSERT, UPDATE, DELETE) ---
+    // IMPORTANTE: Esta suscripción + polling garantiza que los recicladores en línea se actualicen en tiempo real en el panel del residente.
+    // Si alguna vez se pierde la actualización inmediata de recicladores, restaurar este bloque con polling + fetch tras cada evento realtime.
+    // Esta es la forma más robusta para reflejar cambios de sesión de recicladores sin recargar la página.
+    let isMounted = true;
+    const fetchOnlineRecyclers = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'recycler')
+        .eq('online', true);
+      if (!error && Array.isArray(data) && isMounted) {
+        setRecyclers(
+          data.map((rec: any) => ({
+            id: String(rec.id),
+            user_id: rec.user_id,
+            role: rec.role,
+            profiles: {
+              avatar_url: rec.avatar_url,
+              name: rec.name,
+              email: rec.email,
+              phone: rec.phone,
+              dni: rec.dni,
+            },
+            rating_average: rec.rating_average,
+            total_ratings: rec.total_ratings,
+            materials: Array.isArray(rec.materials)
+              ? rec.materials
+              : (typeof rec.materials === 'string' && rec.materials.length > 0
+                  ? [rec.materials]
+                  : []),
+            bio: rec.bio,
+            lat: typeof rec.lat === 'number' ? rec.lat : (rec.lat !== null && rec.lat !== undefined ? Number(rec.lat) : undefined),
+            lng: typeof rec.lng === 'number' ? rec.lng : (rec.lng !== null && rec.lng !== undefined ? Number(rec.lng) : undefined),
+            online: rec.online === true || rec.online === 'true' || rec.online === 1,
+          }))
+        );
+      } else if (isMounted) {
+        setRecyclers([]);
+      }
+    };
+
+    // Fetch inicial
+    fetchOnlineRecyclers();
+
+    // Suscripción realtime: cualquier cambio relevante en profiles dispara fetch
     const channel = supabase.channel('recyclers-profiles')
       .on(
         'postgres_changes',
@@ -153,83 +227,20 @@ useEffect(() => {
           table: 'profiles',
           filter: 'role=eq.recycler',
         },
-        (payload) => {
-          const newRec = payload.new as ProfileRealtimePayload;
-          const oldRec = payload.old as ProfileRealtimePayload;
-          if (newRec && newRec.role && newRec.role.toLowerCase() === 'recycler') {
-            setRecyclers((prev) => {
-              // --- Solo actualiza si cambia online, lat, lng o info relevante ---
-              const exists = prev.find(r => r.id === String(newRec.id));
-              const normalizedMaterials = Array.isArray(newRec.materials)
-                ? newRec.materials
-                : (typeof newRec.materials === 'string' && newRec.materials.length > 0
-                    ? [newRec.materials]
-                    : []);
-              const normalizedOnline = newRec.online === true || newRec.online === 'true' || newRec.online === 1;
-              const normalizedLat = typeof newRec.lat === 'number' ? newRec.lat : (newRec.lat !== null && newRec.lat !== undefined ? Number(newRec.lat) : undefined);
-              const normalizedLng = typeof newRec.lng === 'number' ? newRec.lng : (newRec.lng !== null && newRec.lng !== undefined ? Number(newRec.lng) : undefined);
-              const safeRole = typeof newRec.role === 'string' ? newRec.role : 'recycler';
-              if (exists) {
-                // Solo actualiza si cambia online, lat, lng o info relevante
-                return prev.map(r =>
-                  r.id === String(newRec.id)
-                    ? {
-                        ...r,
-                        online: normalizedOnline,
-                        lat: normalizedLat,
-                        lng: normalizedLng,
-                        materials: normalizedMaterials,
-                        profiles: {
-                          ...r.profiles,
-                          ...newRec,
-                          avatar_url: newRec.avatar_url || r.profiles?.avatar_url,
-                          name: newRec.name || r.profiles?.name,
-                          email: newRec.email || r.profiles?.email,
-                          phone: newRec.phone || r.profiles?.phone,
-                          dni: newRec.dni || r.profiles?.dni, // Agrega el campo dni al objeto de perfiles
-                        },
-                      }
-                    : r
-                ).filter(r => r.online === true); // Solo deja online
-              } else {
-                // Solo agrega si está online
-                if (normalizedOnline) {
-                  return [
-                    ...prev,
-                    {
-                      id: String(newRec.id),
-                      user_id: newRec.user_id,
-                      role: safeRole,
-                      profiles: {
-                        avatar_url: newRec.avatar_url,
-                        name: newRec.name,
-                        email: newRec.email,
-                        phone: newRec.phone,
-                        dni: newRec.dni, // Agrega el campo dni al objeto de perfiles
-                      },
-                      rating_average: newRec.rating_average,
-                      total_ratings: newRec.total_ratings,
-                      materials: normalizedMaterials,
-                      bio: newRec.bio,
-                      lat: normalizedLat,
-                      lng: normalizedLng,
-                      online: normalizedOnline,
-                    },
-                  ];
-                } else {
-                  return prev;
-                }
-              }
-            });
-          }
-          if (payload.eventType === 'DELETE' && oldRec && oldRec.role && oldRec.role.toLowerCase() === 'recycler') {
-            setRecyclers((prev) => prev.filter((r) => r.id !== String(oldRec.id)));
-          }
+        () => {
+          // Forzar fetch incluso en UPDATE y DELETE
+          fetchOnlineRecyclers();
         }
       )
       .subscribe();
+
+    // Además, polling cada 2 segundos como fallback para máxima inmediatez
+    const interval = setInterval(fetchOnlineRecyclers, 2000);
+
     return () => {
+      isMounted = false;
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, []);
 
@@ -695,23 +706,77 @@ useEffect(() => {
         </div>
       )}
       {/* Mostrar mensaje de éxito si existe */}
-      {/* Header con nombre, foto y rol */}
-      <div className="w-full flex items-center justify-between bg-white shadow rounded-t-lg px-4 py-2 mb-4">
-        <h2 className="text-xl font-bold text-green-700">Panel de Residente</h2>
-      </div>
-      <div className="flex items-center gap-4 mb-8 bg-white shadow rounded-lg px-6 py-4 w-full max-w-2xl">
-        <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
-          <img
-            src={getAvatarUrl(user?.avatar_url || avatarUrl)}
-            alt="Foto de perfil"
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
+      {/* Header grande y editable */}
+      <div className="w-full flex flex-col items-center justify-center bg-white shadow rounded-t-3xl px-8 py-8 mb-8 max-w-3xl relative animate-fade-in" style={{ minHeight: '260px', position: 'relative' }}>
+        <div className="absolute top-4 right-4 z-20">
+          {/* Botón para cambiar imagen del header */}
+          <label htmlFor="header-image-upload" className="cursor-pointer bg-green-600 text-white px-3 py-1 rounded shadow hover:bg-green-700 transition-all text-sm flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
+            Cambiar imagen
+            <input
+              id="header-image-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (!['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'].includes(file.type)) {
+                  setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
+                  return;
+                }
+                if (file.size > 2 * 1024 * 1024) {
+                  setError('El archivo debe pesar menos de 2 MB.');
+                  return;
+                }
+                setError(null);
+                try {
+                  // Subir la imagen y guardar la URL en el perfil (campo header_image_url)
+                  const { url, error: uploadError } = await uploadHeaderImage(file, user?.id || '');
+                  if (uploadError || !url) {
+                    setError(uploadError || 'Error al subir la imagen.');
+                    return;
+                  }
+                  // Actualizar el perfil en Supabase
+                  const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ header_image_url: url })
+                    .eq('user_id', user!.id);
+                  if (updateError) {
+                    setError('Error al actualizar la imagen de cabecera.');
+                    return;
+                  }
+                  // Actualizar el estado local del usuario
+                  login({ ...user!, header_image_url: url });
+                  toast.success('Imagen de cabecera actualizada correctamente');
+                } catch (e) {
+                  setError('Error inesperado al subir la imagen.');
+                }
+              }}
+            />
+          </label>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-green-700">{user?.name || 'Residente'}</h2>
-          <p className="text-gray-500 capitalize">{user?.type === 'resident' ? 'Residente' : user?.type || 'Usuario'}</p>
-          
+        {/* Imagen de cabecera grande */}
+        <div className="w-full h-40 md:h-56 rounded-2xl overflow-hidden flex items-center justify-center bg-green-100 border-2 border-green-300 mb-4 relative" style={{ minHeight: '160px', maxHeight: '220px' }}>
+          <img
+            src={user?.header_image_url || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png'}
+            alt="Imagen de cabecera"
+            className="w-full h-full object-cover object-center"
+            style={{ minHeight: '160px', maxHeight: '220px' }}
+          />
+          {/* Foto de perfil sobrepuesta */}
+          <div className="absolute left-6 bottom-24 translate-y-1/2 w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-lg bg-gray-200 flex items-center justify-center">
+            <img
+              src={getAvatarUrl(user?.avatar_url || avatarUrl)}
+              alt="Foto de perfil"
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center w-full mt-8">
+          <h2 className="text-3xl font-extrabold text-green-700 mb-1">{user?.name || 'Residente'}</h2>
+          <p className="text-gray-500 capitalize text-lg">{user?.type === 'resident' ? 'Residente' : user?.type || 'Usuario'}</p>
           {/* Etiqueta de asociación a punto colectivo */}
           {isAssociatedToCollectivePoint && collectivePointInfo && (
             <div className="mt-2">
@@ -726,7 +791,6 @@ useEffect(() => {
               </p>
             </div>
           )}
-          
           {/* Menú desplegable de usuario */}
           <div className="relative mt-2">
             <details className="group">
@@ -751,13 +815,11 @@ useEffect(() => {
                               .from('profiles')
                               .update({ address: null })
                               .eq('user_id', user?.id);
-                            
                             if (error) {
                               toast.error('Error al desvincularse: ' + error.message);
                             } else {
                               setIsAssociatedToCollectivePoint(false);
                               setCollectivePointInfo(null);
-                              // Actualizar el contexto del usuario para reflejar el cambio
                               if (user) {
                                 login({ ...user, address: undefined });
                               }
@@ -1605,5 +1667,6 @@ useEffect(() => {
 };
 
 export default DashboardResident;
+
 
 

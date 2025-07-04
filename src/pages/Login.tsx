@@ -70,16 +70,8 @@ const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="flex flex-col md:flex-row items-center justify-center gap-8 w-full max-w-4xl mx-auto">
-        <div className="hidden md:block flex-1">
-          <img
-            src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1745694849/portada_app_jdttpr.png"
-            alt="Portada EcoNecta"
-            className="w-full h-[480px] object-cover rounded-2xl shadow-xl border-4 border-green-200"
-            style={{ minWidth: 320, maxWidth: 420 }}
-          />
-        </div>
-        <div className="flex-1 w-full max-w-md">
+      <div className="flex flex-col md:flex-row items-center justify-center gap-8 w-full max-w-4xl mx-auto px-2 md:px-8">
+        <div className="flex-1 w-full max-w-md order-2 md:order-1">
           <div className="sm:mx-auto sm:w-full sm:max-w-md flex flex-col items-center">
             <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
               Iniciar Sesión
@@ -173,6 +165,17 @@ const Login: React.FC = () => {
               </form>
             </div>
           </div>
+        </div>
+        {/* Imagen portada: solo visible en desktop, nunca desplaza el formulario */}
+        <div className="hidden md:flex flex-1 justify-center items-center order-1 md:order-2">
+          <img
+            src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1745694849/portada_app_jdttpr.png"
+            alt="Portada EcoNecta"
+            width={180}
+            height={280}
+            className="w-80 h-90 object-cover rounded-2xl shadow-xl border-4 border-green-200"
+            style={{ minWidth: 0 }}
+          />
         </div>
       </div>
     </div>

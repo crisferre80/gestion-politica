@@ -10,10 +10,10 @@ const FIREBASE_CONFIG = {
     appId: "1:15435452481:web:b2e9ae56fd38724a0436c0",
     measurementId: "G-R1E2PWNYLV"
   },
-  // Clave web push (VAPID) para notificaciones
-  vapidKey: "8mjZg2aU_cC-mXi0E9nRRi4aOQQmGh3WPKtPDn2rixY",
-  // Clave del servidor Admin SDK para backend
-  serverKey: "BEb3IDkDXLZ-Zg_BpVzBa9ZrT9Hu9BkskiTxwkLxI0TybSBYZiZiYs-9DARAJfIUvn9hEP_FvMzVfT8RWbqNxI0"
+  // Clave web push (VAPID) para notificaciones - formato correcto para la Web Push API
+  vapidKey: "BEb3IDkDXLZ-Zg_BpVzBa9ZrT9Hu9BkskiTxwkLxI0TybSBYZiZiYs-9DARAJfIUvn9hEP_FvMzVfT8RWbqNxI0",
+  // Clave del servidor Admin SDK para backend (esta sería la clave privada real, no la pública)
+  serverKey: "8mjZg2aU_cC-mXi0E9nRRi4aOQQmGh3WPKtPDn2rixY"
 };
 
 // Credenciales para Firebase Admin SDK

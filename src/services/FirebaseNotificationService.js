@@ -4,14 +4,19 @@
 import { getMessaging, getToken } from 'firebase/messaging';
 import { app } from '../components/Firebase';
 import { FIREBASE_CONFIG } from '../config/firebase-config';
+import { formatVapidKey } from '../utils/vapid-helpers';
 
 const messaging = getMessaging(app);
 
 // Obtener token del dispositivo con la clave VAPID
 export const getDeviceToken = async () => {
   try {
+    const vapidKey = "BEb3IDkDXLZ-Zg_BpVzBa9ZrT9Hu9BkskiTxwkLxI0TybSBYZiZiYs-9DARAJfIUvn9hEP_FvMzVfT8RWbqNxI0";
+    const formattedVapidKey = formatVapidKey(vapidKey);
+    console.log("FirebaseNotificationService: Solicitando token con clave VAPID:", formattedVapidKey);
+    
     const currentToken = await getToken(messaging, { 
-      vapidKey: FIREBASE_CONFIG.vapidKey
+      vapidKey: formattedVapidKey
     });
     
     if (currentToken) {

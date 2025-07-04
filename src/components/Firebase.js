@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import { FIREBASE_CONFIG } from "../config/firebase-config";
+import { urlBase64ToUint8Array, formatVapidKey } from "../utils/vapid-helpers";
 
 const firebaseConfig = FIREBASE_CONFIG.client;
 
@@ -17,16 +18,26 @@ export const requestNotificationPermission = async () => {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       // El usuario ha dado permiso para recibir notificaciones
-      const currentToken = await getToken(messaging, { 
-        vapidKey: FIREBASE_CONFIG.vapidKey // Clave VAPID para Firebase Cloud Messaging
-      });
-      
-      if (currentToken) {
-        console.log('Token de dispositivo:', currentToken);
-        // Aquí puedes enviar este token a tu backend para almacenarlo
-        return currentToken;
-      } else {
-        console.log('No se pudo obtener el token del dispositivo.');
+      try {
+        // Asegurarse de que la clave VAPID está en el formato correcto
+        const vapidKey = "BEb3IDkDXLZ-Zg_BpVzBa9ZrT9Hu9BkskiTxwkLxI0TybSBYZiZiYs-9DARAJfIUvn9hEP_FvMzVfT8RWbqNxI0";
+        const formattedVapidKey = formatVapidKey(vapidKey);
+        
+        console.log("Solicitando token con clave VAPID:", formattedVapidKey);
+        const currentToken = await getToken(messaging, { 
+          vapidKey: formattedVapidKey
+        });
+        
+        if (currentToken) {
+          console.log('Token de dispositivo:', currentToken);
+          // Aquí puedes enviar este token a tu backend para almacenarlo
+          return currentToken;
+        } else {
+          console.log('No se pudo obtener el token del dispositivo.');
+          return null;
+        }
+      } catch (error) {
+        console.error('Error al obtener token con clave VAPID:', error);
         return null;
       }
     } else {

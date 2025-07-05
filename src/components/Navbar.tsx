@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, Recycle, LogOut, User, Settings, Key } from 'lucide-react';
 import { useUser } from '../context/UserContext';
+import { getAvatarUrl } from '../utils/feedbackHelper';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -61,15 +62,11 @@ const Navbar: React.FC = () => {
                     onClick={() => setShowAccountMenu(!showAccountMenu)}
                     className="flex items-center px-3 py-2 rounded-md hover:bg-green-700"
                   >
-                    {user?.avatar_url ? (
-                      <img 
-                        src={user.avatar_url} 
-                        alt={user.name} 
-                        className="h-8 w-8 rounded-full mr-2"
-                      />
-                    ) : (
-                      <User className="h-5 w-5 mr-2" />
-                    )}
+                    <img 
+                      src={getAvatarUrl(user?.avatar_url, user?.name)} 
+                      alt={user?.name || 'Usuario'} 
+                      className="h-8 w-8 rounded-full mr-2"
+                    />
                     <span className="truncate max-w-[100px]">{user?.name || 'Mi Cuenta'}</span>
                   </button>
                   {showAccountMenu && (
@@ -130,20 +127,12 @@ const Navbar: React.FC = () => {
                   className="w-10 h-10 rounded-full overflow-hidden border-2 border-green-300 flex items-center justify-center mx-2 my-2 focus:outline-none focus:ring-2 focus:ring-green-400"
                   aria-label="Opciones de cuenta"
                 >
-                  {user?.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="h-7 w-7 text-white" />
-                  )}
+                  <img src={getAvatarUrl(user?.avatar_url, user?.name)} alt={user?.name || 'Usuario'} className="w-full h-full object-cover" />
                 </button>
                 {showAccountMenu && (
                   <div className="bg-white rounded-md shadow-lg py-1 z-50 text-gray-900 mt-2 absolute left-4 right-4 mx-auto max-w-xs">
                     <div className="px-4 py-2 border-b border-gray-200 text-center">
-                      {user?.avatar_url ? (
-                        <img src={user.avatar_url} alt={user.name} className="w-14 h-14 rounded-full mx-auto mb-2 object-cover border-2 border-green-400" />
-                      ) : (
-                        <User className="h-10 w-10 text-green-600 mx-auto mb-2" />
-                      )}
+                      <img src={getAvatarUrl(user?.avatar_url, user?.name)} alt={user?.name || 'Usuario'} className="w-14 h-14 rounded-full mx-auto mb-2 object-cover border-2 border-green-400" />
                       <p className="text-sm font-medium">{user?.name}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>

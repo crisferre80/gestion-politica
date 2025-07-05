@@ -27,7 +27,7 @@ import React, { useState, useEffect } from 'react';
     return { url: data?.publicUrl || null, error: null };
   }
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Calendar, Plus, User as UserIcon, Star, Mail, Phone } from 'lucide-react';
+import { MapPin, Calendar, Plus, Star, Mail, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
@@ -36,6 +36,7 @@ import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import PhotoCapture from '../components/PhotoCapture';
 import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 import EstadisticasPanel from '../components/EstadisticasPanel';
+import { getAvatarUrl } from '../utils/feedbackHelper';
 
 // Tipo para el payload de realtime de perfiles
 export type ProfileRealtimePayload = {
@@ -151,7 +152,6 @@ useEffect(() => {
 }, [activeTab]);
 
   // --- Estado y lógica para badge de mensajes ---
-  const avatarUrl = user?.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.name || 'Residente') + '&background=22c55e&color=fff&size=128';
 
   useEffect(() => {
     // const fetchCollectionPoints = async () => {
@@ -185,10 +185,10 @@ useEffect(() => {
         .eq('online', true);
       if (!error && Array.isArray(data) && isMounted) {
         setRecyclers(
-          data.map((rec: any) => ({
+          data.map((rec: ProfileRealtimePayload) => ({
             id: String(rec.id),
             user_id: rec.user_id,
-            role: rec.role,
+            role: rec.role ?? 'recycler',
             profiles: {
               avatar_url: rec.avatar_url,
               name: rec.name,
@@ -532,8 +532,9 @@ useEffect(() => {
     }
   }, [location.state]);
 
-  const getAvatarUrl = (url: string | undefined) =>
-  url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
+  // Eliminamos la función local y usamos la centralizada desde feedbackHelper
+  // Esta línea se conserva solo para documentación, pero no tiene efecto
+  // La función anterior solo reemplazaba rutas internas, pero no manejaba casos cuando no hay URL
 
   // Estado para mostrar el modal de eliminar cuenta
   const [, setShowDeleteAccount] = useState(false);
@@ -749,7 +750,7 @@ useEffect(() => {
                   // Actualizar el estado local del usuario
                   login({ ...user!, header_image_url: url });
                   toast.success('Imagen de cabecera actualizada correctamente');
-                } catch (e) {
+                } catch {
                   setError('Error inesperado al subir la imagen.');
                 }
               }}
@@ -767,7 +768,7 @@ useEffect(() => {
           {/* Foto de perfil sobrepuesta */}
           <div className="absolute left-6 bottom-24 translate-y-1/2 w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-lg bg-gray-200 flex items-center justify-center">
             <img
-              src={getAvatarUrl(user?.avatar_url || avatarUrl)}
+              src={getAvatarUrl(user?.avatar_url, user?.name)}
               alt="Foto de perfil"
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
@@ -825,7 +826,7 @@ useEffect(() => {
                               }
                               toast.success('Te has desvinculado del punto colectivo exitosamente.');
                             }
-                          } catch (err) {
+                          } catch {
                             toast.error('Error inesperado al desvincularse.');
                           }
                         }
@@ -1017,7 +1018,7 @@ useEffect(() => {
                           {isClaimed && claim && claim.recycler && (
                             <div className="mt-3 flex items-center gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 shadow-sm flex-wrap">
                               <img
-                                src={claim.recycler.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(claim.recycler.name || 'Reciclador') + '&background=FACC15&color=fff&size=64'}
+                                src={getAvatarUrl(claim.recycler.avatar_url, claim.recycler.name, 'FACC15', 'fff')}
                                 alt="Avatar reciclador"
                                 className="w-10 h-10 rounded-full border-2 border-yellow-400 object-cover"
                               />
@@ -1201,11 +1202,9 @@ useEffect(() => {
                     </span>
                   )}
                   <div className="w-20 h-20 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
-                    {rec.profiles?.avatar_url ? (
-                      <img src={rec.profiles.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
-                    ) : (
-                      <UserIcon className="w-10 h-10 text-gray-400" />
-                    )}
+                    <img src={getAvatarUrl(rec.profiles?.avatar_url, rec.profiles?.name, '22c55e', 'fff')} 
+                         alt="Foto de perfil" 
+                         className="w-full h-full object-cover" />
                   </div>
                   <h3 className="text-lg font-semibold text-green-700 mb-1 flex items-center gap-2">
                     {rec.profiles?.name || 'Reciclador'}

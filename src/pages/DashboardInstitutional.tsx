@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Plus, User as UserIcon, Mail, Phone, Trash2, QrCode } from 'lucide-react';
 import Map from '../components/Map';
 import QRCode from 'react-qr-code';
+import { getAvatarUrl } from '../utils/feedbackHelper';
 
 // Tipo para el payload de realtime de perfiles (igual que en DashboardResident.tsx)
 type ProfileRealtimePayload = {
@@ -435,7 +436,7 @@ const DashboardInstitutional: React.FC = () => {
     <div className="max-w-3xl mx-auto p-4">
       <div className="flex items-center p-4 mb-6 bg-white rounded-lg shadow-md">
         <img
-          src={user?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'E')}&background=0D8ABC&color=fff`}
+          src={getAvatarUrl(user?.avatar_url, user?.name, '0D8ABC', 'fff')}
           alt="Foto de perfil institucional"
           className="w-20 h-20 rounded-full mr-6 border-4 border-gray-100"
         />
@@ -576,7 +577,7 @@ const DashboardInstitutional: React.FC = () => {
                                 console.log('Abriendo WhatsApp:', collectivePointClaim.recycler_phone);
                                 if (collectivePointClaim.recycler_phone) {
                                   // Limpiar el número de teléfono (quitar espacios, guiones, etc.)
-                                  const cleanPhone = collectivePointClaim.recycler_phone.replace(/[\s\-\(\)]/g, '');
+                                  const cleanPhone = collectivePointClaim.recycler_phone.replace(/[\s\-()]/g, '');
                                   const institutionName = user?.name || 'nuestra institución';
                                   const recyclerName = collectivePointClaim.recycler_name || 'reciclador';
                                   const scheduledTime = collectivePointClaim.pickup_time 
@@ -661,7 +662,7 @@ const DashboardInstitutional: React.FC = () => {
                   <li key={res.id} className="py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded transition"
                     onClick={() => handleSelectResident(res)}
                   >
-                    <img src={res.avatar_url || '/default-avatar.png'} alt={res.name} className="w-8 h-8 rounded-full" />
+                    <img src={getAvatarUrl(res.avatar_url, res.name)} alt={res.name} className="w-8 h-8 rounded-full" />
                     <span>{res.name} ({res.email})</span>
                     <button
                       className="ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs flex items-center gap-1"

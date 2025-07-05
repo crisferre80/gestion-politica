@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { createNotification } from '../lib/notifications';
 import AdminAds from './AdminAds';
 import NotificationManager from '../components/NotificationManager';
+import { loadFeedbackSafely, getAvatarUrl } from '../utils/feedbackHelper';
+import { sendBulkEmailNotifications, verifyEmailService } from '../lib/emailService';
 import { TerraDraw } from "terra-draw";
 import { TerraDrawMapboxGLAdapter } from "terra-draw-mapbox-gl-adapter";
 import mapboxgl from "mapbox-gl";
@@ -42,6 +44,10 @@ const AdminPanel: React.FC = () => {
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMsg, setNotifMsg] = useState('');
   const [notifType, setNotifType] = useState(''); // Nuevo estado para el tipo de notificación
+  const [sendEmail, setSendEmail] = useState(false); // Control para envío de correo
+  const [emailButtonText, setEmailButtonText] = useState(''); // Texto para botón de correo (opcional)
+  const [emailButtonUrl, setEmailButtonUrl] = useState(''); // URL para botón de correo (opcional)
+  const [emailServiceStatus, setEmailServiceStatus] = useState<'unchecked' | 'available' | 'unavailable'>('unchecked');
   const [activeTab, setActiveTab] = useState('usuarios');
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [, setRecyclers] = useState<UserRow[]>([]);
@@ -60,6 +66,13 @@ const AdminPanel: React.FC = () => {
   const [selectedTool, setSelectedTool] = useState<string>("Polygon");
   const [zoneName, setZoneName] = useState("");
   const [zoneColor, setZoneColor] = useState("#FF0000");
+  const [userFilter, setUserFilter] = useState<string>("todos"); // Estado para el filtro de usuarios
+
+  // Filtrar usuarios según el rol seleccionado
+  const filteredUsers = users.filter(user => {
+    if (userFilter === "todos") return true;
+    return user.role === userFilter;
+  });
 
   // Drag to scroll para el carrusel de pestañas
   useEffect(() => {
@@ -162,6 +175,22 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     fetchCollectionPoints();
   }, [fetchCollectionPoints]);
+  
+  // Verificar disponibilidad del servicio de correo
+  useEffect(() => {
+    const checkEmailService = async () => {
+      try {
+        const isAvailable = await verifyEmailService();
+        setEmailServiceStatus(isAvailable ? 'available' : 'unavailable');
+        console.log(`Servicio de email ${isAvailable ? 'disponible' : 'no disponible'}`);
+      } catch (error) {
+        console.error('Error al verificar servicio de email:', error);
+        setEmailServiceStatus('unavailable');
+      }
+    };
+    
+    checkEmailService();
+  }, []);
 
   // Agregar suscripción en tiempo real a la tabla collection_points
   useEffect(() => {
@@ -216,6 +245,7 @@ const AdminPanel: React.FC = () => {
         filteredUsers = [selectedUser];
       }
 
+      // Enviar notificaciones en la app
       for (const u of filteredUsers) {
         if (!u.user_id) continue; // Usar user_id (UUID)
         try {
@@ -231,12 +261,51 @@ const AdminPanel: React.FC = () => {
           console.error('[NOTIF][ERROR] Falló envío a', u.user_id, err);
         }
       }
+      
+      // Enviar notificaciones por correo electrónico si está habilitado
+      if (sendEmail && emailServiceStatus === 'available') {
+        const validRecipients = filteredUsers
+          .filter(user => user.email) // Filtrar usuarios sin correo
+          .map(user => ({
+            email: user.email || '',
+            name: user.name || 'Usuario'
+          }));
+          
+        if (validRecipients.length > 0) {
+          try {
+            const { successful, failed } = await sendBulkEmailNotifications(
+              validRecipients,
+              {
+                subject: `Econecta - ${notifTitle}`,
+                title: notifTitle,
+                content: notifMsg,
+                buttonText: emailButtonText || undefined,
+                buttonUrl: emailButtonUrl || undefined
+              }
+            );
+            
+            console.log(`Correos enviados: ${successful}, fallidos: ${failed}`);
+            if (failed > 0) {
+              alert(`Se enviaron ${successful} correos, pero fallaron ${failed}.`);
+            } else if (successful > 0) {
+              alert(`Se enviaron ${successful} correos electrónicos exitosamente.`);
+            }
+          } catch (err) {
+            console.error('[EMAIL][ERROR] Error al enviar correos:', err);
+            alert('Hubo un error al enviar los correos electrónicos.');
+          }
+        } else {
+          alert('No hay destinatarios con correo electrónico válido.');
+        }
+      }
 
       await refreshUsers();
       setNotifTitle('');
       setNotifMsg('');
+      // Mantener los valores de los campos de correo para futuras notificaciones
     } catch (err) {
       console.error('[NOTIF][ERROR] Error al enviar notificaciones:', err);
+      alert('Ocurrió un error al enviar las notificaciones.');
     }
   };
 
@@ -248,6 +317,14 @@ const AdminPanel: React.FC = () => {
     };
     fetchRecyclers();
   }, []);
+  
+  // Función para extraer listas de correos electrónicos
+  const extractEmails = (filteredUsers: UserRow[]): string => {
+    return filteredUsers
+      .filter(user => user.email)
+      .map(user => user.email)
+      .join(', ');
+  };
 
   // Eliminar punto de recolección
 
@@ -313,18 +390,20 @@ const AdminPanel: React.FC = () => {
     if (activeTab === 'feedback') {
       const fetchFeedback = async () => {
         try {
-          const { data, error } = await supabase.from('feedback').select('*');
+          // Usar nuestra función segura que evita problemas de recursión
+          const { data, error } = await loadFeedbackSafely();
+          
           if (error) {
-            console.error('Error al cargar feedback:', error.message);
-            alert(`Error al cargar feedback: ${error.message}`);
+            console.error('Error al cargar feedback:', error instanceof Error ? error.message : 'Error desconocido');
+            alert(`Error al cargar feedback: ${error instanceof Error ? error.message : 'Error desconocido'}`);
             return;
           }
-          if (data) {
-            setFeedbackData(data);
-          }
+          
+          setFeedbackData(data || []);
         } catch (err) {
           console.error('Error inesperado al cargar feedback:', err);
-          alert('Error inesperado al cargar feedback. Verifique la conexión con el servidor.');
+          const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+          alert(`Error inesperado al cargar feedback: ${errorMessage}`);
         }
       };
       fetchFeedback();
@@ -335,10 +414,10 @@ const AdminPanel: React.FC = () => {
   const renderZonePolygon = (
     map: mapboxgl.Map,
     terraDrawInstance: TerraDraw,
-    zone: { coordinates: any; name: string; color: string },
+    zone: { coordinates: unknown; name: string; color: string },
     idx: number
   ) => {
-    let geojsonData = typeof zone.coordinates === "string"
+    const geojsonData = typeof zone.coordinates === "string"
       ? JSON.parse(zone.coordinates)
       : zone.coordinates;
     let polygonGeoJSON: FeatureCollection<Polygon> | null = null;
@@ -461,7 +540,7 @@ const AdminPanel: React.FC = () => {
           });
         }
         terraDrawInstance.clear();
-        data.forEach((zone: { coordinates: any; name: string; color: string }, idx: number) => {
+        data.forEach((zone: { coordinates: unknown; name: string; color: string }, idx: number) => {
           try {
             renderZonePolygon(map, terraDrawInstance, zone, idx);
           } catch (err) {
@@ -580,7 +659,7 @@ const AdminPanel: React.FC = () => {
                 });
               }
               terraDraw.clear();
-              data.forEach((zone: { coordinates: any; name: string; color: string }, idx: number) => {
+              data.forEach((zone: { coordinates: unknown; name: string; color: string }, idx: number) => {
                 try {
                   renderZonePolygon(map, terraDraw, zone, idx);
                 } catch (err) {
@@ -615,7 +694,7 @@ const AdminPanel: React.FC = () => {
         container.style.display = "none";
       }
     }
-  }, [activeTab, handleDrawZones]);
+  }, [activeTab, handleDrawZones, terraDrawInstance]);
 
   useEffect(() => {
     if (terraDrawInstance && selectedTool) {
@@ -656,7 +735,7 @@ const AdminPanel: React.FC = () => {
             });
           }
           terraDrawInstance.clear();
-          data.forEach((zone: { coordinates: any; name: string; color: string }, idx: number) => {
+          data.forEach((zone: { coordinates: unknown; name: string; color: string }, idx: number) => {
             try {
               renderZonePolygon(map, terraDrawInstance, zone, idx);
             } catch (err) {
@@ -686,7 +765,7 @@ const AdminPanel: React.FC = () => {
         mapInstanceRef.current.off("style.load", styleLoadListener);
       }
     };
-  }, [activeTab]);
+  }, [activeTab, terraDrawInstance]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -730,14 +809,72 @@ const AdminPanel: React.FC = () => {
       {activeTab === 'usuarios' && (
         <div>
           <h2 className="text-xl font-semibold mb-4">Usuarios</h2>
-          {users.length === 0 ? (
-            <p className="text-gray-500">No hay usuarios registrados.</p>
+          
+          {/* Filtros de usuarios */}
+          <div className="mb-4">
+            <h3 className="text-md font-medium mb-2">Filtrar por rol:</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setUserFilter("todos")}
+                className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
+                  userFilter === "todos" 
+                    ? "bg-blue-600 text-white" 
+                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => setUserFilter("admin")}
+                className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
+                  userFilter === "admin" 
+                    ? "bg-blue-700 text-white" 
+                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
+              >
+                Administradores
+              </button>
+              <button
+                onClick={() => setUserFilter("recycler")}
+                className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
+                  userFilter === "recycler" 
+                    ? "bg-green-600 text-white" 
+                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
+              >
+                Recicladores
+              </button>
+              <button
+                onClick={() => setUserFilter("resident")}
+                className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
+                  userFilter === "resident" 
+                    ? "bg-orange-600 text-white" 
+                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
+              >
+                Residentes
+              </button>
+              <button
+                onClick={() => setUserFilter("resident_institutional")}
+                className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
+                  userFilter === "resident_institutional" 
+                    ? "bg-purple-600 text-white" 
+                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                }`}
+              >
+                Residentes Institucionales
+              </button>
+            </div>
+          </div>
+          
+          {filteredUsers.length === 0 ? (
+            <p className="text-gray-500">No hay usuarios que coincidan con el filtro seleccionado.</p>
           ) : (
             <div className="bg-white shadow rounded-lg p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {users.map(user => (
+                {filteredUsers.map(user => (
                   <div key={user.id} className="border rounded-lg p-4 flex flex-col sm:flex-row items-start sm:items-center space-x-4">
-                    <img src={user.avatar_url || '/default-avatar.png'} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
+                    <img src={getAvatarUrl(user.avatar_url, user.name)} alt={user.name || 'Usuario'} className="w-16 h-16 rounded-full object-cover" />
                     <div className="flex-1 min-w-0">
                       <p className="text-lg font-semibold truncate">{user.name}</p>
                       <p className="text-sm text-gray-500 truncate">{user.email}</p>
@@ -861,8 +998,90 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="mt-4">
                   <p className="text-sm text-gray-700 font-semibold">Destinatario seleccionado: <span className="text-blue-600">{notifType}</span></p>
+                  
+                  {notifType && notifType !== 'Individual' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Filtrar usuarios según el tipo seleccionado
+                        let filteredUsers = users;
+                        if (notifType === 'Recicladores') {
+                          filteredUsers = users.filter(user => user.role === 'recycler');
+                        } else if (notifType === 'Residentes') {
+                          filteredUsers = users.filter(user => user.role === 'resident');
+                        }
+                        
+                        // Extraer y copiar los emails al portapapeles
+                        const emails = extractEmails(filteredUsers);
+                        navigator.clipboard.writeText(emails)
+                          .then(() => alert('Correos copiados al portapapeles'))
+                          .catch(err => console.error('Error al copiar:', err));
+                      }}
+                      className="mt-2 px-3 py-1 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                    >
+                      Copiar lista de emails
+                    </button>
+                  )}
                 </div>
-                <div className="mt-4">
+                
+                {/* Opciones de correo electrónico */}
+                <div className="mt-6 border-t pt-4">
+                  <h3 className="text-lg font-semibold mb-4">Opciones de correo electrónico</h3>
+                  
+                  <div className="flex items-center mb-4">
+                    <input
+                      type="checkbox"
+                      id="send-email"
+                      checked={sendEmail}
+                      onChange={(e) => setSendEmail(e.target.checked)}
+                      className="h-5 w-5 text-green-600 rounded"
+                      disabled={emailServiceStatus !== 'available'}
+                    />
+                    <label htmlFor="send-email" className="ml-2 text-gray-700">
+                      También enviar por correo electrónico
+                      {emailServiceStatus !== 'available' && (
+                        <span className="ml-2 text-xs text-red-600">
+                          (Servicio de correo no disponible)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  
+                  {sendEmail && (
+                    <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Texto del botón (opcional)
+                        </label>
+                        <input
+                          type="text"
+                          value={emailButtonText}
+                          onChange={(e) => setEmailButtonText(e.target.value)}
+                          placeholder="Ej: Ver más información"
+                          className="block w-full px-3 py-2 border rounded-lg"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          URL del botón (opcional)
+                        </label>
+                        <input
+                          type="url"
+                          value={emailButtonUrl}
+                          onChange={(e) => setEmailButtonUrl(e.target.value)}
+                          placeholder="https://econecta.app/noticias"
+                          className="block w-full px-3 py-2 border rounded-lg"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Si proporciona una URL y un texto, se añadirá un botón al correo.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-6">
                   <button
                     type="submit"
                     className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
@@ -870,7 +1089,7 @@ const AdminPanel: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m6 4H9m6-8H9m6 4H9m6-8H9" />
                     </svg>
-                    <span>Enviar</span>
+                    <span>Enviar {sendEmail ? 'notificación y correo' : 'notificación'}</span>
                   </button>
                 </div>
               </div>
@@ -954,7 +1173,7 @@ const AdminPanel: React.FC = () => {
                 if (terraDrawInstance && mapInstanceRef.current) {
                   // Solo borrar features que existen en TerraDraw
                   const allFeatures = terraDrawInstance.getSnapshot();
-                  const allIds = allFeatures.map((f: any) => f.id);
+                  const allIds = allFeatures.map((f: Feature) => f.id as string);
                   const selectedFeatureIds = terraDrawInstance.getFeatureId();
                   const featureIdsArray = Array.isArray(selectedFeatureIds) ? selectedFeatureIds : [selectedFeatureIds];
                   // Filtrar solo los IDs que existen en TerraDraw

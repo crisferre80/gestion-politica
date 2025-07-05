@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 import MapComponent from '../components/Map';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { getAvatarUrl } from '../utils/feedbackHelper';
 
 const DashboardRecycler: React.FC = () => {
   const { user } = useUser();
@@ -686,8 +687,9 @@ const DashboardRecycler: React.FC = () => {
     };
   }, [user]);
 
-  const getAvatarUrl = (url: string | undefined) =>
-    url ? url.replace('/object/avatars/', '/object/public/avatars/') : undefined;
+  // Eliminamos la función local y usamos la centralizada desde feedbackHelper
+  // Esta línea se conserva solo para documentación, pero no tiene efecto
+  // La función anterior solo reemplazaba rutas internas, pero no manejaba casos cuando no hay URL
 
   // --- MODALES Y ESTADOS PARA ACCIONES DEL HEADER ---
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -1135,11 +1137,7 @@ const DashboardRecycler: React.FC = () => {
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 px-8 py-8 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100">
             <div className="flex-shrink-0">
               <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-green-400 bg-white shadow">
-                {user?.avatar_url ? (
-                  <img src={getAvatarUrl(user.avatar_url)} alt="Foto de perfil" className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-16 h-16 text-gray-300 mx-auto my-6" />
-                )}
+                <img src={getAvatarUrl(user?.avatar_url, user?.name)} alt="Foto de perfil" className="w-full h-full object-cover" />
               </div>
             </div>
             <div className="flex-1 min-w-0 w-full">

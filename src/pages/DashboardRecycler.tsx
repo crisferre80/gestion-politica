@@ -146,6 +146,23 @@ const DashboardRecycler: React.FC = () => {
           setLoading(false);
           return;
         }
+        
+        // Verificar que las tablas existen antes de realizar consultas
+        const { checkTableExists } = await import('../lib/supabase');
+        const pointsTableExists = await checkTableExists('collection_points');
+        const claimsTableExists = await checkTableExists('collection_claims');
+        
+        if (!pointsTableExists) {
+          setError('La tabla collection_points no existe en la base de datos. Verifica la conexión a Supabase y la configuración del esquema.');
+          setLoading(false);
+          return;
+        }
+        
+        if (!claimsTableExists) {
+          setError('La tabla collection_claims no existe en la base de datos. Verifica la conexión a Supabase y la configuración del esquema.');
+          setLoading(false);
+          return;
+        }
         // Reclamos del reciclador (usando recycler_id correcto)
         const { data: claimsData, error: claimsError } = await supabase
           .from('collection_claims')
@@ -356,8 +373,31 @@ const DashboardRecycler: React.FC = () => {
     }
   }, [user]);
 
+  // Inicialización de Supabase y carga de datos
   useEffect(() => {
-    if (user) fetchData();
+    if (!user) return;
+    
+    const init = async () => {
+      try {
+        // Verificar la configuración de Supabase
+        const { initializeSupabase } = await import('../lib/supabase');
+        const initialized = await initializeSupabase();
+        
+        if (!initialized) {
+          console.error('No se pudo inicializar correctamente la conexión con Supabase');
+          setError('Error de conexión con la base de datos. Por favor, contacta al administrador.');
+          return;
+        }
+        
+        // Cargar los datos
+        await fetchData();
+      } catch (error) {
+        console.error('Error en la inicialización:', error);
+        setError('Error al inicializar la aplicación. Por favor, recarga la página.');
+      }
+    };
+    
+    init();
   }, [user, fetchData]);
 
   // Abrir modal para programar recolección
@@ -385,6 +425,14 @@ const DashboardRecycler: React.FC = () => {
       setError('Por favor, selecciona una fecha y hora para la recolección.');
       return;
     }
+    
+    // Validar que los IDs sean UUIDs válidos
+    const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+    if (!isValidUuid(pointToClaim.id) || !isValidUuid(user.id) || !isValidUuid(pointToClaim.user_id)) {
+      setError('Error: Uno o más IDs no son válidos');
+      return;
+    }
+    
     // --- Cerrar modal y limpiar estado ANTES de la llamada asíncrona ---
     setShowPickupModal(false);
     setPointToClaim(null);
@@ -392,6 +440,7 @@ const DashboardRecycler: React.FC = () => {
     setClaimSuccess(false); // Reinicia mensaje de éxito
     setError(null);
     setLoading(true);
+    
     // Actualizar estado local para evitar parpadeo
     setClaimedPoints(prev => [
       ...prev,
@@ -405,25 +454,69 @@ const DashboardRecycler: React.FC = () => {
     ]);
     setAvailablePoints(prev => prev.filter(p => p.id !== pointToClaim.id));
     setViewState('reclamados');
+    
+    // Guardar una referencia al punto que estamos reclamando
+    const pointBeingClaimed = { ...pointToClaim };
+    const pickupTime = new Date(pickupDateTimeInput).toISOString();
+    
     // --- Lógica asíncrona en segundo plano ---
     try {
+      console.log('Iniciando reclamación de punto:', {
+        point_id: pointBeingClaimed.id, 
+        recycler_id: user.id,
+        pickup_time: pickupTime,
+        user_id: pointBeingClaimed.user_id
+      });
+      
+      // No necesitamos verificar la existencia de las tablas explícitamente,
+      // la función claimCollectionPoint ya manejará esos errores
+      console.log('Preparando reclamación de punto:', {
+        point_id: pointBeingClaimed.id,
+        recycler_id: user.id,
+        pickup_time: pickupTime,
+        user_id: pointBeingClaimed.user_id
+      });
+      
       await claimCollectionPoint(
-        pointToClaim.id, // collection_point_id (UUID string)
+        pointBeingClaimed.id, // collection_point_id (UUID string)
         user.id, // recycler_user_id (UUID string)
-        new Date(pickupDateTimeInput).toISOString(),
-        pointToClaim.user_id // user_id del residente dueño del punto (UUID string)
+        pickupTime,
+        pointBeingClaimed.user_id // user_id del residente dueño del punto (UUID string)
       );
+      
+      console.log('Punto reclamado exitosamente');
       setClaimSuccess(true);
+      
       // Sincronizar con la base real en segundo plano
       fetchData();
       setTimeout(() => setClaimSuccess(false), 2500);
     } catch (err: unknown) {
+      console.error('Error al reclamar punto:', err);
+      
       let message = 'Error desconocido al reclamar el punto';
-      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
-        message = (err as { message: string }).message + '\n' + JSON.stringify(err);
+      if (err && typeof err === 'object') {
+        if ('code' in err && err.code === '42P01') {
+          message = 'La tabla necesaria no existe en la base de datos. Contacta al administrador.';
+        } else if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
+          message = (err as { message: string }).message;
+          
+          // Extraer detalles adicionales si están disponibles
+          if ('details' in err || 'hint' in err) {
+            const errorObj = err as Record<string, unknown>;
+            message += '\n\nDetalles: ' + JSON.stringify({
+              details: errorObj.details,
+              hint: errorObj.hint
+            }, null, 2);
+          }
+        }
       } else if (err instanceof Error) {
         message = err.message;
       }
+      
+      // Restaurar estado anterior ya que falló la operación
+      setAvailablePoints(prev => [...prev, pointBeingClaimed]);
+      setClaimedPoints(prev => prev.filter(p => p.id !== pointBeingClaimed.id));
+      
       setError(message || 'Error al reclamar el punto');
     } finally {
       setLoading(false);

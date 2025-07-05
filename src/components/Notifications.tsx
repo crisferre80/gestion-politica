@@ -52,27 +52,33 @@ export default function Notifications() {
     };
   }, []);
 
+  // Estado para controlar las notificaciones ya procesadas por el sistema de audio
+  const [processedNotifications, setProcessedNotifications] = useState<Record<string, boolean>>({});
+  
   useEffect(() => {
-    // Reproducir audio al recibir nuevas notificaciones
-    if (notifications.length > 0) {
-      const playNotificationSound = () => {
-        if (audio && userInteracted) {
-          audio.play().catch((error) => {
-            console.error('Error al reproducir el audio:', error);
-          });
-        } else if (!userInteracted) {
-          console.warn('El usuario no ha interactuado con la página aún.');
-        }
-      };
-
-      // Simulación de una notificación para probar el audio
-      const timer = setTimeout(() => {
-        playNotificationSound();
-      }, 5000);
-
-      return () => clearTimeout(timer);
+    // Solo procesar si tenemos audio y el usuario ha interactuado
+    if (!audio || !userInteracted) return;
+    
+    // Filtramos notificaciones no leídas y que no hayan sido procesadas antes
+    const unprocessedNotifications = notifications.filter(
+      n => !n.read && !processedNotifications[n.id]
+    );
+    
+    if (unprocessedNotifications.length > 0) {
+      // Reproducir el sonido solo una vez por lote de notificaciones nuevas
+      audio.currentTime = 0; // Reiniciar el audio para poder reproducirlo aunque ya se haya terminado
+      audio.play().catch(error => {
+        console.error('Error al reproducir el audio de notificación:', error);
+      });
+      
+      // Marcar todas como procesadas
+      const updatedProcessed = { ...processedNotifications };
+      unprocessedNotifications.forEach(n => {
+        updatedProcessed[n.id] = true;
+      });
+      setProcessedNotifications(updatedProcessed);
     }
-  }, [notifications, audio, userInteracted]);
+  }, [notifications, audio, userInteracted, processedNotifications]);
 
   useEffect(() => {
     // Cargar cerradas de storage al cambiar de usuario
@@ -82,27 +88,46 @@ export default function Notifications() {
   useEffect(() => {
     if (!userId) return;
 
-    // Suscripción en tiempo real a cambios en los paneles de residentes y recicladores
+    // Crear dos canales separados para un mejor manejo de los eventos
+    // Canal para cambios en los paneles de usuarios
     const channelPanelChanges = supabase.channel('panel-changes')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'user_panels',
         filter: `user_id=eq.${userId}`,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }, (payload: { new: any }) => {
+      }, (payload: { new: Record<string, unknown> }) => {
         if (payload.new) {
-          console.log('Actualización en panel:', payload.new);
-          // Aquí puedes actualizar el estado local o realizar acciones necesarias
+          console.log('Actualización en panel de usuario:', payload.new);
         }
       });
 
+    // Canal específico para las notificaciones (opcional, si tienes una tabla de notificaciones)
+    const channelNotifications = supabase.channel('notification-changes')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, () => {
+        // Cuando llega una notificación nueva, reproducir el sonido
+        if (audio && userInteracted) {
+          audio.currentTime = 0;
+          audio.play().catch(error => {
+            console.error('Error al reproducir sonido de notificación en tiempo real:', error);
+          });
+        }
+      });
+
+    // Suscribirse a ambos canales
     channelPanelChanges.subscribe();
+    channelNotifications.subscribe();
 
     return () => {
       supabase.removeChannel(channelPanelChanges);
+      supabase.removeChannel(channelNotifications);
     };
-  }, [userId]);
+  }, [userId, audio, userInteracted]);
 
   // Solo mostrar las no leídas y que no estén cerradas en los últimos 48h
   const closedIdSet = new Set(closedIds.map(c => c.id));
@@ -115,19 +140,40 @@ export default function Notifications() {
     saveClosedIdsToStorage(userId, updatedClosed);
   };
 
+  // Estado para controlar las notificaciones con animación de salida
+  const [closingNotifications, setClosingNotifications] = useState<Set<string>>(new Set());
+  
+  // Manejador mejorado para cerrar notificaciones con animación
+  const handleCloseWithAnimation = (id: string) => {
+    // Marcar para animación de salida
+    setClosingNotifications(prev => new Set(prev).add(id));
+    
+    // Esperar a que termine la animación antes de cerrarla realmente
+    setTimeout(() => {
+      handleClose(id);
+      setClosingNotifications(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 400); // Tiempo igual a la duración de la animación
+  };
+  
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 max-w-xs w-full">
       {unread.slice(0, 3).map(n => (
         <div
           key={n.id}
-          className={
-            `flex items-start gap-3 p-4 rounded-2xl shadow-xl border-l-8 border-green-500 bg-gradient-to-br from-green-50 via-white to-green-100 relative animate-slide-in transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl`
-          }
-          style={{ animation: 'slide-in 0.4s cubic-bezier(.4,2,.6,1)' }}
+          className={`
+            flex items-start gap-3 p-4 rounded-2xl shadow-xl border-l-8 
+            border-green-500 bg-gradient-to-br from-green-50 via-white to-green-100 
+            relative transition-all duration-300 
+            ${closingNotifications.has(n.id) ? 'animate-slide-out' : 'animate-slide-in'}
+            ${!closingNotifications.has(n.id) && 'hover:scale-[1.03] hover:shadow-2xl'}
+          `}
         >
           <div className="flex flex-col items-center justify-center mr-2">
             <span className="bg-green-500 text-white rounded-full p-2 shadow-lg flex items-center justify-center">
-              {/* Cambiado Sparkles por Recycle */}
               <Recycle className="w-6 h-6 text-green-100 animate-spin-slow" />
             </span>
           </div>
@@ -137,13 +183,21 @@ export default function Notifications() {
             </div>
             <div className="text-sm text-gray-700 mb-1">{n.content}</div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-gray-400">{new Date(n.created_at).toLocaleString()}</span>
+              <span className="text-xs text-gray-400">
+                {new Intl.DateTimeFormat('es-ES', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }).format(new Date(n.created_at))}
+              </span>
               <span className="text-xs text-green-700 font-semibold italic">EcoNecta2</span>
             </div>
           </div>
           <button
-            className="ml-2 text-gray-400 hover:text-green-600 transition-colors"
-            onClick={() => handleClose(n.id)}
+            className="ml-2 text-gray-400 hover:text-green-600 transition-colors text-xl"
+            onClick={() => handleCloseWithAnimation(n.id)}
             aria-label="Marcar como leída"
           >
             ×
@@ -154,6 +208,16 @@ export default function Notifications() {
         @keyframes slide-in {
           from { opacity: 0; transform: translateY(-20px) scale(0.95); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes slide-out {
+          from { opacity: 1; transform: translateY(0) scale(1); }
+          to { opacity: 0; transform: translateY(-20px) scale(0.95); }
+        }
+        .animate-slide-in {
+          animation: slide-in 0.4s cubic-bezier(.4,2,.6,1) forwards;
+        }
+        .animate-slide-out {
+          animation: slide-out 0.4s cubic-bezier(.4,2,.6,1) forwards;
         }
         .animate-spin-slow {
           animation: spin 2.5s linear infinite;

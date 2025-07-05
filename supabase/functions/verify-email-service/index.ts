@@ -11,8 +11,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
+// Importar la función serve desde el módulo estándar de Deno
+import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
+
 // Función para verificar la conexión con MailerLite
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Manejo de solicitudes OPTIONS para CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { 

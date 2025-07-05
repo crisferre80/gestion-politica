@@ -2,10 +2,12 @@
 // Este archivo te permite probar tu función antes de desplegarla
 
 // Importamos la función desde el archivo index.ts
-import { corsHeaders } from "../verify-email-service/index.ts";
+// Update the import path to the correct location of corsHeaders
+import { corsHeaders } from "./cors-headers.ts";
+import { serve } from "https://deno.land/std@0.203.0/http/server.ts";
 
 // Crea un servidor HTTP simple para probar
-const server = Deno.serve({
+const server = serve({
   port: 54321,
   hostname: "localhost",
 }, (req) => {

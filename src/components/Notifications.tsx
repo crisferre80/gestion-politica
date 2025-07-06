@@ -88,8 +88,8 @@ export default function Notifications() {
   useEffect(() => {
     if (!userId) return;
 
-    // Crear dos canales separados para un mejor manejo de los eventos
-    // Canal para cambios en los paneles de usuarios
+    // Crear canal solo para cambios en los paneles de usuarios
+    // Las notificaciones ya se manejan en NotificationsContext
     const channelPanelChanges = supabase.channel('panel-changes')
       .on('postgres_changes', {
         event: '*',
@@ -102,32 +102,13 @@ export default function Notifications() {
         }
       });
 
-    // Canal específico para las notificaciones (opcional, si tienes una tabla de notificaciones)
-    const channelNotifications = supabase.channel('notification-changes')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${userId}`,
-      }, () => {
-        // Cuando llega una notificación nueva, reproducir el sonido
-        if (audio && userInteracted) {
-          audio.currentTime = 0;
-          audio.play().catch(error => {
-            console.error('Error al reproducir sonido de notificación en tiempo real:', error);
-          });
-        }
-      });
-
-    // Suscribirse a ambos canales
+    // Suscribirse al canal
     channelPanelChanges.subscribe();
-    channelNotifications.subscribe();
 
     return () => {
       supabase.removeChannel(channelPanelChanges);
-      supabase.removeChannel(channelNotifications);
     };
-  }, [userId, audio, userInteracted]);
+  }, [userId]);
 
   // Solo mostrar las no leídas y que no estén cerradas en los últimos 48h
   const closedIdSet = new Set(closedIds.map(c => c.id));

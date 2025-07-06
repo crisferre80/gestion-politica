@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, Check, Volume2, VolumeX } from 'lucide-react';
 import { useNotifications } from '../context/NotificationsContext';
 
 const NotificationBell: React.FC = () => {
-  const { notifications, markAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, enableSound, setEnableSound } = useNotifications();
   const [open, setOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
-  const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -24,6 +23,15 @@ const NotificationBell: React.FC = () => {
     };
   }, [open]);
 
+  const handleNotificationClick = (id: string) => {
+    markAsRead(id);
+    // Aquí podrías añadir navegación a una página relacionada con la notificación
+  };
+
+  const toggleSound = () => {
+    setEnableSound(!enableSound);
+  };
+
   return (
     <div className="relative" ref={bellRef}>
       <button
@@ -33,14 +41,35 @@ const NotificationBell: React.FC = () => {
       >
         <Bell className="w-6 h-6 text-gray-700" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center animate-pulse">
             {unreadCount}
           </span>
         )}
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50 animate-fade-in">
-          <div className="p-3 border-b font-semibold text-gray-700">Notificaciones</div>
+          <div className="p-3 border-b font-semibold text-gray-700 flex justify-between items-center">
+            <span>Notificaciones</span>
+            <div className="flex gap-2">
+              <button 
+                onClick={toggleSound}
+                className={`text-xs p-1 rounded ${enableSound ? 'text-green-600' : 'text-gray-400'}`}
+                title={enableSound ? "Sonido activado" : "Sonido desactivado"}
+              >
+                {enableSound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+              {unreadCount > 0 && (
+                <button 
+                  onClick={() => markAllAsRead()}
+                  className="text-xs bg-green-500 text-white px-2 py-1 rounded flex items-center gap-1"
+                  title="Marcar todas como leídas"
+                >
+                  <Check className="w-3 h-3" />
+                  <span>Marcar todas</span>
+                </button>
+              )}
+            </div>
+          </div>
           <ul className="divide-y divide-gray-100">
             {notifications.length === 0 && (
               <li className="p-4 text-gray-500 text-sm text-center">No tienes notificaciones</li>
@@ -48,11 +77,11 @@ const NotificationBell: React.FC = () => {
             {notifications.map(n => (
               <li
                 key={n.id}
-                className={`flex items-start gap-3 p-3 hover:bg-gray-50 transition cursor-pointer ${!n.read ? 'bg-gray-100' : ''}`}
-                onClick={() => markAsRead(n.id)}
+                className={`flex items-start gap-3 p-3 hover:bg-gray-50 transition cursor-pointer ${!n.read ? 'bg-gray-50' : ''}`}
+                onClick={() => handleNotificationClick(n.id)}
               >
                 <div className="flex-1">
-                  <div className="font-bold text-sm mb-0.5">{n.title}</div>
+                  <div className={`font-bold text-sm mb-0.5 ${!n.read ? 'text-green-700' : ''}`}>{n.title}</div>
                   <div className="text-xs text-gray-600 mb-1">{n.content}</div>
                   <div className="text-xs text-gray-400">{new Date(n.created_at).toLocaleString()}</div>
                 </div>
@@ -67,6 +96,14 @@ const NotificationBell: React.FC = () => {
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-pulse {
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
         }
       `}</style>
     </div>

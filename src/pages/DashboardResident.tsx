@@ -7,28 +7,48 @@ import React, { useState, useEffect } from 'react';
   // Refactor: ahora retorna { url, error } para mejor manejo desde el componente
   async function uploadHeaderImage(file: File, userId: string): Promise<{ url: string | null, error: string | null }> {
     if (!file || !userId) return { url: null, error: 'Archivo o usuario no válido' };
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}_${Date.now()}.${fileExt}`;
-    // Debug log para verificar nombre y tipo
-    console.log('[uploadHeaderImage] fileName:', fileName, 'fileType:', file.type);
-    const { error: uploadError } = await supabase.storage
-      .from('header-img')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        contentType: file.type,
-      });
-    if (uploadError) {
-      console.error('[uploadHeaderImage] Error al subir:', uploadError);
-      return { url: null, error: 'Error al subir la imagen: ' + (uploadError.message || JSON.stringify(uploadError)) };
+    
+    try {
+      // Procesar la imagen para asegurar que no exceda los 800 KB
+      const processedBase64 = await prepareImageForUpload(file, 800);
+      if (!processedBase64) {
+        return { url: null, error: 'No se pudo procesar la imagen' };
+      }
+      
+      // Convertir el base64 procesado a File
+      const base64Response = await fetch(processedBase64);
+      const processedBlob = await base64Response.blob();
+      const fileName = `${userId}_${Date.now()}.jpg`;
+      const processedFile = new File([processedBlob], fileName, { type: 'image/jpeg' });
+      
+      console.log('[uploadHeaderImage] fileName:', fileName, 'fileType:', processedFile.type, 'size:', Math.round(processedBlob.size/1024) + 'KB');
+      
+      const { error: uploadError } = await supabase.storage
+        .from('header-img')
+        .upload(fileName, processedFile, {
+          cacheControl: '3600',
+          contentType: 'image/jpeg',
+        });
+
+      if (uploadError) {
+        console.error('[uploadHeaderImage] Error al subir:', uploadError);
+        return { url: null, error: 'Error al subir la imagen: ' + (uploadError.message || JSON.stringify(uploadError)) };
+      }
+      
+      // Obtiene la URL pública del archivo subido
+      const { data } = supabase.storage.from('header-img').getPublicUrl(fileName);
+      console.log('[uploadHeaderImage] URL pública:', data?.publicUrl);
+      return { url: data?.publicUrl || null, error: null };
+    } catch (error) {
+      console.error('[uploadHeaderImage] Error inesperado:', error);
+      return { url: null, error: 'Error inesperado al procesar o subir la imagen' };
     }
-    // Obtiene la URL pública del archivo subido
-    const { data } = supabase.storage.from('header-img').getPublicUrl(fileName);
-    console.log('[uploadHeaderImage] URL pública:', data?.publicUrl);
-    return { url: data?.publicUrl || null, error: null };
   }
+
 import { Link, useLocation } from 'react-router-dom';
 import { MapPin, Calendar, Plus, Star, Mail, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { prepareImageForUpload } from '../services/ImageTransformService';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito

@@ -1,6 +1,6 @@
   // Sube la imagen de header a Supabase Storage y retorna la URL pública
   // Sube la imagen de cabecera a Supabase Storage y retorna la URL pública
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 // (Eliminado: hook useState fuera del componente, esto causa error de hooks)
 
@@ -9,19 +9,39 @@ import React, { useState, useEffect } from 'react';
     if (!file || !userId) return { url: null, error: 'Archivo o usuario no válido' };
     
     try {
-      // Procesar la imagen para asegurar que no exceda los 800 KB
-      const processedBase64 = await prepareImageForUpload(file, 800);
+      // Paso 1: Procesar la imagen para asegurar que no exceda los 800 KB
+      console.log('[uploadHeaderImage] Procesando imagen con límite de 800KB');
+      const processedBase64 = await prepareImageForUpload(file, 800); // 800 KB máximo
       if (!processedBase64) {
         return { url: null, error: 'No se pudo procesar la imagen' };
       }
       
+      // Paso 2: Aplicar transformaciones adicionales para la imagen de cabecera
+      const headerTransformed = await transformImage(processedBase64, {
+        width: 1200, // Ancho recomendado para cabeceras
+        height: 400, // Alto recomendado para cabeceras
+        quality: 70,  // Calidad ajustada para mantener bajo los 800KB
+        format: 'jpeg',
+        name: 'header-image'
+      });
+      
+      if (!headerTransformed.success) {
+        return { url: null, error: 'Error al aplicar transformaciones a la imagen' };
+      }
+      
       // Convertir el base64 procesado a File
-      const base64Response = await fetch(processedBase64);
+      const base64Response = await fetch(headerTransformed.url);
       const processedBlob = await base64Response.blob();
       const fileName = `${userId}_${Date.now()}.jpg`;
       const processedFile = new File([processedBlob], fileName, { type: 'image/jpeg' });
       
-      console.log('[uploadHeaderImage] fileName:', fileName, 'fileType:', processedFile.type, 'size:', Math.round(processedBlob.size/1024) + 'KB');
+      // Verificar tamaño final
+      const finalSizeKB = Math.round(processedBlob.size/1024);
+      console.log('[uploadHeaderImage] fileName:', fileName, 'fileType:', processedFile.type, 'size:', finalSizeKB + 'KB');
+      
+      if (finalSizeKB > 800) {
+        console.warn(`[uploadHeaderImage] La imagen sigue siendo grande (${finalSizeKB}KB > 800KB)`);
+      }
       
       const { error: uploadError } = await supabase.storage
         .from('header-img')
@@ -46,9 +66,9 @@ import React, { useState, useEffect } from 'react';
   }
 
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Calendar, Plus, Star, Mail, Phone } from 'lucide-react';
+import { MapPin, Calendar, Plus, Star, Mail, Phone, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { prepareImageForUpload } from '../services/ImageTransformService';
+import { prepareImageForUpload, transformImage } from '../services/ImageTransformService';
 import Map from '../components/Map';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast'; // O tu sistema de notificaciones favorito
@@ -107,7 +127,7 @@ export type User = {
   // otros campos...
 };
 
-const DashboardResident: React.FC = () => {
+const DashboardResident = () => {
   const { user, login } = useUser();
   const location = useLocation();
   // const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
@@ -471,6 +491,9 @@ const [showMyRecyclerRatingsModal, setShowMyRecyclerRatingsModal] = useState<{ r
 const [showDonationModal, setShowDonationModal] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string; alias?: string } | null>(null);
 const [donationAmount, setDonationAmount] = useState<number>(0);
 
+// --- Estado para el modal de edición de imagen de cabecera ---
+const [showHeaderImageModal, setShowHeaderImageModal] = useState(false);
+
 // --- Estado para mensajes no leídos por reciclador ---
 const [unreadMessagesByRecycler, setUnreadMessagesByRecycler] = useState<Record<string, number>>({});
 
@@ -625,27 +648,65 @@ useEffect(() => {
   // Sube el avatar a Supabase Storage y retorna la URL pública
   async function uploadAvatar(file: File, userId: string): Promise<string | null> {
     if (!file || !userId) return null;
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}_${Date.now()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
-
-    // Sube el archivo a Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: file.type,
+    
+    try {
+      // Paso 1: Procesar la imagen para asegurar que no exceda los 300 KB
+      console.log('[uploadAvatar] Procesando imagen con límite de 300KB');
+      const processedBase64 = await prepareImageForUpload(file, 300); // 300 KB máximo para avatar
+      if (!processedBase64) {
+        return null;
+      }
+      
+      // Paso 2: Aplicar transformaciones adicionales para avatar (cuadrado)
+      const avatarTransformed = await transformImage(processedBase64, {
+        width: 400, // Dimensión recomendada para avatar
+        height: 400, // Cuadrado
+        quality: 75,  // Calidad ajustada para mantener bajo los 300KB
+        format: 'jpeg',
+        name: 'avatar-image'
       });
+      
+      if (!avatarTransformed.success) {
+        console.error('Error al transformar avatar:', avatarTransformed.error);
+        return null;
+      }
+      
+      // Convertir base64 a File
+      const base64Response = await fetch(avatarTransformed.url);
+      const processedBlob = await base64Response.blob();
+      const fileName = `${userId}_${Date.now()}.jpg`;
+      const processedFile = new File([processedBlob], fileName, { type: 'image/jpeg' });
+      const filePath = `avatars/${fileName}`;
+      
+      // Verificar tamaño final
+      const finalSizeKB = Math.round(processedBlob.size/1024);
+      console.log('[uploadAvatar] fileName:', fileName, 'fileType:', processedFile.type, 'size:', finalSizeKB + 'KB');
+      
+      if (finalSizeKB > 300) {
+        console.warn(`[uploadAvatar] La imagen sigue siendo grande (${finalSizeKB}KB > 300KB)`);
+      }
+      
+      // Sube el archivo a Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, processedFile, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: 'image/jpeg',
+        });
 
-    if (uploadError) {
-      console.error('Error uploading avatar:', uploadError);
+      if (uploadError) {
+        console.error('Error uploading avatar:', uploadError);
+        return null;
+      }
+
+      // Obtiene la URL pública del archivo subido
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      return data?.publicUrl || null;
+    } catch (error) {
+      console.error('Error en el procesamiento de avatar:', error);
       return null;
     }
-
-    // Obtiene la URL pública del archivo subido
-    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-    return data?.publicUrl || null;
   }
 
   // Suscripción a cambios en puntos de recolección
@@ -731,51 +792,13 @@ useEffect(() => {
       <div className="w-full flex flex-col items-center justify-center bg-white shadow rounded-t-3xl px-8 py-8 mb-8 max-w-3xl relative animate-fade-in" style={{ minHeight: '260px', position: 'relative' }}>
         <div className="absolute top-4 right-4 z-20">
           {/* Botón para cambiar imagen del header */}
-          <label htmlFor="header-image-upload" className="cursor-pointer bg-green-600 text-white px-3 py-1 rounded shadow hover:bg-green-700 transition-all text-sm flex items-center gap-1">
+          <button
+            onClick={() => setShowHeaderImageModal(true)}
+            className="cursor-pointer bg-green-600 text-white px-3 py-1 rounded shadow hover:bg-green-700 transition-all text-sm flex items-center gap-1"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
-            Cambiar imagen
-            <input
-              id="header-image-upload"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                if (!['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'].includes(file.type)) {
-                  setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
-                  return;
-                }
-                if (file.size > 2 * 1024 * 1024) {
-                  setError('El archivo debe pesar menos de 2 MB.');
-                  return;
-                }
-                setError(null);
-                try {
-                  // Subir la imagen y guardar la URL en el perfil (campo header_image_url)
-                  const { url, error: uploadError } = await uploadHeaderImage(file, user?.id || '');
-                  if (uploadError || !url) {
-                    setError(uploadError || 'Error al subir la imagen.');
-                    return;
-                  }
-                  // Actualizar el perfil en Supabase
-                  const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({ header_image_url: url })
-                    .eq('user_id', user!.id);
-                  if (updateError) {
-                    setError('Error al actualizar la imagen de cabecera.');
-                    return;
-                  }
-                  // Actualizar el estado local del usuario
-                  login({ ...user!, header_image_url: url });
-                  toast.success('Imagen de cabecera actualizada correctamente');
-                } catch {
-                  setError('Error inesperado al subir la imagen.');
-                }
-              }}
-            />
-          </label>
+            Cambiar imagen (máx. 800 KB)
+          </button>
         </div>
         {/* Imagen de cabecera grande */}
         <div className="w-full h-40 md:h-56 rounded-2xl overflow-hidden flex items-center justify-center bg-green-100 border-2 border-green-300 mb-4 relative" style={{ minHeight: '160px', maxHeight: '220px' }}>
@@ -1392,14 +1415,15 @@ useEffect(() => {
             }}
           >
             <PhotoCapture
+              aspectRatio="square"
               onCapture={async file => {
                 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
                 if (!allowedTypes.includes(file.type)) {
                   setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
                   return;
                 }
-                if (file.size > 2 * 1024 * 1024) {
-                  setError('El archivo debe pesar menos de 2 MB.');
+                if (file.size > 300 * 1024) {
+                  setError('El archivo debe pesar menos de 300 KB.');
                   return;
                 }
                 setError(null);
@@ -1681,11 +1705,57 @@ useEffect(() => {
           </div>
         </div>
       )}
+      
+      {/* Modal para cambiar la imagen de encabezado */}
+      {showHeaderImageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg max-w-2xl w-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Cambiar imagen de encabezado</h3>
+              <button
+                type="button"
+                onClick={() => setShowHeaderImageModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <PhotoCapture
+              aspectRatio="16:9"
+              onCapture={async file => {
+                setError(null);
+                try {
+                  // Subir la imagen y guardar la URL en el perfil (campo header_image_url)
+                  const { url, error: uploadError } = await uploadHeaderImage(file, user?.id || '');
+                  if (uploadError || !url) {
+                    setError(uploadError || 'Error al subir la imagen.');
+                    return;
+                  }
+                  // Actualizar el perfil en Supabase
+                  const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ header_image_url: url })
+                    .eq('user_id', user!.id);
+                  if (updateError) {
+                    setError('Error al actualizar la imagen de cabecera.');
+                    return;
+                  }
+                  // Actualizar el estado local del usuario
+                  login({ ...user!, header_image_url: url });
+                  setShowHeaderImageModal(false);
+                  toast.success('Imagen de cabecera actualizada correctamente');
+                } catch {
+                  setError('Error inesperado al subir la imagen.');
+                }
+              }}
+              onCancel={() => setShowHeaderImageModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default DashboardResident;
-
-
-

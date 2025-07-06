@@ -172,13 +172,13 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       let blob = await response.blob();
       
       // Verificar tamaño del blob resultante
-      const MAX_SIZE_MB = 1;
+      const MAX_SIZE_MB = aspectRatio === '16:9' ? 0.8 : 0.3; // 800KB para header (16:9), 300KB para avatar
       const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
       let fileSizeMB = blob.size / (1024 * 1024);
       
-      // Si el tamaño es mayor a 2MB, aplicar compresión adicional
+      // Si el tamaño es mayor al máximo permitido, aplicar compresión adicional
       if (blob.size > MAX_SIZE_BYTES) {
-        setProcessingState(`Comprimiendo imagen (${fileSizeMB.toFixed(2)} MB > 2 MB)...`);
+        setProcessingState(`Comprimiendo imagen (${fileSizeMB.toFixed(2)} MB > ${MAX_SIZE_MB} MB)...`);
         
         // Crear un canvas para comprimir más la imagen
         const img = new Image();
@@ -235,7 +235,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     } finally {
       setProcessing(false);
     }
-  }, [previewImage, onCapture, applyImageTransformations]);
+  }, [previewImage, onCapture, applyImageTransformations, aspectRatio]);
 
   // Si no hay cámara activa ni previsualización, mostrar botones iniciales
   if (!isCameraActive && !previewImage) {
@@ -291,11 +291,17 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
 
   // Si hay previsualización, mostrar la imagen y opciones
   if (previewImage) {
+    // Determinar título basado en el aspect ratio
+    const isHeaderImage = aspectRatio === '16:9';
+    const title = isHeaderImage 
+      ? "Previsualización de imagen de encabezado" 
+      : "Previsualización de imagen de perfil";
+    
     return (
       <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
         <div className="bg-white p-4 rounded-lg max-w-md w-full">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium">Previsualización de imagen</h3>
+            <h3 className="text-lg font-medium">{title}</h3>
             <button
               type="button"
               onClick={() => {
@@ -482,26 +488,27 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
               </button>
             </div>
             
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setPreviewImage(null);
-                  setIsCameraActive(false);
-                  setShowTransformOptions(false);
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                disabled={processing}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmImage}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 flex items-center"
-                disabled={processing}
-              >
-                {processing ? (
+            <div className="flex flex-col">
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewImage(null);
+                    setIsCameraActive(false);
+                    setShowTransformOptions(false);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  disabled={processing}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmImage}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 flex items-center"
+                  disabled={processing}
+                >
+                  {processing ? (
                   <div className="flex items-center">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                     <div className="flex flex-col">
@@ -523,6 +530,12 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                   </>
                 )}
               </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                {aspectRatio === '16:9' 
+                  ? 'Límite: 800KB para imagen de encabezado' 
+                  : 'Límite: 300KB para imagen de perfil'}
+              </p>
             </div>
           </div>
         </div>

@@ -97,8 +97,8 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
     // Crear un área oscurecida fuera del recorte usando composición
     ctx.globalCompositeOperation = 'source-over';
     
-    // Oscurecer las áreas fuera del recorte (superior, derecha, inferior, izquierda)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    // Usar un oscurecimiento más sutil para que el usuario pueda ver mejor la imagen completa
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
     
     // Área superior
     ctx.fillRect(0, 0, canvas.width, crop.y);
@@ -116,43 +116,45 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
     ctx.globalCompositeOperation = 'source-over';
     
     // Dibujar borde alrededor del área de recorte
-    // Primero un borde blanco
-    ctx.strokeStyle = '#ffffff';
+    // Borde blanco más prominente
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.lineWidth = 2;
     ctx.strokeRect(crop.x, crop.y, crop.width, crop.height);
     
-    // Luego un borde negro más fino para crear contraste
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    // Crear un borde exterior negro más fino para mejor contraste
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.lineWidth = 1;
     ctx.strokeRect(crop.x - 1, crop.y - 1, crop.width + 2, crop.height + 2);
     
-    // Dibujar líneas de guía para dividir el área en tercios (regla de los tercios)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 1;
+    // Dibujar líneas de guía para dividir el área en tercios (regla de los tercios) - versión más sutil
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 0.5;
     
     // Líneas verticales
     const thirdWidth = crop.width / 3;
-    ctx.beginPath();
-    ctx.moveTo(crop.x + thirdWidth, crop.y);
-    ctx.lineTo(crop.x + thirdWidth, crop.y + crop.height);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(crop.x + thirdWidth * 2, crop.y);
-    ctx.lineTo(crop.x + thirdWidth * 2, crop.y + crop.height);
-    ctx.stroke();
-    
-    // Líneas horizontales
     const thirdHeight = crop.height / 3;
-    ctx.beginPath();
-    ctx.moveTo(crop.x, crop.y + thirdHeight);
-    ctx.lineTo(crop.x + crop.width, crop.y + thirdHeight);
-    ctx.stroke();
     
-    ctx.beginPath();
-    ctx.moveTo(crop.x, crop.y + thirdHeight * 2);
-    ctx.lineTo(crop.x + crop.width, crop.y + thirdHeight * 2);
-    ctx.stroke();
+    // Usar líneas más sutiles, especialmente en móviles
+    const dashPattern = isMobile ? [2, 5] : [3, 3];
+    ctx.setLineDash(dashPattern);
+    
+    // Dibujar las líneas de los tercios
+    for (let i = 1; i < 3; i++) {
+      // Líneas verticales
+      ctx.beginPath();
+      ctx.moveTo(crop.x + thirdWidth * i, crop.y);
+      ctx.lineTo(crop.x + thirdWidth * i, crop.y + crop.height);
+      ctx.stroke();
+      
+      // Líneas horizontales
+      ctx.beginPath();
+      ctx.moveTo(crop.x, crop.y + thirdHeight * i);
+      ctx.lineTo(crop.x + crop.width, crop.y + thirdHeight * i);
+      ctx.stroke();
+    }
+    
+    // Restaurar el estilo de línea
+    ctx.setLineDash([]);
   };
 
   // Actualizar el dibujo cuando cambie el área de recorte
@@ -353,7 +355,7 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
   
   // Manejadores para eventos touch
   
-  // Touch start - equivalente a mousedown
+  // Touch start - optimizado para móviles
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault(); // Prevenir scroll
     const touch = e.touches[0];
@@ -363,18 +365,59 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
     const { x, y } = result;
     
     // Verificar si el usuario está tocando dentro del área de recorte
-    if (
+    const isInsideCropArea = (
       x >= crop.x && 
       x <= crop.x + crop.width && 
       y >= crop.y && 
       y <= crop.y + crop.height
-    ) {
+    );
+    
+    // Verificar si el usuario está cerca de las esquinas (para redimensionar)
+    const cornerSize = 20; // Área más grande para que sea más fácil tocar las esquinas en móviles
+    const corners = [
+      { pos: { x: crop.x, y: crop.y }, dir: 'nw' },
+      { pos: { x: crop.x + crop.width, y: crop.y }, dir: 'ne' },
+      { pos: { x: crop.x, y: crop.y + crop.height }, dir: 'sw' },
+      { pos: { x: crop.x + crop.width, y: crop.y + crop.height }, dir: 'se' }
+    ];
+    
+    // Verificar si tocó una esquina
+    for (const corner of corners) {
+      const distance = Math.sqrt(
+        Math.pow(x - corner.pos.x, 2) + Math.pow(y - corner.pos.y, 2)
+      );
+      
+      if (distance < cornerSize) {
+        // Si tocó una esquina, comenzar redimensionamiento
+        setResizing(true);
+        setResizeDirection(corner.dir);
+        setResizeStart({
+          x: crop.x,
+          y: crop.y,
+          width: crop.width,
+          height: crop.height
+        });
+        return;
+      }
+    }
+    
+    // Si el usuario está tocando dentro del área de recorte o en cualquier parte de la imagen
+    // cuando es un dispositivo móvil, permitir mover
+    if (isInsideCropArea || (isMobile && x >= 0 && y >= 0 && 
+        imageRef.current && 
+        x <= imageRef.current.width && 
+        y <= imageRef.current.height)) {
       setIsDragging(true);
-      setDragStart({ x: x - crop.x, y: y - crop.y });
+      // Calcular el punto de arrastre relativo al área de recorte
+      // Si está fuera del área, usar el borde más cercano
+      setDragStart({
+        x: isInsideCropArea ? (x - crop.x) : (x < crop.x ? 0 : crop.width),
+        y: isInsideCropArea ? (y - crop.y) : (y < crop.y ? 0 : crop.height)
+      });
     }
   };
   
-  // Touch move - equivalente a mousemove
+  // Touch move - optimizado para móviles
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging && !resizing) return;
     e.preventDefault(); // Prevenir scroll
@@ -402,8 +445,113 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
         y: newY
       }));
     } else if (resizing && resizeDirection) {
-      // La lógica de resize es compleja y similar a handleMouseMove
-      // Para evitar duplicación de código, podríamos refactorizar más adelante
+      // Implementar la lógica de resize - similar a handleMouseMove
+      let newWidth = crop.width;
+      let newHeight = crop.height;
+      let newX = crop.x;
+      let newY = crop.y;
+      
+      // Aumentar la sensibilidad en móviles para un mejor control
+      const sensitivity = isMobile ? 1.2 : 1.0;
+      
+      switch (resizeDirection) {
+        case 'nw': // Esquina superior izquierda
+          newWidth = resizeStart.width - (imageX - resizeStart.x) * sensitivity;
+          if (aspectRatio) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = resizeStart.height - (imageY - resizeStart.y) * sensitivity;
+          }
+          newX = resizeStart.x + resizeStart.width - newWidth;
+          newY = resizeStart.y + resizeStart.height - newHeight;
+          break;
+        case 'ne': // Esquina superior derecha
+          newWidth = (imageX - resizeStart.x) * sensitivity;
+          if (aspectRatio) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = resizeStart.height - (imageY - resizeStart.y) * sensitivity;
+          }
+          newY = resizeStart.y + resizeStart.height - newHeight;
+          break;
+        case 'sw': // Esquina inferior izquierda
+          newWidth = resizeStart.width - (imageX - resizeStart.x) * sensitivity;
+          if (aspectRatio) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = (imageY - resizeStart.y) * sensitivity;
+          }
+          newX = resizeStart.x + resizeStart.width - newWidth;
+          break;
+        case 'se': // Esquina inferior derecha
+          newWidth = (imageX - resizeStart.x) * sensitivity;
+          if (aspectRatio) {
+            newHeight = newWidth / aspectRatio;
+          } else {
+            newHeight = (imageY - resizeStart.y) * sensitivity;
+          }
+          break;
+        case 'n': // Medio superior
+          newHeight = resizeStart.height - (imageY - resizeStart.y) * sensitivity;
+          newY = resizeStart.y + resizeStart.height - newHeight;
+          if (aspectRatio) {
+            newWidth = newHeight * aspectRatio;
+            newX = resizeStart.x - (newWidth - resizeStart.width) / 2;
+          }
+          break;
+        case 's': // Medio inferior
+          newHeight = (imageY - resizeStart.y) * sensitivity;
+          if (aspectRatio) {
+            newWidth = newHeight * aspectRatio;
+            newX = resizeStart.x - (newWidth - resizeStart.width) / 2;
+          }
+          break;
+        case 'w': // Medio izquierdo
+          newWidth = resizeStart.width - (imageX - resizeStart.x) * sensitivity;
+          newX = resizeStart.x + resizeStart.width - newWidth;
+          if (aspectRatio) {
+            newHeight = newWidth / aspectRatio;
+            newY = resizeStart.y - (newHeight - resizeStart.height) / 2;
+          }
+          break;
+        case 'e': // Medio derecho
+          newWidth = (imageX - resizeStart.x) * sensitivity;
+          if (aspectRatio) {
+            newHeight = newWidth / aspectRatio;
+            newY = resizeStart.y - (newHeight - resizeStart.height) / 2;
+          }
+          break;
+      }
+      
+      // Asegurar dimensiones mínimas y mantener dentro de los límites
+      const minSize = isMobile ? 30 : 50; // Tamaño mínimo más grande en móviles para mejor usabilidad
+      newWidth = Math.max(minSize, newWidth);
+      newHeight = Math.max(minSize, newHeight);
+      
+      if (newX < 0) {
+        newWidth += newX;
+        newX = 0;
+      }
+      
+      if (newY < 0) {
+        newHeight += newY;
+        newY = 0;
+      }
+      
+      if (imageRef.current && newX + newWidth > imageRef.current.width) {
+        newWidth = imageRef.current.width - newX;
+      }
+      
+      if (imageRef.current && newY + newHeight > imageRef.current.height) {
+        newHeight = imageRef.current.height - newY;
+      }
+      
+      setCrop({
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight
+      });
     }
   };
   
@@ -481,8 +629,30 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
     position: 'relative',
     overflow: 'hidden',
     cursor: isDragging ? 'grabbing' : 'grab',
-    touchAction: 'none'
+    touchAction: 'none',
+    WebkitUserSelect: 'none', // Prevenir selección de texto en móviles
+    userSelect: 'none'
   };
+  
+  // Estado para detectar si es un dispositivo móvil
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Detectar si es un dispositivo móvil para ajustar la experiencia de usuario
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    
+    // Verificar al cargar
+    checkMobile();
+    
+    // Verificar al cambiar el tamaño de la ventana
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  // Tamaño de los controles basado en si es móvil o no
+  const handleSize = isMobile ? 10 : 6;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
@@ -513,93 +683,134 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
             style={{ maxHeight: '60vh' }}
           />
           
-          {/* Recuadro visible del área de recorte con borde personalizado */}
+          {/* Recuadro visible del área de recorte con borde y sombra mejorados */}
           <div
-            className="absolute border-2 border-white pointer-events-none z-10"
+            className="absolute z-10"
             style={{
               left: `${crop.x / (imageRef.current?.width || 1) * 100}%`,
               top: `${crop.y / (imageRef.current?.height || 1) * 100}%`,
               width: `${crop.width / (imageRef.current?.width || 1) * 100}%`,
               height: `${crop.height / (imageRef.current?.height || 1) * 100}%`,
-              outline: '1px solid rgba(0, 0, 0, 0.5)'
+              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
+              border: '2px solid white'
             }}
           ></div>
           
-          {/* Handles para redimensionar - esquinas */}
+          {/* Handles simplificados para redimensionar - solo esquinas */}
           <div 
-            className="absolute w-8 h-8 border border-white bg-blue-600 opacity-90 hover:opacity-100 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize z-20 rounded-full shadow-md" 
+            className="absolute -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize z-20" 
             style={{ 
               left: `${crop.x / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${crop.y / (imageRef.current?.height || 1) * 100}%` 
+              top: `${crop.y / (imageRef.current?.height || 1) * 100}%`,
+              width: `${handleSize}px`,
+              height: `${handleSize}px`,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              border: '1px solid rgba(0, 0, 0, 0.3)',
+              borderRadius: '50%'
             }}
             onMouseDown={(e) => handleResizeStart('nw', e)}
             onTouchStart={(e) => handleTouchResizeStart('nw', e)}
           />
           <div 
-            className="absolute w-8 h-8 border border-white bg-blue-600 opacity-90 hover:opacity-100 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize z-20 rounded-full shadow-md" 
+            className="absolute translate-x-1/2 -translate-y-1/2 cursor-nesw-resize z-20" 
             style={{ 
               left: `${(crop.x + crop.width) / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${crop.y / (imageRef.current?.height || 1) * 100}%` 
+              top: `${crop.y / (imageRef.current?.height || 1) * 100}%`,
+              width: `${handleSize}px`,
+              height: `${handleSize}px`,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              border: '1px solid rgba(0, 0, 0, 0.3)',
+              borderRadius: '50%'
             }}
             onMouseDown={(e) => handleResizeStart('ne', e)}
             onTouchStart={(e) => handleTouchResizeStart('ne', e)}
           />
           <div 
-            className="absolute w-8 h-8 border border-white bg-blue-600 opacity-90 hover:opacity-100 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize z-20 rounded-full shadow-md" 
+            className="absolute -translate-x-1/2 translate-y-1/2 cursor-nesw-resize z-20" 
             style={{ 
               left: `${crop.x / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${(crop.y + crop.height) / (imageRef.current?.height || 1) * 100}%` 
+              top: `${(crop.y + crop.height) / (imageRef.current?.height || 1) * 100}%`,
+              width: `${handleSize}px`,
+              height: `${handleSize}px`,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              border: '1px solid rgba(0, 0, 0, 0.3)',
+              borderRadius: '50%'
             }}
             onMouseDown={(e) => handleResizeStart('sw', e)}
             onTouchStart={(e) => handleTouchResizeStart('sw', e)}
           />
           <div 
-            className="absolute w-8 h-8 border border-white bg-blue-600 opacity-90 hover:opacity-100 translate-x-1/2 translate-y-1/2 cursor-nwse-resize z-20 rounded-full shadow-md" 
+            className="absolute translate-x-1/2 translate-y-1/2 cursor-nwse-resize z-20" 
             style={{ 
               left: `${(crop.x + crop.width) / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${(crop.y + crop.height) / (imageRef.current?.height || 1) * 100}%` 
+              top: `${(crop.y + crop.height) / (imageRef.current?.height || 1) * 100}%`,
+              width: `${handleSize}px`,
+              height: `${handleSize}px`,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              border: '1px solid rgba(0, 0, 0, 0.3)',
+              borderRadius: '50%'
             }}
             onMouseDown={(e) => handleResizeStart('se', e)}
             onTouchStart={(e) => handleTouchResizeStart('se', e)}
           />
           
-          {/* Handles centrales para mejor control */}
-          <div 
-            className="absolute w-5 h-6 border border-white bg-blue-600 opacity-90 hover:opacity-100 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize z-20 rounded-md shadow-md" 
-            style={{ 
-              left: `${(crop.x + crop.width/2) / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${crop.y / (imageRef.current?.height || 1) * 100}%` 
-            }}
-            onMouseDown={(e) => handleResizeStart('n', e)}
-            onTouchStart={(e) => handleTouchResizeStart('n', e)}
-          />
-          <div 
-            className="absolute w-5 h-6 border border-white bg-blue-600 opacity-90 hover:opacity-100 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize z-20 rounded-md shadow-md" 
-            style={{ 
-              left: `${(crop.x + crop.width/2) / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${(crop.y + crop.height) / (imageRef.current?.height || 1) * 100}%` 
-            }}
-            onMouseDown={(e) => handleResizeStart('s', e)}
-            onTouchStart={(e) => handleTouchResizeStart('s', e)}
-          />
-          <div 
-            className="absolute w-6 h-5 border border-white bg-blue-600 opacity-90 hover:opacity-100 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize z-20 rounded-md shadow-md" 
-            style={{ 
-              left: `${crop.x / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${(crop.y + crop.height/2) / (imageRef.current?.height || 1) * 100}%` 
-            }}
-            onMouseDown={(e) => handleResizeStart('w', e)}
-            onTouchStart={(e) => handleTouchResizeStart('w', e)}
-          />
-          <div 
-            className="absolute w-6 h-5 border border-white bg-blue-600 opacity-90 hover:opacity-100 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize z-20 rounded-md shadow-md" 
-            style={{ 
-              left: `${(crop.x + crop.width) / (imageRef.current?.width || 1) * 100}%`, 
-              top: `${(crop.y + crop.height/2) / (imageRef.current?.height || 1) * 100}%` 
-            }}
-            onMouseDown={(e) => handleResizeStart('e', e)}
-            onTouchStart={(e) => handleTouchResizeStart('e', e)}
-          />
+          {/* Solo mostrar controladores adicionales en escritorio */}
+          {!isMobile && (
+            <>
+              <div 
+                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-ns-resize z-20" 
+                style={{ 
+                  left: `${(crop.x + crop.width/2) / (imageRef.current?.width || 1) * 100}%`, 
+                  top: `${crop.y / (imageRef.current?.height || 1) * 100}%`,
+                  width: `${handleSize}px`,
+                  height: `${handleSize}px`,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.3)',
+                  borderRadius: '50%'
+                }}
+                onMouseDown={(e) => handleResizeStart('n', e)}
+              />
+              <div 
+                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-ns-resize z-20" 
+                style={{ 
+                  left: `${(crop.x + crop.width/2) / (imageRef.current?.width || 1) * 100}%`, 
+                  top: `${(crop.y + crop.height) / (imageRef.current?.height || 1) * 100}%`,
+                  width: `${handleSize}px`,
+                  height: `${handleSize}px`,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.3)',
+                  borderRadius: '50%'
+                }}
+                onMouseDown={(e) => handleResizeStart('s', e)}
+              />
+              <div 
+                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-ew-resize z-20" 
+                style={{ 
+                  left: `${crop.x / (imageRef.current?.width || 1) * 100}%`, 
+                  top: `${(crop.y + crop.height/2) / (imageRef.current?.height || 1) * 100}%`,
+                  width: `${handleSize}px`,
+                  height: `${handleSize}px`,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.3)',
+                  borderRadius: '50%'
+                }}
+                onMouseDown={(e) => handleResizeStart('w', e)}
+              />
+              <div 
+                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-ew-resize z-20" 
+                style={{ 
+                  left: `${(crop.x + crop.width) / (imageRef.current?.width || 1) * 100}%`, 
+                  top: `${(crop.y + crop.height/2) / (imageRef.current?.height || 1) * 100}%`,
+                  width: `${handleSize}px`,
+                  height: `${handleSize}px`,
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(0, 0, 0, 0.3)',
+                  borderRadius: '50%'
+                }}
+                onMouseDown={(e) => handleResizeStart('e', e)}
+              />
+            </>
+          )}
         </div>
 
         <div className="mt-4">
@@ -608,15 +819,22 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
               ? `Relación de aspecto fijada a ${aspectRatio === 1 ? '1:1 (cuadrada)' : aspectRatio === 16/9 ? '16:9 (panorámica)' : aspectRatio}`
               : 'Relación de aspecto libre'}
             <p className="text-xs text-gray-400 mt-1">
-              Usa los puntos azules para ajustar el recorte. En dispositivos móviles, desliza el área para moverla.
+              {isMobile 
+                ? "Toca los puntos blancos para ajustar el tamaño. Toca y arrastra dentro del recuadro para moverlo." 
+                : "Usa los puntos blancos para ajustar el tamaño. Haz clic y arrastra dentro del recuadro para moverlo."}
             </p>
           </div>
-          <div className="text-sm text-gray-500 mb-4">
-            Tamaño del recorte: {Math.round(crop.width)} x {Math.round(crop.height)} px
+          <div className="text-sm text-gray-500 mb-4 flex items-center">
+            <span>Tamaño: {Math.round(crop.width)} × {Math.round(crop.height)} px</span>
+            {isMobile && (
+              <span className="ml-3 text-xs text-blue-600">
+                Gira tu dispositivo horizontalmente para mayor precisión
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="mt-4 flex justify-end space-x-2">
+        <div className="mt-4 flex justify-end space-x-3">
           <button
             type="button"
             onClick={onCancel}
@@ -627,9 +845,9 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
           <button
             type="button"
             onClick={handleCrop}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            className="px-5 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
           >
-            Recortar
+            Aplicar
           </button>
         </div>
       </div>

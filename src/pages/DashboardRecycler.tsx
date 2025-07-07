@@ -887,7 +887,13 @@ const DashboardRecycler: React.FC = () => {
           .eq('user_id', user.id)
           .single();
         if (updatedProfile) {
-          login({ ...user, ...updatedProfile });
+          // Asegurar que se mantenga el tipo de usuario como 'recycler'
+          login({ 
+            ...user, 
+            ...updatedProfile,
+            type: 'recycler', // Mantener el tipo como reciclador
+            role: 'recycler'  // Asegurar el rol correcto
+          });
         }
         setSuccess(true);
         setTimeout(() => {

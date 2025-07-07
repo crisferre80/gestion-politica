@@ -14,6 +14,69 @@ async function dataURLtoFile(dataUrl: string, filename: string): Promise<File> {
 }
 
 /**
+ * Verifica si el bucket de avatars existe y está configurado correctamente
+ */
+async function verifyAvatarsBucket(): Promise<boolean> {
+  try {
+    console.log('Verificando bucket de avatars...');
+    
+    // Intentar listar los buckets
+    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+    
+    if (bucketsError) {
+      console.error('Error al listar buckets:', bucketsError);
+      return false;
+    }
+    
+    console.log('Buckets disponibles:', buckets?.map(b => b.name));
+    
+    // Verificar si el bucket 'avatars' existe
+    const avatarsBucket = buckets?.find(bucket => bucket.name === 'avatars');
+    
+    if (!avatarsBucket) {
+      console.error('Bucket "avatars" no encontrado');
+      return false;
+    }
+    
+    console.log('Bucket "avatars" encontrado:', avatarsBucket);
+    
+    // Intentar hacer una operación de prueba en el bucket
+    try {
+      const { error: listError } = await supabase.storage
+        .from('avatars')
+        .list('avatares', { limit: 1 }); // Verificar específicamente la subcarpeta "avatares"
+      
+      if (listError) {
+        console.error('Error al acceder a la subcarpeta avatares:', listError);
+        
+        // Si la subcarpeta no existe, intentar crear un archivo de prueba para crearla
+        console.log('Intentando crear la subcarpeta avatares...');
+        const dummyFile = new File(['test'], 'avatares/.placeholder', { type: 'text/plain' });
+        const { error: createError } = await supabase.storage
+          .from('avatars')
+          .upload('avatares/.placeholder', dummyFile);
+        
+        if (createError) {
+          console.error('Error al crear la subcarpeta avatares:', createError);
+          return false;
+        }
+        
+        console.log('Subcarpeta avatares creada exitosamente');
+      }
+      
+      console.log('Acceso a la subcarpeta avatares exitoso');
+      return true;
+    } catch (err) {
+      console.error('Error en operación de prueba del bucket:', err);
+      return false;
+    }
+  } catch (err) {
+    console.error('Error verificando bucket:', err);
+    return false;
+  }
+}
+
+/**
  * Procesa y sube el avatar de un usuario.
  * Est    // Generar un nombre único para el archivo (usando jpg en lugar de webp)
     const fileName = `${userId}_${Date.now()}.jpg`;
@@ -36,18 +99,34 @@ export async function uploadAvatar(
   fileOrBase64: File | string
 ): Promise<string | null> {
   try {
-    // Generamos un nombre único para el archivo
-    const fileName = `${userId}_${Date.now()}.webp`; // Siempre usamos WebP para mejor compresión
+    console.log('uploadAvatar iniciado:', { userId, type: typeof fileOrBase64 });
+    
+    // Verificar que el bucket existe antes de proceder
+    const bucketExists = await verifyAvatarsBucket();
+    if (!bucketExists) {
+      throw new Error('El bucket "avatars" no está disponible o no está configurado correctamente en Supabase Storage');
+    }
+    
+    // Generamos un nombre único para el archivo con la ruta correcta
+    const fileName = `avatares/${userId}_${Date.now()}.webp`; // Subir a la subcarpeta "avatares"
+    console.log('Nombre de archivo generado con ruta:', fileName);
     
     // Convertimos a blob según el tipo de entrada
     let processedFile: File;
     
     if (typeof fileOrBase64 === 'string') {
+      console.log('Procesando string base64...');
       // Es un string base64
       const base64Response = await fetch(fileOrBase64);
       const processedBlob = await base64Response.blob();
       processedFile = new File([processedBlob], fileName, { type: 'image/webp' });
+      console.log('Archivo procesado desde base64:', { size: processedFile.size, type: processedFile.type });
     } else {
+      console.log('Procesando archivo File:', { 
+        name: fileOrBase64.name, 
+        size: fileOrBase64.size, 
+        type: fileOrBase64.type 
+      });
       // Es un archivo File
       if (fileOrBase64.type.startsWith('image/webp')) {
         // Ya es webp, pero aplicamos el límite de tamaño de 300KB para avatar
@@ -60,30 +139,85 @@ export async function uploadAvatar(
         processedFile = new File([processedBlob], fileName, { type: 'image/webp' });
       } else {
         // Convertir a base64, luego a webp, con límite de 300KB para avatar
+        console.log('Preparando imagen para subir...');
         const base64 = await prepareImageForUpload(fileOrBase64, 300);
         if (!base64) {
           throw new Error('No se pudo procesar la imagen');
         }
+        console.log('Imagen procesada a base64, convirtiendo a File...');
         const base64Response = await fetch(base64);
         const processedBlob = await base64Response.blob();
         processedFile = new File([processedBlob], fileName, { type: 'image/webp' });
+        console.log('Archivo final preparado:', { size: processedFile.size, type: processedFile.type });
       }
     }
 
     // Subir a Supabase Storage
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, processedFile, {
+    console.log('Subiendo archivo a Supabase Storage bucket "avatars"...');
+    let uploadResult = await supabase.storage.from('avatars').upload(fileName, processedFile, {
       cacheControl: '3600',
       upsert: true,
       contentType: 'image/webp',
     });
     
-    if (uploadError) {
-      console.error('Error al subir avatar:', uploadError);
-      throw uploadError;
+    // Si hay error con WebP, intentar con JPEG como fallback
+    if (uploadResult.error) {
+      console.warn('Error con WebP, intentando con JPEG como fallback:', uploadResult.error);
+      
+      // Convertir a JPEG
+      const jpegFileName = fileName.replace('.webp', '.jpg'); // Esto ya tendrá la ruta "avatares/"
+      console.log('Intentando subir como JPEG:', jpegFileName);
+      
+      // Crear archivo JPEG desde el original
+      let jpegFile: File;
+      if (typeof fileOrBase64 === 'string') {
+        const base64Response = await fetch(fileOrBase64);
+        const blob = await base64Response.blob();
+        jpegFile = new File([blob], jpegFileName, { type: 'image/jpeg' });
+      } else {
+        // Procesar el archivo original como JPEG
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.src = URL.createObjectURL(fileOrBase64);
+        });
+        
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const jpegResponse = await fetch(jpegDataUrl);
+        const jpegBlob = await jpegResponse.blob();
+        jpegFile = new File([jpegBlob], jpegFileName, { type: 'image/jpeg' });
+        
+        URL.revokeObjectURL(img.src);
+      }
+      
+      uploadResult = await supabase.storage.from('avatars').upload(jpegFileName, jpegFile, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'image/jpeg',
+      });
+      
+      if (uploadResult.error) {
+        console.error('Error al subir avatar (tanto WebP como JPEG fallaron):', uploadResult.error);
+        throw uploadResult.error;
+      }
+      
+      console.log('Archivo subido exitosamente como JPEG, obteniendo URL pública...');
+      const { data } = supabase.storage.from('avatars').getPublicUrl(jpegFileName);
+      console.log('URL pública obtenida:', data.publicUrl);
+      return data.publicUrl || null;
     }
 
+    console.log('Archivo subido exitosamente como WebP, obteniendo URL pública...');
     // Obtener URL pública
     const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+    console.log('URL pública obtenida:', data.publicUrl);
     return data.publicUrl || null;
   } catch (err) {
     console.error('Error en uploadAvatar:', err);
@@ -263,4 +397,79 @@ export async function handleProfileImageUpload(userId: string, file: File): Prom
       error: err instanceof Error ? err.message : 'Error desconocido al procesar la imagen'
     };
   }
+}
+
+/**
+ * Función de prueba para verificar la conectividad con Supabase Storage
+ * Puedes llamar esta función desde la consola del navegador para debug
+ */
+export async function testSupabaseStorage(): Promise<void> {
+  console.log('=== Test de Supabase Storage ===');
+  
+  try {
+    // 1. Verificar bucket
+    console.log('1. Verificando bucket...');
+    const bucketExists = await verifyAvatarsBucket();
+    console.log('Bucket exists:', bucketExists);
+    
+    if (!bucketExists) {
+      console.error('❌ El bucket "avatars" no está disponible');
+      return;
+    }
+    
+    // 2. Crear un archivo de prueba
+    console.log('2. Creando archivo de prueba...');
+    const testData = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzAwODAyNiIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VEVTVDwvdGV4dD48L3N2Zz4=';
+    const testFileName = `avatares/test_${Date.now()}.jpg`; // Usar la subcarpeta correcta
+    
+    const response = await fetch(testData);
+    const blob = await response.blob();
+    const testFile = new File([blob], testFileName, { type: 'image/jpeg' });
+    
+    console.log('Archivo de prueba creado:', { name: testFile.name, size: testFile.size, type: testFile.type });
+    
+    // 3. Subir archivo de prueba
+    console.log('3. Subiendo archivo de prueba...');
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(testFileName, testFile, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'image/jpeg',
+      });
+    
+    if (uploadError) {
+      console.error('❌ Error al subir archivo de prueba:', uploadError);
+      return;
+    }
+    
+    console.log('✅ Archivo de prueba subido exitosamente');
+    
+    // 4. Obtener URL pública
+    console.log('4. Obteniendo URL pública...');
+    const { data } = supabase.storage.from('avatars').getPublicUrl(testFileName);
+    console.log('✅ URL pública obtenida:', data.publicUrl);
+    
+    // 5. Limpiar archivo de prueba
+    console.log('5. Limpiando archivo de prueba...');
+    const { error: deleteError } = await supabase.storage
+      .from('avatars')
+      .remove([testFileName]);
+    
+    if (deleteError) {
+      console.warn('⚠️ Error al eliminar archivo de prueba:', deleteError);
+    } else {
+      console.log('✅ Archivo de prueba eliminado');
+    }
+    
+    console.log('=== Test completado exitosamente ===');
+    
+  } catch (err) {
+    console.error('❌ Error en test de Supabase Storage:', err);
+  }
+}
+
+// Hacer la función disponible globalmente para debug
+if (typeof window !== 'undefined') {
+  (window as Window & { testSupabaseStorage?: () => Promise<void> }).testSupabaseStorage = testSupabaseStorage;
 }

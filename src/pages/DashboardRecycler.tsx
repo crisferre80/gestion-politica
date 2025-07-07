@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Phone, Mail, MapIcon, X, User, Clock } from 'lucide-react';
+import { Calendar, Phone, Mail, MapIcon, X, Clock } from 'lucide-react';
 import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection } from '../lib/supabase';
 import Map from '../components/Map';
 import CountdownTimer from '../components/CountdownTimer';
 import { useUser } from '../context/UserContext';
 import NotificationBell from '../components/NotificationBell';
 import HeaderRecycler from '../components/HeaderRecycler';
-import { uploadAvatar } from '../lib/uploadAvatar';
+import { prepareImageForUpload, transformImage } from '../services/ImageTransformService';
 import PhotoCapture from '../components/PhotoCapture';
 import ChatList from '../components/ChatList';
 import { getChatPreviews } from '../lib/chatUtils';
 import { useNavigate } from 'react-router-dom';
 import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 import MapComponent from '../components/Map';
+import { toast } from 'react-hot-toast';
+
+// Importar funciones de prueba para debugging
+import '../utils/testAvatarUpload.js';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { getAvatarUrl } from '../utils/feedbackHelper';
 
@@ -806,55 +810,107 @@ const DashboardRecycler: React.FC = () => {
   }, [user]);
 
   // --- COMPONENTE EditProfileForm ---
-  // Define un tipo local para el perfil completo del reciclador
-  interface RecyclerProfile {
-    id: string;
-    user_id: string;
-    name?: string;
-    email?: string;
-    phone?: string;
-    avatar_url?: string;
-    address?: string;
-    bio?: string;
-  }
+  // Define un tipo local para el perfil completo del reciclador (eliminado porque no se usa)
 
   interface EditProfileFormProps {
-    user: RecyclerProfile;
     onClose: () => void;
     onProfileUpdated: () => void;
   }
 
-  const EditProfileForm: React.FC<EditProfileFormProps> = ({ user, onClose, onProfileUpdated }) => {
-    const { login } = useUser(); // Para actualizar el contexto global
+  const EditProfileForm: React.FC<EditProfileFormProps> = ({ onClose, onProfileUpdated }) => {
+    const { user: globalUser, login: updateUser } = useUser(); // Para actualizar el contexto global
     const [form, setForm] = React.useState({
-      name: user?.name || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
-      address: user?.address || '',
-      bio: user?.bio || '',
-      avatar_url: user?.avatar_url || '',
+      name: globalUser?.name || '',
+      email: globalUser?.email || '',
+      phone: globalUser?.phone || '',
+      address: globalUser?.address || '',
+      bio: globalUser?.bio || '',
+      avatar_url: globalUser?.avatar_url || '',
     });
-    const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
-    const [photoModal, setPhotoModal] = React.useState(false);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [success, setSuccess] = React.useState(false);
 
+    // Función local para subir avatar (igual que en DashboardResident)
+    async function uploadAvatar(file: File, userId: string): Promise<string | null> {
+      if (!file || !userId) return null;
+      
+      try {
+        // Paso 1: Procesar la imagen para asegurar que no exceda los 300 KB
+        console.log('[uploadAvatar] Procesando imagen con límite de 300KB');
+        const processedBase64 = await prepareImageForUpload(file, 300); // 300 KB máximo para avatar
+        if (!processedBase64) {
+          return null;
+        }
+        
+        // Paso 2: Aplicar transformaciones adicionales para avatar (cuadrado)
+        const avatarTransformed = await transformImage(processedBase64, {
+          width: 400, // Dimensión recomendada para avatar
+          height: 400, // Cuadrado
+          quality: 75,  // Calidad ajustada para mantener bajo los 300KB
+          format: 'jpeg',
+          name: 'avatar-image'
+        });
+        
+        if (!avatarTransformed.success) {
+          console.error('Error al transformar avatar:', avatarTransformed.error);
+          return null;
+        }
+        
+        // Convertir base64 a File
+        const base64Response = await fetch(avatarTransformed.url);
+        const processedBlob = await base64Response.blob();
+        const fileName = `${userId}_${Date.now()}.jpg`;
+        const processedFile = new File([processedBlob], fileName, { type: 'image/jpeg' });
+        const filePath = `avatars/${fileName}`;
+        
+        // Verificar tamaño final
+        const finalSizeKB = Math.round(processedBlob.size/1024);
+        console.log('[uploadAvatar] fileName:', fileName, 'fileType:', processedFile.type, 'size:', finalSizeKB + 'KB');
+        
+        if (finalSizeKB > 300) {
+          console.warn(`[uploadAvatar] La imagen sigue siendo grande (${finalSizeKB}KB > 300KB)`);
+        }
+        
+        // Sube el archivo a Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, processedFile, {
+            cacheControl: '3600',
+            upsert: true,
+            contentType: 'image/jpeg',
+          });
+
+        if (uploadError) {
+          console.error('Error uploading avatar:', uploadError);
+          return null;
+        }
+
+        // Obtiene la URL pública del archivo subido
+        const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        return data?.publicUrl || null;
+      } catch (error) {
+        console.error('Error en el procesamiento de avatar:', error);
+        return null;
+      }
+    }
+
+    // Sincronizar formulario cuando cambia el usuario
+    React.useEffect(() => {
+      if (globalUser) {
+        setForm({
+          name: globalUser?.name || '',
+          email: globalUser?.email || '',
+          phone: globalUser?.phone || '',
+          address: globalUser?.address || '',
+          bio: globalUser?.bio || '',
+          avatar_url: globalUser?.avatar_url || '',
+        });
+      }
+    }, [globalUser]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setForm({ ...form, [e.target.name]: e.target.value });
-    };
-
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-        setAvatarFile(e.target.files[0]);
-        setForm({ ...form, avatar_url: URL.createObjectURL(e.target.files[0]) });
-      }
-    };
-
-    const handlePhotoCapture = (file: File) => {
-      setAvatarFile(file);
-      setForm({ ...form, avatar_url: URL.createObjectURL(file) });
-      setPhotoModal(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -862,45 +918,71 @@ const DashboardRecycler: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        let avatarUrl = form.avatar_url;
-        if (avatarFile) {
-          const url = await uploadAvatar(user.id, avatarFile);
-          if (url) avatarUrl = url;
+        if (!globalUser) {
+          throw new Error('Usuario no encontrado');
         }
-        // Actualizar perfil en Supabase
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            name: form.name,
-            email: form.email,
-            phone: form.phone,
-            address: form.address,
-            bio: form.bio,
-            avatar_url: avatarUrl,
-          })
-          .eq('user_id', user.id);
-        if (updateError) throw updateError;
+        
+        // Preparar datos de actualización (solo campos que han cambiado)
+        const updateData: Record<string, string | null> = {};
+        
+        if (form.name !== globalUser?.name) updateData.name = form.name;
+        if (form.email !== globalUser?.email) updateData.email = form.email;
+        if (form.phone !== globalUser?.phone) updateData.phone = form.phone;
+        if (form.address !== globalUser?.address) updateData.address = form.address;
+        if (form.bio !== globalUser?.bio) updateData.bio = form.bio;
+        if (form.avatar_url !== globalUser?.avatar_url) updateData.avatar_url = form.avatar_url;
+        
+        // Solo actualizar si hay cambios
+        if (Object.keys(updateData).length > 0) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('user_id', globalUser.id);
+          
+          if (updateError) throw updateError;
+          console.log('Perfil actualizado en BD:', updateData);
+        }
+        
         // Obtener el perfil actualizado y actualizar el contexto global
-        const { data: updatedProfile } = await supabase
+        const { data: updatedProfile, error: fetchError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', globalUser.id)
           .single();
+        
+        if (fetchError) throw fetchError;
+        
         if (updatedProfile) {
           // Asegurar que se mantenga el tipo de usuario como 'recycler'
-          login({ 
-            ...user, 
+          const updatedUser = { 
+            ...globalUser, 
             ...updatedProfile,
             type: 'recycler', // Mantener el tipo como reciclador
             role: 'recycler'  // Asegurar el rol correcto
+          };
+          
+          console.log('Actualizando contexto con:', updatedUser);
+          updateUser(updatedUser);
+          
+          // Actualizar el formulario con los datos reales de la BD
+          setForm({
+            name: updatedProfile.name || '',
+            email: updatedProfile.email || '',
+            phone: updatedProfile.phone || '',
+            address: updatedProfile.address || '',
+            bio: updatedProfile.bio || '',
+            avatar_url: updatedProfile.avatar_url || '',
           });
         }
+        
         setSuccess(true);
+        toast.success('Perfil actualizado exitosamente');
         setTimeout(() => {
           setSuccess(false);
           onProfileUpdated();
         }, 1200);
       } catch (err) {
+        console.error('Error al actualizar perfil:', err);
         setError((err as Error).message || 'Error al actualizar el perfil');
       } finally {
         setLoading(false);
@@ -911,26 +993,68 @@ const DashboardRecycler: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex flex-col items-center gap-2 mb-4">
           <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-green-400 bg-white">
-            {form.avatar_url ? (
-              <img src={form.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-16 h-16 text-gray-300 mx-auto my-4" />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              title="Cambiar foto"
-              onChange={handleAvatarChange}
+            <img 
+              src={form.avatar_url || '/default-avatar.png'} 
+              alt="Avatar" 
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = '/default-avatar.png';
+              }}
             />
           </div>
-          <button type="button" className="text-xs text-green-700 underline" onClick={() => setPhotoModal(true)}>
-            Tomar nueva foto
-          </button>
+          
+          {/* PhotoCapture igual que en DashboardResident */}
+          <PhotoCapture
+            aspectRatio="square"
+            onCapture={async (file) => {
+              const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
+              if (!allowedTypes.includes(file.type)) {
+                setError('Solo se permiten imágenes JPG, PNG, GIF o WEBP.');
+                return;
+              }
+              if (file.size > 300 * 1024) {
+                setError('El archivo debe pesar menos de 300 KB.');
+                return;
+              }
+              setError(null);
+              try {
+                if (!globalUser) {
+                  setError('Usuario no encontrado.');
+                  return;
+                }
+                // Subir el avatar y obtener la URL
+                const url = await uploadAvatar(file, globalUser.id);
+                if (!url) {
+                  setError('Error al subir la imagen.');
+                  return;
+                }
+                // Actualizar el perfil en Supabase
+                const { error: updateError } = await supabase
+                  .from('profiles')
+                  .update({ avatar_url: url })
+                  .eq('user_id', globalUser.id);
+                if (updateError) {
+                  setError('Error al actualizar el perfil con la nueva foto.');
+                  return;
+                }
+                // Actualizar el estado local del usuario y formulario
+                console.log('Avatar subido exitosamente:', url);
+                updateUser({
+                  ...globalUser,
+                  avatar_url: url
+                });
+                setForm({ ...form, avatar_url: url });
+                toast.success('Foto de perfil actualizada correctamente');
+              } catch (e) {
+                setError('Error inesperado al subir la foto.');
+                console.error(e);
+              }
+            }}
+            onCancel={() => {}}
+          />
         </div>
-        {photoModal && (
-          <PhotoCapture onCapture={handlePhotoCapture} onCancel={() => setPhotoModal(false)} />
-        )}
+        
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre</label>
           <input name="name" value={form.name} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2" required />
@@ -2037,16 +2161,6 @@ const DashboardRecycler: React.FC = () => {
                     <button onClick={() => setShowEditProfileModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
                   </div>
                   <EditProfileForm
-                    user={{
-                      id: user.id,
-                      user_id: user.id,
-                      name: user.name,
-                      email: user.email,
-                      phone: user.phone,
-                      avatar_url: user.avatar_url,
-                      address: user.address,
-                      bio: user.bio,
-                    }}
                     onClose={() => setShowEditProfileModal(false)}
                     onProfileUpdated={async () => {
                       await fetchData();

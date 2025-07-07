@@ -216,6 +216,12 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
       // Paso 3: Enviar el archivo procesado
       setProcessingState('Guardando imagen...');
       setProcessingProgress(75);
+      console.log('PhotoCapture: Enviando archivo procesado:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        sizeMB: fileSizeMB.toFixed(2)
+      });
       await onCapture(file);
       
       setProcessingProgress(100);
@@ -281,6 +287,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
         imageUrl={previewImage}
         aspectRatio={getAspectRatioValue()}
         onCropComplete={(croppedImageUrl) => {
+          console.log('PhotoCapture: Imagen cropped, actualizando preview:', croppedImageUrl.substring(0, 50) + '...');
           setPreviewImage(croppedImageUrl);
           setShowCropper(false);
         }}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Calendar, Phone, Mail, MapIcon, X, Clock } from 'lucide-react';
 import { supabase, type CollectionPoint, cancelClaim, claimCollectionPoint, completeCollection } from '../lib/supabase';
 import Map from '../components/Map';
@@ -142,9 +142,18 @@ const DashboardRecycler: React.FC = () => {
   
     // Cargar puntos reclamados y disponibles
     const fetchData = useCallback(async () => {
+      // Prevenir múltiples llamadas simultáneas usando referencia
+      if (fetchDataRef.current) {
+        console.log('fetchData ya está en ejecución, ignorando llamada duplicada');
+        return;
+      }
+      
+      fetchDataRef.current = true;
+      
       try {
         setLoading(true);
         setError(null);
+        
         if (!user) {
           setError('Usuario no autenticado');
           setLoading(false);
@@ -366,14 +375,52 @@ const DashboardRecycler: React.FC = () => {
         };
       }));
     } catch (err) {
-      // Mostrar el error real de Supabase si existe
-      if (err && typeof err === 'object' && 'message' in err) {
-        setError((err as { message: string }).message + '\n' + JSON.stringify(err));
-      } else {
-        setError('Error al cargar los datos: ' + JSON.stringify(err));
+      console.error('Error en fetchData:', err);
+      
+      // Manejo más específico de errores
+      let errorMessage = 'Error al cargar los datos';
+      
+      if (err && typeof err === 'object') {
+        if ('code' in err) {
+          const errorCode = (err as { code: string }).code;
+          switch (errorCode) {
+            case '42P01':
+              errorMessage = 'Tabla no encontrada en la base de datos. Contacta al administrador.';
+              break;
+            case 'PGRST116':
+              errorMessage = 'Error de conexión con la base de datos. Verifica tu conexión a internet.';
+              break;
+            case '42703':
+              errorMessage = 'Error en la estructura de la base de datos. Contacta al administrador.';
+              break;
+            default:
+              if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
+                errorMessage = (err as { message: string }).message;
+              }
+          }
+        } else if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
+          errorMessage = (err as { message: string }).message;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
       }
+      
+      // Si es un error crítico, no mostrar detalles técnicos al usuario
+      if (errorMessage.includes('JSON') || errorMessage.includes('undefined')) {
+        errorMessage = 'Error interno de la aplicación. Por favor, recarga la página.';
+      }
+      
+      setError(errorMessage);
+      
+      // Log detallado para desarrollo
+      console.error('Detalles completos del error:', {
+        error: err,
+        timestamp: new Date().toISOString(),
+        user: user?.id
+      });
     } finally {
       setLoading(false);
+      fetchDataRef.current = false; // Resetear la referencia al finalizar
     }
   }, [user]);
 
@@ -414,9 +461,19 @@ const DashboardRecycler: React.FC = () => {
 
   // Estado para mensaje de éxito al reclamar
   const [claimSuccess, setClaimSuccess] = useState(false);
+  
+  // Estado para controlar operaciones en curso y evitar conflictos
+  const [isProcessingClaim, setIsProcessingClaim] = useState(false);
+  const fetchDataRef = useRef(false);
 
   // Confirmar reclamo con hora de recolección
   const handleConfirmClaim = async () => {
+    // Prevenir múltiples operaciones simultáneas
+    if (isProcessingClaim) {
+      console.log('Ya hay una operación de reclamo en curso');
+      return;
+    }
+
     if (!user) {
       setError('Usuario no autenticado');
       return;
@@ -437,45 +494,24 @@ const DashboardRecycler: React.FC = () => {
       return;
     }
     
-    // --- Cerrar modal y limpiar estado ANTES de la llamada asíncrona ---
-    setShowPickupModal(false);
-    setPointToClaim(null);
-    setPickupDateTimeInput('');
-    setClaimSuccess(false); // Reinicia mensaje de éxito
+    // Marcar operación en curso
+    setIsProcessingClaim(true);
     setError(null);
     setLoading(true);
     
-    // Actualizar estado local para evitar parpadeo
-    setClaimedPoints(prev => [
-      ...prev,
-      {
-        ...pointToClaim,
-        claim_status: 'claimed',
-        status: 'claimed',
-        pickup_time: new Date(pickupDateTimeInput).toISOString(),
-        claim_id: '', // Se actualizará con fetchData, pero así la UI no parpadea
-      }
-    ]);
-    setAvailablePoints(prev => prev.filter(p => p.id !== pointToClaim.id));
-    setViewState('reclamados');
-    
-    // Guardar una referencia al punto que estamos reclamando
+    // Guardar referencias antes de limpiar el estado
     const pointBeingClaimed = { ...pointToClaim };
     const pickupTime = new Date(pickupDateTimeInput).toISOString();
     
-    // --- Lógica asíncrona en segundo plano ---
+    // Cerrar modal inmediatamente para mejor UX
+    setShowPickupModal(false);
+    setPointToClaim(null);
+    setPickupDateTimeInput('');
+    setClaimSuccess(false);
+    
     try {
       console.log('Iniciando reclamación de punto:', {
         point_id: pointBeingClaimed.id, 
-        recycler_id: user.id,
-        pickup_time: pickupTime,
-        user_id: pointBeingClaimed.user_id
-      });
-      
-      // No necesitamos verificar la existencia de las tablas explícitamente,
-      // la función claimCollectionPoint ya manejará esos errores
-      console.log('Preparando reclamación de punto:', {
-        point_id: pointBeingClaimed.id,
         recycler_id: user.id,
         pickup_time: pickupTime,
         user_id: pointBeingClaimed.user_id
@@ -489,89 +525,176 @@ const DashboardRecycler: React.FC = () => {
       );
       
       console.log('Punto reclamado exitosamente');
-      setClaimSuccess(true);
       
-      // Sincronizar con la base real en segundo plano
-      fetchData();
-      setTimeout(() => setClaimSuccess(false), 2500);
+      // Mostrar mensaje de éxito
+      setClaimSuccess(true);
+      toast.success('Punto reclamado exitosamente');
+      
+      // Cambiar a vista de reclamados
+      setViewState('reclamados');
+      
+      // Recargar datos después de un breve delay para asegurar que la BD esté actualizada
+      setTimeout(async () => {
+        try {
+          await fetchData();
+        } catch (fetchErr) {
+          console.error('Error al recargar datos después del reclamo:', fetchErr);
+          setError('El punto fue reclamado pero hubo un error al actualizar la vista. Recarga la página.');
+        }
+      }, 1000);
+      
+      setTimeout(() => setClaimSuccess(false), 3000);
     } catch (err: unknown) {
       console.error('Error al reclamar punto:', err);
       
-      let message = 'Error desconocido al reclamar el punto';
+      let message = 'No se pudo reclamar el punto de recolección.';
+      
       if (err && typeof err === 'object') {
         if ('code' in err && err.code === '42P01') {
-          message = 'La tabla necesaria no existe en la base de datos. Contacta al administrador.';
+          message = 'Error en la base de datos: tabla no encontrada. Contacta al administrador.';
+        } else if ('code' in err && err.code === '23505') {
+          message = 'Este punto ya ha sido reclamado por otro reciclador.';
         } else if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
-          message = (err as { message: string }).message;
+          const errorMessage = (err as { message: string }).message;
           
-          // Extraer detalles adicionales si están disponibles
-          if ('details' in err || 'hint' in err) {
-            const errorObj = err as Record<string, unknown>;
-            message += '\n\nDetalles: ' + JSON.stringify({
-              details: errorObj.details,
-              hint: errorObj.hint
-            }, null, 2);
+          if (errorMessage.includes('already claimed')) {
+            message = 'Este punto ya ha sido reclamado por otro reciclador.';
+          } else if (errorMessage.includes('not found')) {
+            message = 'El punto de recolección ya no está disponible.';
+          } else if (errorMessage.includes('violates foreign key')) {
+            message = 'Error de referencia en la base de datos. Contacta al administrador.';
+          } else {
+            message = `Error: ${errorMessage}`;
           }
         }
       } else if (err instanceof Error) {
         message = err.message;
       }
       
-      // Restaurar estado anterior ya que falló la operación
-      setAvailablePoints(prev => [...prev, pointBeingClaimed]);
-      setClaimedPoints(prev => prev.filter(p => p.id !== pointBeingClaimed.id));
+      setError(message);
+      toast.error(message);
       
-      setError(message || 'Error al reclamar el punto');
+      // Recargar datos para sincronizar el estado actual
+      try {
+        await fetchData();
+      } catch (fetchErr) {
+        console.error('Error al recargar datos después del error:', fetchErr);
+        setError(prev => prev + '\n\nNo se pudieron recargar los datos. Recarga la página.');
+      }
     } finally {
       setLoading(false);
+      setIsProcessingClaim(false);
     }
   };
 
   // Cancelar reclamo
   const handleCancelClaim = async () => {
     if (!selectedClaim || !user) return;
+    
     // Validar que los IDs sean UUIDs válidos y no vacíos
     const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
     if (!isValidUuid(selectedClaim.id) || !isValidUuid(selectedClaim.pointId)) {
       setError('Error: ID de reclamo o punto inválido.');
       return;
     }
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      setError(null);
-      await cancelClaim(selectedClaim.id, selectedClaim.pointId, cancellationReason); // Solo 3 argumentos
+      await cancelClaim(selectedClaim.id, selectedClaim.pointId, cancellationReason);
+      
+      // Cerrar modal y limpiar estado
       setShowCancelClaimModal(false);
       setSelectedClaim(null);
       setCancellationReason('');
-      await fetchData();
+      
+      toast.success('Reclamo cancelado exitosamente');
+      
+      // Recargar datos con un pequeño delay
+      setTimeout(async () => {
+        try {
+          await fetchData();
+        } catch (fetchErr) {
+          console.error('Error al recargar datos después de cancelar:', fetchErr);
+          setError('El reclamo fue cancelado pero hubo un error al actualizar la vista. Recarga la página.');
+        }
+      }, 500);
+      
     } catch (err: unknown) {
-      let message = 'Error al cancelar la reclamación';
+      console.error('Error al cancelar reclamo:', err);
+      
+      let message = 'No se pudo cancelar la reclamación.';
+      
       if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
-        message = (err as { message: string }).message;
+        const errorMessage = (err as { message: string }).message;
+        
+        if (errorMessage.includes('not found')) {
+          message = 'La reclamación ya no existe o fue modificada por otro usuario.';
+        } else if (errorMessage.includes('already cancelled')) {
+          message = 'Esta reclamación ya ha sido cancelada.';
+        } else {
+          message = errorMessage;
+        }
       } else if (err instanceof Error) {
         message = err.message;
       }
+      
       setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Marcar punto como retirado
   const handleCompleteCollection = async () => {
     if (!pointToComplete || !pointToComplete.claim_id) return;
+    
     setLoading(true);
     setError(null);
+    
     try {
-      setError(null);
       console.log('[DEBUG handleCompleteCollection] claim_id:', pointToComplete.claim_id, 'point_id:', pointToComplete.id);
-      await completeCollection(pointToComplete.claim_id, pointToComplete.id); // Solo 2 argumentos
+      
+      await completeCollection(pointToComplete.claim_id, pointToComplete.id);
+      
+      // Cerrar modal
       setShowCompleteModal(false);
-      await fetchData();
+      
+      toast.success('Punto marcado como retirado exitosamente');
+      
+      // Recargar datos con delay para asegurar consistencia
+      setTimeout(async () => {
+        try {
+          await fetchData();
+        } catch (fetchErr) {
+          console.error('Error al recargar datos después de completar:', fetchErr);
+          setError('El punto fue marcado como retirado pero hubo un error al actualizar la vista. Recarga la página.');
+        }
+      }, 500);
+      
     } catch (err: unknown) {
-      let message = 'Error al marcar como retirado';
-      if (err instanceof Error) {
+      console.error('[DEBUG handleCompleteCollection] error:', err);
+      
+      let message = 'No se pudo marcar el punto como retirado.';
+      
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
+        const errorMessage = (err as { message: string }).message;
+        
+        if (errorMessage.includes('not found')) {
+          message = 'La reclamación ya no existe o fue modificada.';
+        } else if (errorMessage.includes('already completed')) {
+          message = 'Este punto ya ha sido marcado como retirado.';
+        } else {
+          message = errorMessage;
+        }
+      } else if (err instanceof Error) {
         message = err.message;
       }
+      
       setError(message);
-      console.error('[DEBUG handleCompleteCollection] error:', err);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -685,35 +808,58 @@ const DashboardRecycler: React.FC = () => {
   // Suscripción en tiempo real a collection_points y collection_claims para actualización instantánea
   useEffect(() => {
     if (!user?.id) return;
-    // Suscripción a collection_points (ya existente)
+    
+    // Suscripción a collection_points con debounce para evitar actualizaciones excesivas
     const channelPoints = supabase.channel('recycler-collection-points')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'collection_points',
       }, () => {
-        // Si el punto es nuevo, cambia de estado, o es eliminado, refresca los datos
-        fetchData();
+        // Solo actualizar si no hay operaciones en curso
+        if (!isProcessingClaim) {
+          // Usar un pequeño delay para evitar actualizaciones demasiado frecuentes
+          setTimeout(() => {
+            if (!isProcessingClaim) {
+              fetchData();
+            }
+          }, 500);
+        }
       });
-    // Suscripción a collection_claims (NUEVO: para que los reclamos actualicen en tiempo real)
+      
+    // Suscripción a collection_claims con mayor cuidado
     const channelClaims = supabase.channel('recycler-collection-claims')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'collection_claims',
         filter: `recycler_id=eq.${user.id}`,
-      }, () => {
-        // Cualquier cambio relevante en los claims del reciclador refresca los datos
-        fetchData();
+      }, (payload) => {
+        console.log('Cambio en claims detectado:', payload);
+        
+        // Solo actualizar si no hay operaciones en curso y no es un INSERT reciente
+        if (!isProcessingClaim) {
+          // Para eventos UPDATE o DELETE, actualizar inmediatamente
+          // Para eventos INSERT, esperar un poco más para evitar conflictos
+          const delay = payload.eventType === 'INSERT' ? 1500 : 500;
+          
+          setTimeout(() => {
+            if (!isProcessingClaim) {
+              fetchData();
+            }
+          }, delay);
+        }
       });
+      
     // Activar ambos canales
     channelPoints.subscribe();
     channelClaims.subscribe();
+    
     return () => {
       supabase.removeChannel(channelPoints);
       supabase.removeChannel(channelClaims);
     };
-  }, [user, fetchData]);
+  }, [user, fetchData, isProcessingClaim]);
 
   // Suscripción en tiempo real a mensajes para actualizar badge de mensajes no leídos
   useEffect(() => {
@@ -1301,6 +1447,63 @@ const DashboardRecycler: React.FC = () => {
     <div className="bg-gray-50 min-h-screen py-8">
       <HeaderRecycler />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Mostrar errores de forma prominente */}
+        {error && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <X className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p className="whitespace-pre-line">{error}</p>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      setError(null);
+                      // Intentar recargar datos si el error persiste
+                      if (error.includes('recarga la página')) {
+                        window.location.reload();
+                      }
+                    }}
+                    className="bg-red-100 px-3 py-1 rounded text-red-800 text-sm hover:bg-red-200 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                  {error.includes('recarga la página') && (
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="ml-2 bg-red-600 px-3 py-1 rounded text-white text-sm hover:bg-red-700 transition-colors"
+                    >
+                      Recargar página
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mensaje de éxito al reclamar */}
+        {claimSuccess && (
+          <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">
+                  ¡Punto reclamado exitosamente! Se ha añadido a tu lista de puntos reclamados.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- MAPA DE PUNTOS DE RECOLECCIÓN --- */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">

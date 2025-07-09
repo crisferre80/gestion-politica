@@ -260,42 +260,77 @@ const DashboardRecycler: React.FC = () => {
       let availablePointsRaw = availableData || [];
       // Debug: mostrar cuántos puntos trae la consulta inicial
       console.log('DEBUG: Puntos disponibles iniciales:', availablePointsRaw.length, availablePointsRaw.map(p => p.id));
-      // Filtrar puntos que ya tienen un claim activo (status 'claimed' o 'completed')
-      // Obtener todos los ids de puntos disponibles
+      // Filtrar puntos que ya tienen un claim activo (solo 'claimed' o 'completed', NO 'cancelled')
+      // Los puntos cancelados deben estar disponibles nuevamente
       const availableIds = availablePointsRaw.map(p => p.id);
-      // Buscar claims activos para esos puntos
+      // Buscar claims activos para esos puntos (excluyendo cancelados)
       let claimedPointIds: string[] = [];
       if (availableIds.length > 0) {
         const { data: claims, error: claimsError2 } = await supabase
           .from('collection_claims')
-          .select('collection_point_id, status')
-          .in('collection_point_id', availableIds);
+          .select('collection_point_id, status, recycler_id, created_at')
+          .in('collection_point_id', availableIds)
+          .order('created_at', { ascending: false }); // Ordenar por fecha para facilitar el procesamiento
+        
         console.log('DEBUG: claims for available points:', claims);
+        console.log('DEBUG: Punto específico c1edea08-105a-4cdd-97d2-dd65bd9ffcaa claims:', 
+          claims?.filter(c => c.collection_point_id === 'c1edea08-105a-4cdd-97d2-dd65bd9ffcaa'));
+        
         if (!claimsError2 && claims) {
-          claimedPointIds = claims
-            .filter(c => c.status === 'claimed' || c.status === 'completed')
-            .map(c => c.collection_point_id);
+          // Agrupar claims por collection_point_id y obtener el más reciente
+          type ClaimForFiltering = {
+            collection_point_id: string;
+            status: string;
+            recycler_id: string;
+            created_at: string;
+          };
+          
+          const latestClaimsByPoint: Record<string, ClaimForFiltering> = {};
+          claims.forEach(claim => {
+            const existing = latestClaimsByPoint[claim.collection_point_id];
+            const claimDate = new Date(claim.created_at).getTime();
+            const existingDate = existing ? new Date(existing.created_at).getTime() : 0;
+            
+            if (!existing || claimDate > existingDate) {
+              latestClaimsByPoint[claim.collection_point_id] = claim;
+            }
+          });
+          
+          console.log('DEBUG: Latest claims by point:', latestClaimsByPoint);
+          console.log('DEBUG: Latest claim for punto c1edea08-105a-4cdd-97d2-dd65bd9ffcaa:', 
+            latestClaimsByPoint['c1edea08-105a-4cdd-97d2-dd65bd9ffcaa']);
+          
+          // Solo excluir puntos cuyo claim más reciente esté 'claimed' o 'completed'
+          claimedPointIds = Object.values(latestClaimsByPoint)
+            .filter((claim: ClaimForFiltering) => {
+              const shouldExclude = claim.status === 'claimed' || claim.status === 'completed';
+              console.log(`DEBUG: Punto ${claim.collection_point_id} - status: ${claim.status} - será excluido: ${shouldExclude}`);
+              return shouldExclude;
+            })
+            .map((claim: ClaimForFiltering) => claim.collection_point_id);
         }
       }
       // Debug: mostrar los IDs de puntos excluidos por claims activos
-      console.log('DEBUG: claimedPointIds (excluidos):', claimedPointIds);
-      // Excluir los puntos ya reclamados
+      console.log('DEBUG: claimedPointIds (excluidos por claims activos):', claimedPointIds);
+      // Excluir los puntos ya reclamados (solo con claims activos)
       availablePointsRaw = availablePointsRaw.filter(p => !claimedPointIds.includes(p.id));
       // Debug: mostrar cuántos puntos quedan tras el filtro
-      console.log('DEBUG: Puntos disponibles tras filtro:', availablePointsRaw.length, availablePointsRaw.map(p => p.id));
-      // Buscar claims cancelados recientes por este reciclador
+      console.log('DEBUG: Puntos disponibles tras filtro de claims activos:', availablePointsRaw.length, availablePointsRaw.map(p => p.id));
+      // Buscar claims cancelados recientes por este reciclador específico
+      // Un reciclador no puede reclamar nuevamente un punto que él mismo canceló recientemente (penalización de 3 horas)
       let penalizedPointIds: string[] = [];
       if (claimsData && claimsData.length > 0) {
         const now = new Date();
         penalizedPointIds = claimsData
-          .filter(c => c.status === 'cancelled' && c.cancelled_at)
+          .filter(c => c.status === 'cancelled' && c.cancelled_at && c.recycler_id === user.id) // Solo cancelaciones de este reciclador
           .filter(c => {
             const cancelledAt = new Date(c.cancelled_at);
             return (now.getTime() - cancelledAt.getTime()) < 3 * 60 * 60 * 1000; // 3 horas
           })
           .map(c => c.collection_point_id);
       }
-      // Excluir los puntos penalizados para este reciclador
+      console.log('DEBUG: penalizedPointIds para este reciclador:', penalizedPointIds);
+      // Excluir los puntos penalizados para este reciclador específico
       const trulyAvailablePointsRaw = availablePointsRaw.filter(p => !penalizedPointIds.includes(p.id));
       // Debug: mostrar cuántos puntos quedan tras el filtro de penalización
       console.log('DEBUG: Puntos disponibles tras filtro de penalización:', trulyAvailablePointsRaw.length, trulyAvailablePointsRaw.map(p => p.id));
@@ -546,6 +581,13 @@ const DashboardRecycler: React.FC = () => {
       setTimeout(() => setClaimSuccess(false), 3000);
     } catch (err: unknown) {
       console.error('Error al reclamar punto:', err);
+      console.error('Detalles completos del error:', {
+        error: err,
+        point_id: pointBeingClaimed.id,
+        recycler_id: user.id,
+        user_id: pointBeingClaimed.user_id,
+        timestamp: new Date().toISOString()
+      });
       
       let message = 'No se pudo reclamar el punto de recolección.';
       
@@ -553,16 +595,20 @@ const DashboardRecycler: React.FC = () => {
         if ('code' in err && err.code === '42P01') {
           message = 'Error en la base de datos: tabla no encontrada. Contacta al administrador.';
         } else if ('code' in err && err.code === '23505') {
-          message = 'Este punto ya ha sido reclamado por otro reciclador.';
+          message = 'Este punto ya ha sido reclamado por otro reciclador mientras procesabas tu solicitud.';
         } else if ('message' in err && typeof (err as { message: unknown }).message === 'string') {
           const errorMessage = (err as { message: string }).message;
           
-          if (errorMessage.includes('already claimed')) {
+          if (errorMessage.includes('already claimed') || errorMessage.includes('ya reclamado')) {
             message = 'Este punto ya ha sido reclamado por otro reciclador.';
-          } else if (errorMessage.includes('not found')) {
-            message = 'El punto de recolección ya no está disponible.';
+          } else if (errorMessage.includes('not found') || errorMessage.includes('no encontrado')) {
+            message = 'El punto de recolección ya no está disponible o fue eliminado.';
           } else if (errorMessage.includes('violates foreign key')) {
-            message = 'Error de referencia en la base de datos. Contacta al administrador.';
+            message = 'Error de referencia en la base de datos. El punto puede haber sido eliminado.';
+          } else if (errorMessage.includes('duplicate key') || errorMessage.includes('clave duplicada')) {
+            message = 'Ya has reclamado este punto anteriormente o está siendo procesado por otro reciclador.';
+          } else if (errorMessage.includes('claim cancelado que impide')) {
+            message = 'Error temporal con un reclamo cancelado anterior. Reintenta en unos segundos.';
           } else {
             message = `Error: ${errorMessage}`;
           }

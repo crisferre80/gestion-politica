@@ -31,6 +31,7 @@ const Login: React.FC = () => {
           type: profile.type,
           role: profile.role, // <-- Asegura que el rol esté presente
           avatar_url: profile.avatar_url,
+          header_image_url: profile.header_image_url, // <-- Incluir imagen de header
           phone: profile.phone,
           address: profile.address,
           online: true,

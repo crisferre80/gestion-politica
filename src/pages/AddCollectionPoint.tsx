@@ -609,17 +609,43 @@ const AddCollectionPoint: React.FC = () => {
                 <label htmlFor="bultos" className="block text-sm font-medium text-gray-700 mb-2">
                   Cantidad de bultos <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
-                  id="bultos"
-                  min="1"
-                  max="50"
-                  value={bultos}
-                  onChange={(e) => setBultos(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-                  placeholder="Ej: 5"
-                />
-                <p className="mt-1 text-sm text-gray-500">
+                <div className="flex items-center justify-center gap-3 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setBultos(Math.max(1, bultos - 1))}
+                    className="w-10 h-10 flex items-center justify-center bg-green-600 text-white rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md transition-all duration-200 active:scale-95"
+                    disabled={bultos <= 1}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </button>
+                  
+                  <div className="flex-1 max-w-24">
+                    <input
+                      type="number"
+                      id="bultos"
+                      min="1"
+                      max="50"
+                      value={bultos}
+                      onChange={(e) => setBultos(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                      className="w-full text-center border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm font-semibold text-lg"
+                      placeholder="1"
+                    />
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setBultos(Math.min(50, bultos + 1))}
+                    className="w-10 h-10 flex items-center justify-center bg-green-600 text-white rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md transition-all duration-200 active:scale-95"
+                    disabled={bultos >= 50}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="mt-2 text-sm text-gray-500 text-center">
                   Número de bultos o bolsas de materiales reciclables (mínimo 1, máximo 50)
                 </p>
               </div>

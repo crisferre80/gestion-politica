@@ -1,6 +1,6 @@
-  // Sube la imagen de header a Supabase Storage y retorna la URL pública
+// Sube la imagen de header a Supabase Storage y retorna la URL pública
   // Sube la imagen de cabecera a Supabase Storage y retorna la URL pública
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 // (Eliminado: hook useState fuera del componente, esto causa error de hooks)
 
@@ -306,24 +306,55 @@ useEffect(() => {
     created_at?: string; // <-- Añadido para acceso seguro a la fecha de creación
   };
   const [detailedPoints, setDetailedPoints] = useState<DetailedPoint[]>([]);
+  
+  // Estado para indicar cuando se están actualizando los datos en tiempo real
+  const [isUpdatingRealtime, setIsUpdatingRealtime] = useState(false);
+
+  // Función para cargar puntos con detalles de reclamo y reciclador
+  const fetchDetailedPoints = useCallback(async () => {
+    // CORREGIDO: select anidado con el nombre correcto de la foreign key y orden explícito
+    if (!user) return;
+    
+    setIsUpdatingRealtime(true);
+    const { data, error } = await supabase
+      .from('collection_points')
+      .select(`
+        *,
+        claim:collection_claims!collection_point_id(
+          id,
+          status,
+          pickup_time,
+          collection_point_id,
+          recycler_id,
+          recycler:profiles!recycler_id(
+            id,
+            user_id,
+            name,
+            avatar_url,
+            email,
+            phone,
+            alias
+          )
+        )
+      `)
+      .eq('user_id', user?.id ?? '')
+      .order('created_at', { ascending: false });
+    
+    console.log('[DEBUG] Consulta SQL resultado:', { data, error });
+    
+    if (!error && data) {
+      setDetailedPoints(data);
+    } else {
+      setDetailedPoints([]);
+    }
+    
+    // Pequeño retraso para mostrar el indicador de actualización
+    setTimeout(() => setIsUpdatingRealtime(false), 500);
+  }, [user]);
 
   // Cargar puntos con detalles de reclamo y reciclador
   useEffect(() => {
     if (!user?.id) return;
-    // Asegura que el perfil existe antes de cargar puntos
-    // ensureUserProfile({ id: user.id, email: user.email, name: user.name });
-    const fetchDetailedPoints = async () => {
-      // CORREGIDO: select anidado con el nombre correcto de la foreign key y orden explícito
-      if (!user) return;
-      const { data, error } = await supabase
-        .from('collection_points')
-        .select(`*,claim:collection_claims!collection_point_id(*,recycler:profiles!recycler_id(id,user_id,name,avatar_url,email,phone))`)
-        .eq('user_id', user?.id ?? '')
-        .order('created_at', { ascending: false });
-      if (!error && data) {
-        setDetailedPoints(data);
-      } else setDetailedPoints([]);
-    };
     fetchDetailedPoints();
 
     const channelPoints = supabase.channel('resident-collection-points')
@@ -332,21 +363,100 @@ useEffect(() => {
         schema: 'public',
         table: 'collection_points',
         filter: `user_id=eq.${user.id}`,
-      }, () => {
+      }, (payload) => {
+        console.log('Cambio en collection_points:', payload);
         fetchDetailedPoints();
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'collection_claims',
-      }, () => {
+      }, async (payload) => {
+        console.log('Cambio en collection_claims:', payload);
+        
+        // Si es un nuevo claim (INSERT), verificar si es para un punto del usuario y mostrar notificación
+        if (payload.eventType === 'INSERT') {
+          const newClaim = payload.new as Record<string, unknown>;
+          const collectionPointId = newClaim.collection_point_id;
+          const recyclerId = newClaim.recycler_id;
+          
+          // Verificar si el punto reclamado pertenece al usuario actual y obtener info del reciclador
+          const [pointResult, recyclerResult] = await Promise.all([
+            supabase
+              .from('collection_points')
+              .select('id, address, user_id')
+              .eq('id', collectionPointId)
+              .eq('user_id', user.id)
+              .single(),
+            supabase
+              .from('profiles')
+              .select('name, avatar_url')
+              .eq('id', recyclerId)
+              .single()
+          ]);
+          
+          if (pointResult.data && !pointResult.error) {
+            const recyclerName = recyclerResult.data?.name || 'Un reciclador';
+            // Es un punto del usuario actual que fue reclamado
+            playNotificationSound(); // Reproducir sonido
+            toast.success(
+              `¡${recyclerName} ha reclamado tu punto de recolección en "${pointResult.data.address}"!`, 
+              {
+                duration: 6000,
+                icon: '🚀',
+                style: {
+                  background: '#10B981',
+                  color: 'white',
+                  fontWeight: 'bold'
+                }
+              }
+            );
+            
+            // Forzar actualización inmediata después de mostrar notificación
+            setTimeout(() => {
+              fetchDetailedPoints();
+            }, 1000);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedClaim = payload.new as Record<string, unknown>;
+          const collectionPointId = updatedClaim.collection_point_id;
+          const status = updatedClaim.status as string;
+          
+          // Solo mostrar notificación para cambios a 'completed'
+          if (status === 'completed') {
+            const { data: pointData } = await supabase
+              .from('collection_points')
+              .select('id, address, user_id')
+              .eq('id', collectionPointId)
+              .eq('user_id', user.id)
+              .single();
+            
+            if (pointData) {
+              playNotificationSound(); // Reproducir sonido
+              toast.success(
+                `¡El material de tu punto en "${pointData.address}" ha sido retirado exitosamente!`,
+                {
+                  duration: 5000,
+                  icon: '✅',
+                  style: {
+                    background: '#059669',
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }
+                }
+              );
+            }
+          }
+        }
+        
+        // Recargar todos los puntos para obtener la información actualizada
         fetchDetailedPoints();
       })
       .subscribe();
     return () => {
       supabase.removeChannel(channelPoints);
     };
-  }, [user]);
+  }, [user, fetchDetailedPoints]);
 
   // Filtrado por sub-tab
   const now = new Date();
@@ -373,8 +483,20 @@ interface ClaimType {
 
 // Normaliza el claim para asegurar que el tipo es correcto y rating_average es opcional
 function normalizeClaim(claim: unknown): ClaimType | undefined {
-  if (!claim || typeof claim !== 'object') return undefined;
+  if (!claim) return undefined;
+  
+  // Si claim es un array, tomar el más reciente (último elemento)
+  if (Array.isArray(claim)) {
+    if (claim.length === 0) return undefined;
+    const latestClaim = claim[claim.length - 1];
+    return normalizeClaim(latestClaim);
+  }
+  
+  if (typeof claim !== 'object') return undefined;
+  
   const c = claim as ClaimType;
+  console.log('[DEBUG] Normalizando claim:', c);
+  
   if (c.recycler && typeof c.recycler === 'object') {
     return {
       ...c,
@@ -415,11 +537,18 @@ const puntosDemorados = detailedPoints.filter(p => {
   return false;
 });
 
-  // DEBUG LOGS
-  // console.log('[DEBUG] puntosTodos:', puntosTodos.map(p => p.id));
-  // console.log('[DEBUG] puntosReclamados:', puntosReclamados.map(p => p.id));
-  // console.log('[DEBUG] puntosRetirados:', puntosRetirados.map(p => p.id));
-  // console.log('[DEBUG] puntosDemorados:', puntosDemorados.map(p => p.id));
+  // DEBUG LOGS - Agregados para diagnosticar el problema
+  console.log('[DEBUG] Total detailedPoints:', detailedPoints.length);
+  console.log('[DEBUG] detailedPoints con claims:', detailedPoints.map(p => ({
+    id: p.id,
+    address: p.address,
+    claim: p.claim,
+    claimStatus: p.claim?.status
+  })));
+  console.log('[DEBUG] puntosTodos:', puntosTodos.length, puntosTodos.map(p => p.id));
+  console.log('[DEBUG] puntosReclamados:', puntosReclamados.length, puntosReclamados.map(p => p.id));
+  console.log('[DEBUG] puntosRetirados:', puntosRetirados.length, puntosRetirados.map(p => p.id));
+  console.log('[DEBUG] puntosDemorados:', puntosDemorados.length, puntosDemorados.map(p => p.id));
 
   // Función para volver a poner un punto como disponible
   const handleMakeAvailableAgain = async (point: DetailedPoint) => {
@@ -711,20 +840,33 @@ useEffect(() => {
 
   // Suscripción a cambios en puntos de recolección
   useEffect(() => {
+    if (!user?.id) return;
+
     const pointsSubscription = supabase
-      .channel('collection_points')
+      .channel('collection_points_general')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_points' }, payload => {
-        console.log('Evento en puntos de recolección:', payload);
+        console.log('Evento general en puntos de recolección:', payload);
         // Actualizar estado o lógica según sea necesario
       })
       .subscribe();
 
-    // Suscripción a cambios en claims
+    // Suscripción a cambios en claims - mejorada para tiempo real
     const claimsSubscription = supabase
-      .channel('claims')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'claims' }, payload => {
-        console.log('Evento en claims:', payload);
-        // Actualizar estado o lógica según sea necesario
+      .channel('claims_general')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_claims' }, payload => {
+        console.log('Evento general en claims:', payload);
+        
+        // Si es un nuevo claim (INSERT) o una actualización (UPDATE), mostrar notificación
+        if (payload.eventType === 'INSERT') {
+          const newClaim = payload.new as Record<string, unknown>;
+          console.log('Nuevo claim creado:', newClaim);
+          
+          // Verificar si el claim es para un punto del usuario actual
+          // (Esta verificación se hará cuando se recarguen los datos detallados)
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedClaim = payload.new as Record<string, unknown>;
+          console.log('Claim actualizado:', updatedClaim);
+        }
       })
       .subscribe();
 
@@ -733,7 +875,7 @@ useEffect(() => {
       supabase.removeChannel(pointsSubscription);
       supabase.removeChannel(claimsSubscription);
     };
-  }, []);
+  }, [user?.id]);
 
   // --- Estado para verificar si está asociado a un punto colectivo ---
   const [isAssociatedToCollectivePoint, setIsAssociatedToCollectivePoint] = useState<boolean>(false);
@@ -779,6 +921,22 @@ useEffect(() => {
     checkCollectivePointAssociation();
   }, [user]);
 
+  // Función para reproducir sonido de notificación (opcional)
+  const playNotificationSound = () => {
+    try {
+      // Solo reproducir sonido si el documento está visible (pestaña activa)
+      if (document.visibilityState === 'visible') {
+        const audio = new Audio('/assets/alarma econecta.mp3');
+        audio.volume = 0.3; // Volumen moderado
+        audio.play().catch(() => {
+          // Fallar silenciosamente si no se puede reproducir
+        });
+      }
+    } catch {
+      // Fallar silenciosamente si hay problemas con el audio
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
       {/* Mostrar mensaje de error si existe */}
@@ -794,10 +952,13 @@ useEffect(() => {
           {/* Botón para cambiar imagen del header */}
           <button
             onClick={() => setShowHeaderImageModal(true)}
-            className="cursor-pointer bg-green-600 text-white px-3 py-1 rounded shadow hover:bg-green-700 transition-all text-sm flex items-center gap-1"
+            className="cursor-pointer bg-green-600 text-white px-3 py-2 rounded shadow hover:bg-green-700 transition-all text-sm flex items-center gap-2"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
-            Cambiar imagen (máx. 800 KB)
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 19.5V7.125c0-.621.504-1.125 1.125-1.125h3.38c.414 0 .788-.252.94-.639l.57-1.522A1.125 1.125 0 018.21 3.75h7.58c.482 0 .915.304 1.07.764l.57 1.522c.152.387.526.639.94.639h3.38c.621 0 1.125.504 1.125 1.125V19.5a1.125 1.125 0 01-1.125 1.125H3.375A1.125 1.125 0 012.25 19.5z" />
+              <circle cx="12" cy="13.5" r="3.75" />
+            </svg>
+            imagen
           </button>
         </div>
         {/* Imagen de cabecera grande */}
@@ -964,13 +1125,23 @@ useEffect(() => {
                 ${activePointsTab==='todos' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
             >
               Disponibles
+              {puntosTodos.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-800 text-white rounded-full">
+                  {puntosTodos.length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActivePointsTab('reclamados')}
-              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
+              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all relative
                 ${activePointsTab==='reclamados' ? 'bg-yellow-400 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}
             >
               Puntos reclamados
+              {puntosReclamados.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-yellow-600 text-white rounded-full animate-pulse">
+                  {puntosReclamados.length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActivePointsTab('demorados')}
@@ -978,6 +1149,11 @@ useEffect(() => {
                 ${activePointsTab==='demorados' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
             >
               Puntos demorados
+              {puntosDemorados.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-600 text-white rounded-full animate-pulse">
+                  {puntosDemorados.length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActivePointsTab('retirados')}
@@ -985,10 +1161,35 @@ useEffect(() => {
                 ${activePointsTab==='retirados' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
             >
               Puntos retirados
+              {puntosRetirados.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-600 text-white rounded-full">
+                  {puntosRetirados.length}
+                </span>
+              )}
             </button>
           </div>
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold mb-4">Mis Puntos de Recolección</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Mis Puntos de Recolección</h2>
+              <div className="flex items-center gap-2">
+                {isUpdatingRealtime && (
+                  <div className="flex items-center gap-2 text-green-600 text-sm font-semibold">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    Actualizando en tiempo real...
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    console.log('[DEBUG] Refrescando manualmente...');
+                    fetchDetailedPoints();
+                  }}
+                  className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-all"
+                  title="Refrescar datos manualmente"
+                >
+                  🔄 Refrescar
+                </button>
+              </div>
+            </div>
             {/* Enlace para agregar punto: elimina el paso de función por state */}
             <Link
               to="/add-collection-point"
@@ -1397,6 +1598,7 @@ useEffect(() => {
                     address: editAddress,
                     bio: editBio,
                     avatar_url: user!.avatar_url,
+                    header_image_url: user!.header_image_url, // <-- Mantener imagen de header
                     materials: editMaterials.split(',').map((m: string) => m.trim()).filter(Boolean),
                     lat: user!.lat,
                     lng: user!.lng,

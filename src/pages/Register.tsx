@@ -136,6 +136,7 @@ const Register: React.FC = () => {
                   lng: 0,
                   lat: 0,
                   avatar_url: updatedProfile?.avatar_url || avatarUrl,
+                  header_image_url: updatedProfile?.header_image_url, // <-- Incluir imagen de header
                 });
         navigate('/dashboard');
       } else {

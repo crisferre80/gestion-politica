@@ -746,6 +746,7 @@ const AddCollectionPoint: React.FC = () => {
                     enableCropping={true}
                     onCapture={handlePhotoCapture}
                     onCancel={() => {}}
+                    facingMode="environment"
                   />
                   {photoError && <p className="text-sm text-red-600 mb-2">{photoError}</p>}
                   {materialPhotoPreview && (

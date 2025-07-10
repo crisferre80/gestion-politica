@@ -1377,7 +1377,7 @@ useEffect(() => {
                             )}
                             {activePointsTab === 'retirados' && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-semibold border border-purple-300">
-                                
+                               Rating 
                               </span>
                             )}
                             {activePointsTab==='demorados' && (

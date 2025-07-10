@@ -1733,18 +1733,68 @@ const DashboardRecycler: React.FC = () => {
                 </ul>
               </div>
             )}
-            {/* Dropdown for view selection */}
-            <div className="mb-6 flex justify-end">
-              <select
-                className="border border-green-300 rounded px-3 py-2 text-green-800 bg-white shadow focus:outline-none focus:ring-2 focus:ring-green-400"
-                value={view}
-                onChange={e => handleSetView(e.target.value)}
+            {/* Botones para selección de vista */}
+            <div className="mb-6 flex flex-wrap gap-2 justify-center md:justify-end">
+              <button
+                onClick={() => handleSetView('disponibles')}
+                className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 min-w-[140px] text-sm
+                  ${view === 'disponibles'
+                    ? 'bg-green-600 text-white shadow-lg scale-105'
+                    : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}
+                `}
               >
-                <option value="disponibles">Puntos Disponibles</option>
-                <option value="reclamados">Puntos Reclamados</option>
-                <option value="cancelados">Puntos Cancelados</option>
-                <option value="retirados">Puntos Retirados</option>
-              </select>
+                Disponibles
+                {trulyAvailablePoints.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-green-800 text-white rounded-full">
+                    {trulyAvailablePoints.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => handleSetView('reclamados')}
+                className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 min-w-[140px] text-sm
+                  ${view === 'reclamados'
+                    ? 'bg-yellow-500 text-white shadow-lg scale-105'
+                    : 'bg-gray-100 text-gray-700 hover:bg-yellow-100 hover:text-yellow-700'}
+                `}
+              >
+                Reclamados
+                {claimedPoints.filter(p => p.claim_status === 'claimed').length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-yellow-600 text-white rounded-full">
+                    {claimedPoints.filter(p => p.claim_status === 'claimed').length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => handleSetView('cancelados')}
+                className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 min-w-[140px] text-sm
+                  ${view === 'cancelados'
+                    ? 'bg-red-600 text-white shadow-lg scale-105'
+                    : 'bg-gray-100 text-gray-700 hover:bg-red-100 hover:text-red-700'}
+                `}
+              >
+                Cancelados
+                {claimedPoints.filter(p => p.claim_status === 'cancelled').length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-red-700 text-white rounded-full">
+                    {claimedPoints.filter(p => p.claim_status === 'cancelled').length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => handleSetView('retirados')}
+                className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 min-w-[140px] text-sm
+                  ${view === 'retirados'
+                    ? 'bg-purple-600 text-white shadow-lg scale-105'
+                    : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700'}
+                `}
+              >
+                Retirados
+                {claimedPoints.filter(p => p.claim_status === 'completed').length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-purple-700 text-white rounded-full">
+                    {claimedPoints.filter(p => p.claim_status === 'completed').length}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Secciones de Mis Puntos */}
@@ -2031,7 +2081,31 @@ const DashboardRecycler: React.FC = () => {
               )}
               {view === 'cancelados' && (
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Cancelados</h2>
+                  <div className="flex justify-end mb-4">
+                    <button
+                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
+                      onClick={async () => {
+                        if (!user) return;
+                        // Filtrar puntos cancelados
+                        const cancelados = claimedPoints.filter(p => p.claim_status === 'cancelled');
+                        if (cancelados.length === 0) return;
+                        if (!window.confirm('¿Estás seguro de que deseas vaciar los puntos cancelados? Esta acción no se puede deshacer. Los datos para estadísticas se conservarán.')) return;
+                        // Clonar los puntos cancelados a una tabla de respaldo
+                        for (const punto of cancelados) {
+                          await supabase.from('collection_points_backup').insert({ 
+                            ...punto, 
+                            original_id: punto.id, 
+                            deleted_at: new Date().toISOString(),
+                            backup_reason: 'cancelled_cleanup'
+                          });
+                        }
+                        // Ocultar puntos cancelados de la vista
+                        setClaimedPoints(prev => prev.filter(p => p.claim_status !== 'cancelled'));
+                      }}
+                    >
+                      Vaciar Puntos Cancelados
+                    </button>
+                  </div>
                   <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Cancelados</h2>
                   <div className="grid gap-6 md:grid-cols-2">
                     {claimedPoints.filter(p => p.claim_status === 'cancelled').length === 0 ? (

@@ -47,7 +47,70 @@ const AddCollectionPoint: React.FC = () => {
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [showDistrictSuggestions, setShowDistrictSuggestions] = useState(false);
 
-  const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos'];
+  const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos', 'Escombros'];
+  // Estado para la foto del material
+  const [materialPhoto, setMaterialPhoto] = useState<string | null>(null); // base64
+  const [photoError, setPhotoError] = useState<string>('');
+
+  // Función para reescalar la imagen a máximo 150 KB
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhotoError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('El archivo debe ser una imagen.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        // Crear canvas para reescalar
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        // Reducir tamaño si es muy grande
+        const maxDim = 1024;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, width, height);
+        // Intentar varios niveles de calidad para no superar 150 KB
+        let quality = 0.8;
+        let dataUrl = '';
+        for (let i = 0; i < 5; i++) {
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          // Calcular tamaño en bytes
+          const size = Math.round((dataUrl.length * 3) / 4 - (dataUrl.endsWith('==') ? 2 : dataUrl.endsWith('=') ? 1 : 0));
+          if (size <= 150 * 1024) break;
+          quality -= 0.15;
+          if (quality < 0.3) break;
+        }
+        // Validar tamaño final
+        const finalSize = Math.round((dataUrl.length * 3) / 4 - (dataUrl.endsWith('==') ? 2 : dataUrl.endsWith('=') ? 1 : 0));
+        if (finalSize > 150 * 1024) {
+          setPhotoError('No se pudo reducir la imagen a menos de 150 KB. Usa una imagen más pequeña.');
+          setMaterialPhoto(null);
+        } else {
+          setMaterialPhoto(dataUrl);
+        }
+      };
+      if (typeof event.target?.result === 'string') {
+        img.src = event.target.result;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const fetchAddressSuggestions = async (query: string) => {
     if (!query) {
@@ -225,6 +288,7 @@ const AddCollectionPoint: React.FC = () => {
     
     setLoading(true);
     setError('');
+    setPhotoError('');
 
     const formattedSchedule = `${format(collectionDate, 'EEEE')}s, ${format(collectionTimeStart, 'HH:mm')} - ${format(collectionTimeEnd, 'HH:mm')}`;
 
@@ -244,6 +308,28 @@ const AddCollectionPoint: React.FC = () => {
     });
     
     try {
+      // Guardar la foto en la base de datos si existe
+      let photoUrl: string | null = null;
+      if (materialPhoto) {
+        // Subir a Supabase Storage (requiere bucket 'collection_photos')
+        const fileName = `photo_${user.id}_${Date.now()}.jpg`;
+        const base64Data = materialPhoto.split(',')[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const file = new File([byteArray], fileName, { type: 'image/jpeg' });
+        const { data: uploadData, error: uploadError } = await supabase.storage.from('collection_photos').upload(fileName, file, { upsert: true });
+        if (uploadError) {
+          setPhotoError('No se pudo subir la foto.');
+        } else {
+          const { data: publicUrlData } = supabase.storage.from('collection_photos').getPublicUrl(fileName);
+          photoUrl = publicUrlData?.publicUrl || null;
+        }
+      }
+
       const { error: supabaseError, data: newPoint } = await supabase
         .from('collection_points')
         .insert([
@@ -257,7 +343,8 @@ const AddCollectionPoint: React.FC = () => {
             additional_info: additionalInfo,
             lat: selectedLocation.lat,
             lng: selectedLocation.lng,
-            ...(user.type === 'resident_institutional' ? { type: 'colective_point' } : {})
+            ...(user.type === 'resident_institutional' ? { type: 'colective_point' } : {}),
+            photo_url: photoUrl
           }
         ])
         .select()
@@ -479,6 +566,25 @@ const AddCollectionPoint: React.FC = () => {
             )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Foto del material (opcional, máx. 150 KB)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="mb-2"
+                  disabled={loading}
+                />
+                {photoError && <p className="text-sm text-red-600 mb-2">{photoError}</p>}
+                {materialPhoto && (
+                  <div className="mb-2">
+                    <img src={materialPhoto} alt="Foto del material" className="max-h-40 rounded shadow" />
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {isAssociatedToCollectivePoint 

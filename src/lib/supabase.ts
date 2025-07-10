@@ -192,6 +192,7 @@ export type CollectionPoint = {
   pickup_time?: string | null;
   pickup_extra?: string | null; // Nuevo campo agregado
   type?: string; // <-- Añadido para distinguir puntos colectivos
+  photo_url?: string | null;
   // otros campos...
 };
 

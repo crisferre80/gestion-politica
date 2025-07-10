@@ -23,7 +23,7 @@ function PuntosRecoleccion() {
   type ActiveClaim = { collection_point_id: string; status: string };
   const [claims, setClaims] = useState<ActiveClaim[]>([]);
 
-  const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos'];
+  const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos', 'Escombros'];
 
   const fetchPoints = React.useCallback(async () => {
     try {
@@ -255,6 +255,17 @@ function PuntosRecoleccion() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredPoints.map(point => (
               <div key={point.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 hover:shadow-md transition-shadow">
+                {/* Mostrar foto si existe */}
+                {point.photo_url && (
+                  <div className="w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={point.photo_url}
+                      alt="Foto del material a recoger"
+                      className="object-contain max-h-48 w-auto"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
                 <div className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start">

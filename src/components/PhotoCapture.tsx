@@ -9,6 +9,7 @@ export interface PhotoCaptureProps {
   aspectRatio?: 'square' | 'cover' | '16:9';
   enableTransformations?: boolean;
   enableCropping?: boolean;
+  facingMode?: string;
 }
 
 const PhotoCapture: React.FC<PhotoCaptureProps> = ({ 
@@ -16,7 +17,8 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   onCancel,
   aspectRatio = 'square',
   enableTransformations = true,
-  enableCropping = true
+  enableCropping = true,
+  facingMode = 'user'
 }) => {
   const webcamRef = useRef<Webcam>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -575,7 +577,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             screenshotFormat="image/jpeg"
             className="w-full rounded-lg"
             videoConstraints={{
-              facingMode: { ideal: 'user' }
+              facingMode: { ideal: facingMode }
             }}
           />
         </div>

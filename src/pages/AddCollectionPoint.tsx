@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import PhotoCapture from '../components/PhotoCapture';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useUser } from '../context/UserContext';
@@ -48,28 +49,22 @@ const AddCollectionPoint: React.FC = () => {
   const [showDistrictSuggestions, setShowDistrictSuggestions] = useState(false);
 
   const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos', 'Escombros'];
-  // Estado para la foto del material
-  const [materialPhoto, setMaterialPhoto] = useState<string | null>(null); // base64
+  // Estado para la foto del material (ahora con File y URL)
+  const [materialPhotoFile, setMaterialPhotoFile] = useState<File | null>(null);
+  const [materialPhotoPreview, setMaterialPhotoPreview] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string>('');
 
-  // Función para reescalar la imagen a máximo 150 KB
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handler para PhotoCapture
+  const handlePhotoCapture = async (file: File) => {
     setPhotoError('');
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setPhotoError('El archivo debe ser una imagen.');
-      return;
-    }
+    // Reescalar a máximo 150 KB usando lógica similar a PhotoCapture
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const img = new window.Image();
-      img.onload = () => {
-        // Crear canvas para reescalar
+      img.onload = async () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        // Reducir tamaño si es muy grande
         const maxDim = 1024;
         if (width > maxDim || height > maxDim) {
           if (width > height) {
@@ -85,24 +80,34 @@ const AddCollectionPoint: React.FC = () => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, width, height);
-        // Intentar varios niveles de calidad para no superar 150 KB
         let quality = 0.8;
         let dataUrl = '';
         for (let i = 0; i < 5; i++) {
           dataUrl = canvas.toDataURL('image/jpeg', quality);
-          // Calcular tamaño en bytes
           const size = Math.round((dataUrl.length * 3) / 4 - (dataUrl.endsWith('==') ? 2 : dataUrl.endsWith('=') ? 1 : 0));
           if (size <= 150 * 1024) break;
           quality -= 0.15;
           if (quality < 0.3) break;
         }
-        // Validar tamaño final
         const finalSize = Math.round((dataUrl.length * 3) / 4 - (dataUrl.endsWith('==') ? 2 : dataUrl.endsWith('=') ? 1 : 0));
         if (finalSize > 150 * 1024) {
           setPhotoError('No se pudo reducir la imagen a menos de 150 KB. Usa una imagen más pequeña.');
-          setMaterialPhoto(null);
+          setMaterialPhotoFile(null);
+          setMaterialPhotoPreview(null);
         } else {
-          setMaterialPhoto(dataUrl);
+          // Convertir a File
+          const arr = dataUrl.split(',');
+          const mimeMatch = arr[0].match(/:(.*?);/);
+          const mime = mimeMatch ? mimeMatch[1] : '';
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const newFile = new File([u8arr], `material-photo-${Date.now()}.jpg`, { type: mime });
+          setMaterialPhotoFile(newFile);
+          setMaterialPhotoPreview(dataUrl);
         }
       };
       if (typeof event.target?.result === 'string') {
@@ -310,18 +315,10 @@ const AddCollectionPoint: React.FC = () => {
     try {
       // Guardar la foto en la base de datos si existe
       let photoUrl: string | null = null;
-      if (materialPhoto) {
+      if (materialPhotoFile) {
         // Subir a Supabase Storage (requiere bucket 'collection_photos')
         const fileName = `photo_${user.id}_${Date.now()}.jpg`;
-        const base64Data = materialPhoto.split(',')[1];
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const file = new File([byteArray], fileName, { type: 'image/jpeg' });
-        const { data: uploadData, error: uploadError } = await supabase.storage.from('collection_photos').upload(fileName, file, { upsert: true });
+        const { error: uploadError } = await supabase.storage.from('collection_photos').upload(fileName, materialPhotoFile, { upsert: true });
         if (uploadError) {
           setPhotoError('No se pudo subir la foto.');
         } else {
@@ -566,24 +563,7 @@ const AddCollectionPoint: React.FC = () => {
             )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Foto del material (opcional, máx. 150 KB)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  className="mb-2"
-                  disabled={loading}
-                />
-                {photoError && <p className="text-sm text-red-600 mb-2">{photoError}</p>}
-                {materialPhoto && (
-                  <div className="mb-2">
-                    <img src={materialPhoto} alt="Foto del material" className="max-h-40 rounded shadow" />
-                  </div>
-                )}
-              </div>
+
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -754,6 +734,26 @@ const AddCollectionPoint: React.FC = () => {
                 <p className="mt-2 text-sm text-gray-500 text-center">
                   Número de bultos o bolsas de materiales reciclables (mínimo 1, máximo 50)
                 </p>
+
+                {/* Botón tomar foto o seleccionar archivo, igual que en perfil/header */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Foto del material (opcional, máx. 150 KB)
+                  </label>
+                  <PhotoCapture
+                    aspectRatio="square"
+                    enableTransformations={true}
+                    enableCropping={true}
+                    onCapture={handlePhotoCapture}
+                    onCancel={() => {}}
+                  />
+                  {photoError && <p className="text-sm text-red-600 mb-2">{photoError}</p>}
+                  {materialPhotoPreview && (
+                    <div className="mb-2">
+                      <img src={materialPhotoPreview} alt="Foto del material" className="max-h-40 rounded shadow" />
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div>

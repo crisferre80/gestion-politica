@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Recycle, LogOut, User, Settings, Key } from 'lucide-react';
+import { Menu, X, Recycle, LogOut, Key, User, Trash2 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { getAvatarUrl } from '../utils/feedbackHelper';
 
@@ -23,6 +23,7 @@ const Navbar: React.FC = () => {
     await logout();
   };
 
+  // Cerrar menú móvil al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
@@ -37,9 +38,9 @@ const Navbar: React.FC = () => {
   }, []);
 
   return (
-    <nav className="bg-green-600 text-white shadow-md">
+    <nav className="bg-green-600 text-white shadow-md sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-14 md:h-16 items-center">
+        <div className="flex justify-between h-16 items-center">
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
               <Recycle className="h-7 w-7 md:h-8 md:w-8 mr-2" />
@@ -75,13 +76,10 @@ const Navbar: React.FC = () => {
                         <p className="text-sm font-medium">{user?.name}</p>
                         <p className="text-xs text-gray-500">{user?.email}</p>
                       </div>
-                      {user?.id && (
-                        <Link to={`/recycler-profile/${user.id}`} className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center">
-                          <User className="h-4 w-4 mr-2" />Mi Perfil
-                        </Link>
-                      )}
-                      <Link to="/profile" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Settings className="h-4 w-4 mr-2" />Configuración</Link>
+                      <Link to="/dashboard?tab=perfil" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><User className="h-4 w-4 mr-2" />Mi Perfil</Link>
                       <Link to="/change-password" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Key className="h-4 w-4 mr-2" />Cambiar contraseña</Link>
+                      <div className="border-t border-gray-200 my-1"></div>
+                      <button className="block w-full text-left px-4 py-2 text-sm hover:bg-red-50 text-red-600 flex items-center"><Trash2 className="h-4 w-4 mr-2" />Eliminar cuenta</button>
                       <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><LogOut className="h-4 w-4 mr-2" />Cerrar sesión</button>
                     </div>
                   )}
@@ -111,45 +109,83 @@ const Navbar: React.FC = () => {
       {isOpen && (
         <div className="md:hidden bg-green-700/95 backdrop-blur-sm">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <Link to="/" className="block px-3 py-2 rounded-md hover:bg-green-800">Inicio</Link>
+            <Link to="/" className="block px-3 py-2 rounded-md hover:bg-green-800" onClick={() => setIsOpen(false)}>Inicio</Link>
             {isAuthenticated ? (
               <>
-                <Link to="/dashboard" className="block px-3 py-2 rounded-md hover:bg-green-800">Mi Panel</Link>
-                <button
-                  onClick={async (e) => { e.stopPropagation(); await handleLogout(); setShowAccountMenu(false); setIsOpen(false); }}
-                  className="block w-full text-left px-3 py-2 rounded-md hover:bg-green-800 flex items-center text-red-100 font-semibold"
-                >
-                  <LogOut className="h-5 w-5 mr-2" />Cerrar sesión
-                </button>
-                {/* Avatar como botón para desplegar menú */}
-                <button
-                  onClick={() => setShowAccountMenu(!showAccountMenu)}
-                  className="w-10 h-10 rounded-full overflow-hidden border-2 border-green-300 flex items-center justify-center mx-2 my-2 focus:outline-none focus:ring-2 focus:ring-green-400"
-                  aria-label="Opciones de cuenta"
-                >
-                  <img src={getAvatarUrl(user?.avatar_url, user?.name)} alt={user?.name || 'Usuario'} className="w-full h-full object-cover" />
-                </button>
-                {showAccountMenu && (
-                  <div className="bg-white rounded-md shadow-lg py-1 z-50 text-gray-900 mt-2 absolute left-4 right-4 mx-auto max-w-xs">
-                    <div className="px-4 py-2 border-b border-gray-200 text-center">
-                      <img src={getAvatarUrl(user?.avatar_url, user?.name)} alt={user?.name || 'Usuario'} className="w-14 h-14 rounded-full mx-auto mb-2 object-cover border-2 border-green-400" />
-                      <p className="text-sm font-medium">{user?.name}</p>
-                      <p className="text-xs text-gray-500">{user?.email}</p>
-                    </div>
-                    {user?.id && (
-                      <Link to={`/recycler-profile/${user.id}`} className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center">
-                        <User className="h-4 w-4 mr-2" />Mi Perfil
-                      </Link>
-                    )}
-                    <Link to="/profile" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Settings className="h-4 w-4 mr-2" />Configuración</Link>
-                    <Link to="/change-password" className="block px-4 py-2 text-sm hover:bg-gray-100 flex items-center"><Key className="h-4 w-4 mr-2" />Cambiar contraseña</Link>
-                  </div>
+                <Link to="/dashboard" className="block px-3 py-2 rounded-md hover:bg-green-800" onClick={() => setIsOpen(false)}>Mi Panel</Link>
+                
+                {/* Acceso Admin también en móvil */}
+                {user?.email === 'cristianferreyra8076@gmail.com' && (
+                  <Link 
+                    to="/admin-panel" 
+                    className="block px-3 py-2 rounded-md bg-yellow-400 text-green-900 font-bold hover:bg-yellow-500 transition"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Acceso Administrador
+                  </Link>
                 )}
+                
+                {/* Usuario info con menú desplegable mejorado */}
+                <div className="border-t border-green-600 pt-3 mt-3">
+                  <div className="flex items-center px-3 py-2">
+                    <img 
+                      src={getAvatarUrl(user?.avatar_url, user?.name)} 
+                      alt={user?.name || 'Usuario'} 
+                      className="h-10 w-10 rounded-full mr-3 border-2 border-green-300"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+                      <p className="text-xs text-green-200 truncate">{user?.email}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Opciones de cuenta */}
+                  <div className="mt-2 space-y-1">
+                    <Link 
+                      to="/dashboard?tab=perfil" 
+                      className="block px-3 py-2 rounded-md hover:bg-green-800 flex items-center text-sm"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <User className="h-4 w-4 mr-3" />
+                      Mi Perfil
+                    </Link>
+                    <Link 
+                      to="/change-password" 
+                      className="block px-3 py-2 rounded-md hover:bg-green-800 flex items-center text-sm"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <Key className="h-4 w-4 mr-3" />
+                      Cambiar contraseña
+                    </Link>
+                    <button 
+                      className="block w-full text-left px-3 py-2 rounded-md hover:bg-red-600 flex items-center text-sm text-red-100"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-3" />
+                      Eliminar cuenta
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Cerrar sesión separado */}
+                <div className="border-t border-green-600 pt-3 mt-3">
+                  <button
+                    onClick={async (e) => { 
+                      e.stopPropagation(); 
+                      await handleLogout(); 
+                      setIsOpen(false); 
+                    }}
+                    className="block w-full text-left px-3 py-2 rounded-md hover:bg-red-600 flex items-center text-red-100 font-semibold"
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    Cerrar sesión
+                  </button>
+                </div>
               </>
             ) : (
               <>
-                <Link to="/login" className="block px-3 py-2 rounded-md hover:bg-green-800">Ingresar</Link>
-                <Link to="/register" className="block px-3 py-2 bg-white text-green-600 font-medium rounded-md hover:bg-gray-100">Registrarse</Link>
+                <Link to="/login" className="block px-3 py-2 rounded-md hover:bg-green-800" onClick={() => setIsOpen(false)}>Ingresar</Link>
+                <Link to="/register" className="block px-3 py-2 bg-white text-green-600 font-medium rounded-md hover:bg-gray-100" onClick={() => setIsOpen(false)}>Registrarse</Link>
               </>
             )}
           </div>

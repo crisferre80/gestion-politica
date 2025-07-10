@@ -52,7 +52,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Escuchar cambios de sesión de Supabase (si está disponible)
   useEffect(() => {
-    let sub: any;
+    let sub: { data?: { subscription?: { unsubscribe?: () => void } } } | null = null;
     try {
       import('../lib/supabase').then(({ supabase }) => {
         sub = supabase.auth.onAuthStateChange((_, session) => {
@@ -62,9 +62,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         });
       });
-    } catch {}
+    } catch (error) {
+      // Silenciar errores de importación si Supabase no está disponible
+      console.debug('[UserContext] Supabase no disponible:', error);
+    }
     return () => {
-      if (sub && typeof sub.unsubscribe === 'function') sub.unsubscribe();
+      if (sub?.data?.subscription?.unsubscribe) {
+        sub.data.subscription.unsubscribe();
+      }
     };
   }, []);
 

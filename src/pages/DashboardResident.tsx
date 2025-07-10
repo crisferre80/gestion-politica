@@ -114,9 +114,18 @@ const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
 });
 
 // --- Persistencia de estado del tab activo ---
-const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'historial'>(() => {
+const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'ecocuenta' | 'historial'>(() => {
+  // Verificar si hay un parámetro de tab en la URL
+  const urlParams = new URLSearchParams(location.search);
+  const urlTab = urlParams.get('tab');
+  
+  if (urlTab === 'puntos' || urlTab === 'recicladores' || urlTab === 'perfil' || urlTab === 'ecocuenta' || urlTab === 'historial') {
+    return urlTab;
+  }
+  
+  // Si no hay parámetro de URL, usar el cached
   const cachedTab = sessionStorage.getItem('dashboard_resident_active_tab');
-  if (cachedTab === 'puntos' || cachedTab === 'recicladores' || cachedTab === 'perfil' || cachedTab === 'historial') {
+  if (cachedTab === 'puntos' || cachedTab === 'recicladores' || cachedTab === 'perfil' || cachedTab === 'ecocuenta' || cachedTab === 'historial') {
     return cachedTab;
   }
   return 'puntos';
@@ -782,7 +791,7 @@ useEffect(() => {
   // La función anterior solo reemplazaba rutas internas, pero no manejaba casos cuando no hay URL
 
   // Estado para mostrar el modal de eliminar cuenta
-  const [, setShowDeleteAccount] = useState(false);
+  // (Funcionalidad movida al navbar)
 
   // Definir estados para edición de perfil
 const [editName, setEditName] = useState(user?.name || '');
@@ -1140,61 +1149,6 @@ useEffect(() => {
               </p>
             </div>
           )}
-          {/* Menú desplegable de usuario */}
-          <div className="relative mt-2">
-            <details className="group">
-              <summary className="cursor-pointer text-green-700 hover:underline">Opciones</summary>
-              <ul className="absolute left-0 mt-2 w-48 bg-white border rounded shadow-lg z-10">
-                <li>
-                  <button
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100"
-                    onClick={() => setActiveTab('perfil')}
-                  >
-                    Mi Perfil
-                  </button>
-                </li>
-                {isAssociatedToCollectivePoint && (
-                  <li>
-                    <button
-                      className="w-full text-left px-4 py-2 text-orange-600 hover:bg-orange-50"
-                      onClick={async () => {
-                        if (window.confirm('¿Estás seguro de que quieres desvincularte del punto colectivo? Podrás volver a asociarte usando el código QR de la institución.')) {
-                          try {
-                            const { error } = await supabase
-                              .from('profiles')
-                              .update({ address: null })
-                              .eq('user_id', user?.id);
-                            if (error) {
-                              toast.error('Error al desvincularse: ' + error.message);
-                            } else {
-                              setIsAssociatedToCollectivePoint(false);
-                              setCollectivePointInfo(null);
-                              if (user) {
-                                login({ ...user, address: undefined });
-                              }
-                              toast.success('Te has desvinculado del punto colectivo exitosamente.');
-                            }
-                          } catch {
-                            toast.error('Error inesperado al desvincularse.');
-                          }
-                        }
-                      }}
-                    >
-                      Desvincular del punto colectivo
-                    </button>
-                  </li>
-                )}
-                <li>
-                  <button
-                    className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
-                    onClick={() => setShowDeleteAccount(true)}
-                  >
-                    Eliminar cuenta
-                  </button>
-                </li>
-              </ul>
-            </details>
-          </div>
         </div>
       </div>
       <Link to="/collection-points" className="block px-6 py-4 rounded-md font-bold text-green-700 hover:bg-green-700 hover:text-white">
@@ -1248,6 +1202,16 @@ useEffect(() => {
           onClick={() => setActiveTab('perfil')}
         >
           Mi Perfil
+        </button>
+        <button
+          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
+            ${activeTab === 'ecocuenta'
+              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
+              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
+          `}
+          onClick={() => setActiveTab('ecocuenta')}
+        >
+          EcoCuenta
         </button>
         <button
           className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
@@ -1674,8 +1638,8 @@ useEffect(() => {
           )}
         </div>
       )}
-      {/* Sección Mi EcoCuenta (solo una vez, antes del formulario de perfil) */}
-      {activeTab === 'perfil' && (
+      {/* Sección Mi EcoCuenta (movida al tab ecocuenta) */}
+      {activeTab === 'ecocuenta' && (
         <div className="w-full max-w-2xl bg-gradient-to-br from-green-50 via-emerald-100 to-green-200 shadow-xl rounded-3xl p-8 flex flex-col items-center mb-8 relative overflow-hidden animate-fade-in">
           {/* Animación de confeti al ganar recompensa */}
           {ecoRewardVisible && ecoReward && (
@@ -1722,7 +1686,23 @@ useEffect(() => {
       {/* Sección Mi Perfil (sin duplicar Mi EcoCuenta) */}
       {activeTab === 'perfil' && (
         <div className="w-full max-w-2xl bg-white shadow-md rounded-lg p-6 flex flex-col items-center">
-          <h2 className="text-2xl font-bold mb-4">Mi Perfil</h2>
+          <h2 className="text-2xl font-bold mb-6">Mi Perfil</h2>
+          
+          {/* Avatar actual */}
+          <div className="mb-6 flex flex-col items-center">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-green-300 shadow-lg mb-4">
+              <img
+                src={getAvatarUrl(user?.avatar_url, user?.name)}
+                alt="Foto de perfil actual"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <p className="text-sm text-gray-600 text-center">
+              Foto de perfil actual
+            </p>
+          </div>
+          
           <form
             className="flex flex-col items-center w-full"
             onSubmit={async (e) => {
@@ -1771,7 +1751,12 @@ useEffect(() => {
               }
             }}
           >
-            <PhotoCapture
+            {/* Sección para cambiar foto de perfil */}
+            <div className="mb-6 w-full">
+              <h3 className="text-lg font-semibold text-gray-700 mb-3 text-center">
+                Cambiar foto de perfil
+              </h3>
+              <PhotoCapture
               aspectRatio="square"
               onCapture={async file => {
                 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
@@ -1813,7 +1798,13 @@ useEffect(() => {
               }}
               onCancel={() => {}}
             />
+            </div>
+            
+            {/* Formulario de información personal */}
             <div className="w-full flex flex-col gap-4">
+              <h3 className="text-lg font-semibold text-gray-700 mb-2 text-center border-b border-gray-200 pb-2">
+                Información Personal
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700" htmlFor="name">Nombre</label>

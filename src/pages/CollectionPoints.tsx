@@ -5,6 +5,7 @@ import { useUser } from '../context/UserContext';
 import Map from '../components/Map';
 import { supabase, type CollectionPoint } from '../lib/supabase';
 import DatePicker from 'react-datepicker';
+import es from '../utils/datepickerEs';
 import "react-datepicker/dist/react-datepicker.css";
 
 function PuntosRecoleccion() {
@@ -280,7 +281,27 @@ function PuntosRecoleccion() {
                   </div>
                   <div className="mt-4 flex items-center text-sm text-gray-500">
                     <Calendar className="h-4 w-4 mr-1" />
-                    <span>{point.schedule}</span>
+                    <span>{(() => {
+                      // Traducción manual de días en inglés a español si es string tipo "Wednesday, 07:30 - 17:00"
+                      if (typeof point.schedule === 'string') {
+                        const dias = [
+                          { en: 'Mondays', es: 'Lunes' },
+                          { en: 'Tuesdays', es: 'Martes' },
+                          { en: 'Wednesdays', es: 'Miércoles' },
+                          { en: 'Thursdays', es: 'Jueves' },
+                          { en: 'Fridays', es: 'Viernes' },
+                          { en: 'Saturdays', es: 'Sábado' },
+                          { en: 'Sundays', es: 'Domingo' },
+                        ];
+                        let texto = point.schedule;
+                        // Reemplazo solo si es palabra completa (evita doble ss)
+                        dias.forEach(d => {
+                          texto = texto.replace(new RegExp(`\\b${d.en}\\b`, 'g'), d.es);
+                        });
+                        return texto;
+                      }
+                      return point.schedule;
+                    })()}</span>
                   </div>
                   {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
                     <div className="mt-2 text-sm text-gray-600">
@@ -323,10 +344,13 @@ function PuntosRecoleccion() {
                   showTimeSelect
                   timeFormat="HH:mm"
                   timeIntervals={30}
-                  dateFormat="MMMM d, yyyy h:mm aa"
+                  dateFormat="d 'de' MMMM 'de' yyyy HH:mm"
                   minDate={new Date()}
                   className="w-full border border-gray-300 rounded-md shadow-sm p-2"
                   placeholderText="Selecciona fecha y hora"
+                  locale={es}
+                  timeCaption="Hora"
+                  dayClassName={() => 'capitalize'}
                 />
               </div>
               <div className="mb-4">

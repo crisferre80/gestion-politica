@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MapPin, Calendar, Plus, Star, Mail, Phone, X } from 'lucide-react';
+import { FaMapMarkerAlt, FaUserCircle, FaRecycle, FaWallet, FaHistory, FaPlus, FaMapPin, FaCalendarAlt, FaStar, FaEnvelope, FaPhone, FaTimes } from 'react-icons/fa';
 import { supabase } from '../lib/supabase';
 import { prepareImageForUpload, transformImage } from '../services/ImageTransformService';
 import Map from '../components/Map';
@@ -1166,64 +1166,72 @@ useEffect(() => {
         <hr className="border-t-2 border-green-100" />
       </div>
 
-      <div className="flex space-x-1 mb-10">
-        <button
-          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
-            ${activeTab === 'puntos'
-              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
-              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
-          `}
-          onClick={() => setActiveTab('puntos')}
-        >
-          Mis Puntos
-        </button>
-        <button
-          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
-            ${activeTab === 'recicladores'
-              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
-              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
-          `}
-          onClick={() => setActiveTab('recicladores')}
-        >
-          Recicladores
-          {/* Badge rojo si hay mensajes no leídos */}
-          {Object.values(unreadMessagesByRecycler).some(count => count > 0) && (
-            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
-              ●
-            </span>
-          )}
-        </button>
-        <button
-          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
-            ${activeTab === 'perfil'
-              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
-              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
-          `}
-          onClick={() => setActiveTab('perfil')}
-        >
-          Mi Perfil
-        </button>
-        <button
-          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
-            ${activeTab === 'ecocuenta'
-              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
-              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
-          `}
-          onClick={() => setActiveTab('ecocuenta')}
-        >
-          EcoCuenta
-        </button>
-        <button
-          className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 relative
-            ${activeTab === 'historial'
-              ? 'bg-green-600 text-white shadow-lg scale-105 active-tab-effect'
-              : 'bg-gray-200 text-gray-700 hover:bg-green-100'}
-          `}
-          onClick={() => setActiveTab('historial')}
-        >
-          Historial
-        </button>
-      </div>
+      <div
+        className="flex flex-wrap md:flex-nowrap gap-2 md:gap-1 mb-10 overflow-x-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent px-3 md:px-8"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+          <button
+            className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
+              ${activeTab === 'puntos'
+                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+            `}
+            onClick={() => setActiveTab('puntos')}
+          >
+            <FaMapMarkerAlt className="w-5 h-5" />
+            Mis Puntos
+          </button>
+          <button
+            className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
+              ${activeTab === 'recicladores'
+                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+            `}
+            onClick={() => setActiveTab('recicladores')}
+          >
+            <FaRecycle className="w-5 h-5" />
+            Recicladores
+            {/* Badge rojo si hay mensajes no leídos */}
+            {Object.values(unreadMessagesByRecycler).some(count => count > 0) && (
+              <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
+                ●
+              </span>
+            )}
+          </button>
+          <button
+            className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
+              ${activeTab === 'perfil'
+                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+            `}
+            onClick={() => setActiveTab('perfil')}
+          >
+            <FaUserCircle className="w-5 h-5" />
+            Mi Perfil
+          </button>
+          <button
+            className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
+              ${activeTab === 'ecocuenta'
+                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+            `}
+            onClick={() => setActiveTab('ecocuenta')}
+          >
+            <FaWallet className="w-5 h-5" />
+            EcoCuenta
+          </button>
+          <button
+            className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
+              ${activeTab === 'historial'
+                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+            `}
+            onClick={() => setActiveTab('historial')}
+          >
+            <FaHistory className="w-5 h-5" />
+            Historial
+          </button>
+        </div>
       {activeTab === 'puntos' && (
         <div className="w-full max-w-4xl">
           <div className="mb-4 flex flex-wrap gap-2 justify-center md:justify-start">
@@ -1296,7 +1304,7 @@ useEffect(() => {
               className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700 focus:ring-4 focus:ring-green-400 focus:outline-none shadow-xl transition-all duration-300 w-fit mb-4 group animate-bounce animate-delay-500 animate-once animate-ease-in-out animate-fill-both animate-fast animate-important border-2 border-green-400 scale-105 hover:scale-110 ring-4 ring-green-300/40 hover:ring-green-500/60"
               style={{ minWidth: 'unset', maxWidth: '220px', boxShadow: '0 0 0 4px #bbf7d0, 0 8px 24px 0 rgba(34,197,94,0.15)' }}
             >
-              <Plus className="h-4 w-4 mr-1 group-hover:rotate-90 transition-transform duration-300" />
+              <FaPlus className="h-4 w-4 mr-1 group-hover:rotate-90 transition-transform duration-300" />
               <span className="font-bold tracking-wide text-base animate-pulse">Agregar Punto</span>
             </Link>
             {(() => {
@@ -1348,8 +1356,35 @@ useEffect(() => {
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-300">Demorado</span>
                             )}
                           </div>
-                          <p className="text-gray-500"><MapPin className="inline-block w-4 h-4 mr-1" />{point.district}</p>
-                          <p className="text-gray-500"><Calendar className="inline-block w-4 h-4 mr-1" />{point.schedule}</p>
+                          <p className="text-gray-500"><FaMapPin className="inline-block w-4 h-4 mr-1" />{point.district}</p>
+                          <p className="text-gray-500"><FaCalendarAlt className="inline-block w-4 h-4 mr-1" />
+                            {(() => {
+                              if (typeof point.schedule === 'string') {
+                                const dias = [
+                                  { en: 'Monday', es: 'Lunes' },
+                                  { en: 'Tuesday', es: 'Martes' },
+                                  { en: 'Wednesday', es: 'Miércoles' },
+                                  { en: 'Thursday', es: 'Jueves' },
+                                  { en: 'Friday', es: 'Viernes' },
+                                  { en: 'Saturday', es: 'Sábado' },
+                                  { en: 'Sunday', es: 'Domingo' },
+                                  { en: 'Mondays', es: 'Lunes' },
+                                  { en: 'Tuesdays', es: 'Martes' },
+                                  { en: 'Wednesdays', es: 'Miércoles' },
+                                  { en: 'Thursdays', es: 'Jueves' },
+                                  { en: 'Fridays', es: 'Viernes' },
+                                  { en: 'Saturdays', es: 'Sábado' },
+                                  { en: 'Sundays', es: 'Domingo' },
+                                ];
+                                let texto = point.schedule;
+                                dias.forEach(d => {
+                                  texto = texto.replace(new RegExp(`\\b${d.en}\\b`, 'g'), d.es);
+                                });
+                                return texto;
+                              }
+                              return point.schedule;
+                            })()}
+                          </p>
                           {/* Mostrar notas adicionales si existen */}
                           {point.notas && (<p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>)}
                           {point.additional_info && (<p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>)}
@@ -1367,7 +1402,7 @@ useEffect(() => {
                                 </span>
                                 {claim.recycler.phone && (
                                   <span className="text-gray-600 text-sm flex items-center gap-1">
-                                    <Phone className="w-4 h-4 text-yellow-500" />{claim.recycler.phone}
+                                    <FaPhone className="w-4 h-4 text-yellow-500" />{claim.recycler.phone}
                                   </span>
                                 )}
                                 {claim.recycler.dni && (
@@ -1376,7 +1411,7 @@ useEffect(() => {
                                   </span>
                                 )}
                                 <span className="text-yellow-700 text-sm flex items-center gap-1">
-                                  <Star className="w-4 h-4 text-yellow-400" />
+                                  <FaStar className="w-4 h-4 text-yellow-400" />
                                   {typeof claim.recycler.rating_average === 'number' ? claim.recycler.rating_average.toFixed(1) : 'N/A'}
                                 </span>
                               </div>
@@ -1452,7 +1487,7 @@ useEffect(() => {
                                         }}
                                         type="button"
                                       >
-                                        <Star className="w-4 h-4" />
+                                        <FaStar className="w-4 h-4" />
                                         Calificar reciclador
                                       </button>
                                       <button
@@ -1486,7 +1521,7 @@ useEffect(() => {
                                 onClick={() => handleDeletePoint(point)}
                                 type="button"
                               >
-                                <X className="w-4 h-4" />
+                                <FaTimes className="w-4 h-4" />
                                 Eliminar
                               </button>
                             )}
@@ -1590,7 +1625,7 @@ useEffect(() => {
                     })}
                   >
                     <span className="flex items-center">
-                      <Star className="h-5 w-5 text-yellow-400 mr-1" />
+                      <FaStar className="h-5 w-5 text-yellow-400 mr-1" />
                       <span className="font-semibold text-gray-700 text-base">
                         {typeof rec.rating_average === 'number' ? rec.rating_average.toFixed(1) : 'N/A'}
                       </span>
@@ -1599,10 +1634,10 @@ useEffect(() => {
                   </button>
                   {/* Mostrar email y teléfono si existen */}
                   {rec.profiles?.email && (
-                    <p className="text-gray-500 text-sm mb-1 flex items-center"><Mail className="h-4 w-4 mr-1" />{rec.profiles.email}</p>
+                    <p className="text-gray-500 text-sm mb-1 flex items-center"><FaEnvelope className="h-4 w-4 mr-1" />{rec.profiles.email}</p>
                   )}
                   {rec.profiles?.phone && (
-                    <p className="text-gray-500 text-sm mb-1 flex items-center"><Phone className="h-4 w-4 mr-1" />{rec.profiles.phone}</p>
+                    <p className="text-gray-500 text-sm mb-1 flex items-center"><FaPhone className="h-4 w-4 mr-1" />{rec.profiles.phone}</p>
                   )}
                   {rec.profiles?.dni && (
                     <p className="text-gray-500 text-sm mb-1 flex items-center"><span className="font-semibold mr-2">DNI:</span>{rec.profiles.dni}</p>
@@ -2065,7 +2100,7 @@ useEffect(() => {
                 onClick={() => setShowHeaderImageModal(false)}
                 className="text-gray-400 hover:text-gray-500"
               >
-                <X className="h-6 w-6" />
+                <FaTimes className="h-6 w-6" />
               </button>
             </div>
             

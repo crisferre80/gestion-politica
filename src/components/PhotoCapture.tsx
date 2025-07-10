@@ -20,6 +20,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
   enableCropping = true,
   facingMode = 'user'
 }) => {
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const webcamRef = useRef<Webcam>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -569,19 +570,26 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             <X className="h-6 w-6" />
           </button>
         </div>
-        
-        <div className="relative">
-          <Webcam
-            audio={false}
-            ref={webcamRef}
-            screenshotFormat="image/jpeg"
-            className="w-full rounded-lg"
-            videoConstraints={{
-              facingMode: { ideal: facingMode }
-            }}
-          />
-        </div>
-        
+        {cameraError ? (
+          <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-center">
+            {cameraError}
+          </div>
+        ) : (
+          <div className="relative">
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              className="w-full rounded-lg"
+              videoConstraints={{
+                facingMode: { ideal: facingMode }
+              }}
+              onUserMediaError={() => {
+                setCameraError('No se pudo acceder a la cámara. Verifica los permisos y que estés usando HTTPS.');
+              }}
+            />
+          </div>
+        )}
         <div className="mt-4 flex justify-end space-x-2">
           <button
             type="button"
@@ -594,6 +602,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
             type="button"
             onClick={capture}
             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            disabled={!!cameraError}
           >
             Capturar
           </button>

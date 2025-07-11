@@ -42,6 +42,7 @@ type CollectionPoint = {
   lat?: number;
   lng?: number;
   materials?: string[]; // <-- Añadido explícitamente
+  photo_url?: string; // <-- URL de la imagen del material
   // Agrega aquí otros campos si existen en tu tabla
 };
 
@@ -206,8 +207,21 @@ useEffect(() => {
     // Fetch inicial
     fetchOnlineRecyclers();
 
-    // Suscripción realtime: cualquier cambio relevante en profiles dispara fetch
-    const channel = supabase.channel('recyclers-profiles')
+    // Estado para control de reconexión
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 3;
+    let reconnectTimeout: NodeJS.Timeout;
+
+    // Función para crear la suscripción con manejo mejorado de errores
+    const createRecyclersSubscription = () => {
+      const channelName = `recyclers-profiles-${Date.now()}`;
+      
+      const channel = supabase.channel(channelName, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: 'recyclers' }
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -221,13 +235,44 @@ useEffect(() => {
           fetchOnlineRecyclers();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[REALTIME] Estado suscripción recicladores:', status);
+          if (err) console.error('[REALTIME] Error suscripción recicladores:', err);
+        }
+
+        if (status === 'SUBSCRIBED') {
+          reconnectAttempts = 0; // Reset attempts on successful connection
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[REALTIME] Conexión recicladores perdida. Estado:', status);
+          
+          // Intentar reconectar si no hemos excedido el límite
+          if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            const delay = Math.min(2000 * reconnectAttempts, 10000); // Backoff más corto para recicladores
+            
+            reconnectTimeout = setTimeout(() => {
+              supabase.removeChannel(channel);
+              createRecyclersSubscription();
+            }, delay);
+          }
+        }
+      });
+
+      return channel;
+    };
+
+    // Crear la suscripción inicial
+    const channel = createRecyclersSubscription();
 
     // Además, polling cada 5 segundos como fallback para máxima inmediatez (reducido de 2s para mejor rendimiento)
     const interval = setInterval(fetchOnlineRecyclers, 5000);
 
     return () => {
       isMounted = false;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
@@ -362,8 +407,21 @@ useEffect(() => {
       fetchDetailedPoints();
     }, 30000);
 
-    // Crear una sola suscripción que maneje ambas tablas
-    const channel = supabase.channel(`resident-dashboard-${user.id}`)
+    // Estado para control de reconexión
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let reconnectTimeout: NodeJS.Timeout;
+
+    // Función para crear la suscripción con configuración mejorada
+    const createSubscription = () => {
+      const channelName = `resident-dashboard-${user.id}-${Date.now()}`;
+      
+      const channel = supabase.channel(channelName, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: user.id }
+        }
+      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -493,18 +551,50 @@ useEffect(() => {
           }
         }
       })
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (process.env.NODE_ENV === 'development') {
           console.log('[REALTIME] Estado de suscripción:', status);
-          if (status === 'SUBSCRIBED') {
-            console.log('[REALTIME] ¡Suscripción activa para usuario:', user.id);
+          if (err) console.error('[REALTIME] Error en suscripción:', err);
+        }
+
+        if (status === 'SUBSCRIBED') {
+          console.log('[REALTIME] ¡Suscripción activa para usuario:', user.id);
+          reconnectAttempts = 0; // Reset attempts on successful connection
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.warn('[REALTIME] Conexión perdida. Estado:', status);
+          
+          // Intentar reconectar si no hemos excedido el límite
+          if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff, max 30s
+            
+            console.log(`[REALTIME] Reintentando conexión en ${delay}ms (intento ${reconnectAttempts}/${maxReconnectAttempts})`);
+            
+            reconnectTimeout = setTimeout(() => {
+              if (isDebugMode) {
+                console.log('[REALTIME] Reintentando suscripción...');
+              }
+              supabase.removeChannel(channel);
+              createSubscription();
+            }, delay);
+          } else {
+            console.error('[REALTIME] Máximo número de intentos de reconexión alcanzado');
           }
         }
       });
 
+      return channel;
+    };
+
+    // Crear la suscripción inicial
+    const channel = createSubscription();
+
     return () => {
       if (isDebugMode) {
         console.log('[REALTIME] Limpiando suscripción...');
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
       }
       supabase.removeChannel(channel);
       clearInterval(autoUpdateInterval);
@@ -732,17 +822,57 @@ useEffect(() => {
     if (isMounted) setUnreadMessagesByRecycler(counts);
   };
   fetchUnread();
-  // Suscripción realtime a nuevos mensajes
-  const channel = supabase.channel('resident-messages-badge')
+  // Suscripción realtime a nuevos mensajes con manejo mejorado de errores
+  let reconnectAttempts = 0;
+  const maxReconnectAttempts = 3;
+  let reconnectTimeout: NodeJS.Timeout;
+
+  const createMessagesSubscription = () => {
+    const channelName = `resident-messages-badge-${user.id}-${Date.now()}`;
+    
+    const channel = supabase.channel(channelName, {
+      config: {
+        broadcast: { self: false },
+        presence: { key: `messages-${user.id}` }
+      }
+    })
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'messages',
       filter: `receiver_id=eq.${user.id}`,
     }, fetchUnread)
-    .subscribe();
+    .subscribe((status, err) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[REALTIME] Estado suscripción mensajes:', status);
+        if (err) console.error('[REALTIME] Error suscripción mensajes:', err);
+      }
+
+      if (status === 'SUBSCRIBED') {
+        reconnectAttempts = 0;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts++;
+          const delay = 1000 * reconnectAttempts;
+          
+          reconnectTimeout = setTimeout(() => {
+            supabase.removeChannel(channel);
+            createMessagesSubscription();
+          }, delay);
+        }
+      }
+    });
+
+    return channel;
+  };
+
+  const channel = createMessagesSubscription();
+
   return () => {
     isMounted = false;
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+    }
     supabase.removeChannel(channel);
   };
 }, [user, recyclers]);
@@ -1429,15 +1559,56 @@ useEffect(() => {
                             </div>
                           )}
                         </div>
-                        {/* Imagen estática en vez de GIF animado */}
+                        {/* Imagen del material o imagen por defecto */}
                         <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
-                          <div className={`transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}> 
+                          <div className={`relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}> 
                             <img
-                              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"
-                              alt="Punto de Recolección"
-                              className={`w-40 h-28 object-contain rounded-lg shadow-md border border-green-200 ${isInactive ? 'grayscale' : ''}`}
+                              src={point.photo_url || "https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"}
+                              alt={point.photo_url ? "Foto del material" : "Punto de Recolección"}
+                              className={`w-40 h-28 object-cover rounded-lg shadow-md border border-green-200 ${isInactive ? 'grayscale' : ''}`}
                               style={{ background: '#f0fdf4' }}
+                              onError={(e) => {
+                                // Si la imagen del material falla, usar la imagen por defecto
+                                const target = e.target as HTMLImageElement;
+                                target.src = "https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png";
+                                target.className = target.className.replace('object-cover', 'object-contain');
+                              }}
                             />
+                            {/* Lower third con etiquetas de materiales */}
+                            {point.materials && point.materials.length > 0 && (
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-lg p-2">
+                                <div className="flex flex-wrap gap-1 justify-center">
+                                  {point.materials.slice(0, 2).map((material, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-block px-2 py-0.2 bg-green-500/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm border border-white/40"
+                                      style={{ fontSize: '9px' }}
+                                    >
+                                      {material}
+                                    </span>
+                                  ))}
+                                  {point.materials.length > 2 && (
+                                    <span
+                                      className="inline-block px-2 py-1 bg-blue-600/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm border border-white/20"
+                                      style={{ fontSize: '10px' }}
+                                      title={`+${point.materials.length - 2} materiales más: ${point.materials.slice(2).join(', ')}`}
+                                    >
+                                      +{point.materials.length - 2}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {/* Indicador de foto del material */}
+                            {point.photo_url && (
+                              <div className="absolute top-2 right-2">
+                                <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {/* Contenedor de botones de acción - Responsive y organizado */}

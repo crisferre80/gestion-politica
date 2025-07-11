@@ -162,6 +162,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           materials: string[] | null
+          photo_url: string | null
           pickup_time: string | null
           recycler_id: string | null
           schedule: string | null
@@ -181,6 +182,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           materials?: string[] | null
+          photo_url?: string | null
           pickup_time?: string | null
           recycler_id?: string | null
           schedule?: string | null
@@ -200,6 +202,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           materials?: string[] | null
+          photo_url?: string | null
           pickup_time?: string | null
           recycler_id?: string | null
           schedule?: string | null

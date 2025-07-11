@@ -316,13 +316,13 @@ const AddCollectionPoint: React.FC = () => {
       // Guardar la foto en la base de datos si existe
       let photoUrl: string | null = null;
       if (materialPhotoFile) {
-        // Subir a Supabase Storage (requiere bucket 'collection_photos')
+        // Subir a Supabase Storage (bucket 'points' para fotos de puntos de recolección)
         const fileName = `photo_${user.id}_${Date.now()}.jpg`;
-        const { error: uploadError } = await supabase.storage.from('collection_photos').upload(fileName, materialPhotoFile, { upsert: true });
+        const { error: uploadError } = await supabase.storage.from('points').upload(fileName, materialPhotoFile, { upsert: true });
         if (uploadError) {
           setPhotoError('No se pudo subir la foto.');
         } else {
-          const { data: publicUrlData } = supabase.storage.from('collection_photos').getPublicUrl(fileName);
+          const { data: publicUrlData } = supabase.storage.from('points').getPublicUrl(fileName);
           photoUrl = publicUrlData?.publicUrl || null;
         }
       }

@@ -43,6 +43,12 @@ const DashboardRecycler: React.FC = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
 
+  // Estados para filtro de distancia
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [maxDistance, setMaxDistance] = useState<number | null>(null); // en kilómetros
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [gettingLocation, setGettingLocation] = useState(false);
+
   // --- Chat state for ChatList modal ---
   interface ChatPreview {
     name: unknown;
@@ -138,6 +144,63 @@ const DashboardRecycler: React.FC = () => {
     email?: string;
     phone?: string;
     avatar_url?: string;
+  };
+
+  // Función para calcular distancia usando fórmula de Haversine
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // Radio de la Tierra en kilómetros
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distancia en kilómetros
+  };
+
+  // Función para obtener ubicación del usuario
+  const getUserLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('La geolocalización no está soportada en este navegador');
+      return;
+    }
+
+    setGettingLocation(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
+        setGettingLocation(false);
+        setLocationError(null);
+      },
+      (error) => {
+        setGettingLocation(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError('Permiso de ubicación denegado');
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError('Información de ubicación no disponible');
+            break;
+          case error.TIMEOUT:
+            setLocationError('Tiempo de espera agotado al obtener ubicación');
+            break;
+          default:
+            setLocationError('Error desconocido al obtener ubicación');
+            break;
+        }
+      },
+      { 
+        enableHighAccuracy: true, 
+        timeout: 10000, 
+        maximumAge: 300000 // 5 minutos
+      }
+    );
   };
   
     // Cargar puntos reclamados y disponibles
@@ -1466,10 +1529,64 @@ const DashboardRecycler: React.FC = () => {
 
   // Exclude points that are already claimed by this recycler (by id)
   const claimedIds = new Set(claimedPoints.map(p => p.id));
-  const trulyAvailablePoints = availablePoints.filter(p => !claimedIds.has(p.id));
+  let trulyAvailablePoints = availablePoints.filter(p => !claimedIds.has(p.id));
+  
+  // Aplicar filtro de distancia si está habilitado
+  if (userLocation && maxDistance) {
+    trulyAvailablePoints = trulyAvailablePoints.filter(point => {
+      // Verificar que el punto tenga coordenadas válidas
+      if (typeof point.lat !== 'number' || typeof point.lng !== 'number') {
+        return true; // Incluir puntos sin coordenadas para evitar excluir puntos válidos
+      }
+      
+      const distance = calculateDistance(
+        userLocation.lat, 
+        userLocation.lng, 
+        point.lat, 
+        point.lng
+      );
+      
+      // Agregar la distancia calculada al punto para mostrarla en la UI
+      (point as CollectionPoint & { calculatedDistance?: number }).calculatedDistance = distance;
+      
+      return distance <= maxDistance;
+    });
+  } else {
+    // Si no hay filtro de distancia, calcular distancias de todos modos para mostrarlas si hay ubicación
+    if (userLocation) {
+      trulyAvailablePoints = trulyAvailablePoints.map(point => {
+        if (typeof point.lat === 'number' && typeof point.lng === 'number') {
+          const distance = calculateDistance(
+            userLocation.lat, 
+            userLocation.lng, 
+            point.lat, 
+            point.lng
+          );
+          (point as CollectionPoint & { calculatedDistance?: number }).calculatedDistance = distance;
+        }
+        return point;
+      });
+    }
+  }
+  
+  // Ordenar por distancia si hay ubicación del usuario
+  if (userLocation) {
+    trulyAvailablePoints.sort((a, b) => {
+      const distanceA = (a as CollectionPoint & { calculatedDistance?: number }).calculatedDistance;
+      const distanceB = (b as CollectionPoint & { calculatedDistance?: number }).calculatedDistance;
+      
+      // Los puntos sin coordenadas van al final
+      if (distanceA === undefined && distanceB === undefined) return 0;
+      if (distanceA === undefined) return 1;
+      if (distanceB === undefined) return -1;
+      
+      return distanceA - distanceB;
+    });
+  }
+  
   console.log('DEBUG: claimedPoints:', claimedPoints);
   console.log('DEBUG: availablePoints:', availablePoints);
-  console.log('DEBUG: trulyAvailablePoints:', trulyAvailablePoints);
+  console.log('DEBUG: trulyAvailablePoints (after distance filter):', trulyAvailablePoints);
 
   // Handler para cambio de vista que limpia el residente enfocado
   const handleSetView = (newView: string) => {
@@ -1797,11 +1914,123 @@ const DashboardRecycler: React.FC = () => {
               </button>
             </div>
 
+            {/* Filtro de distancia para puntos disponibles */}
+            {view === 'disponibles' && (
+              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-blue-800 mb-3">Filtrar por Distancia</h3>
+                
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Botón para obtener ubicación */}
+                  <button
+                    onClick={getUserLocation}
+                    disabled={gettingLocation}
+                    className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 text-sm ${
+                      userLocation 
+                        ? 'bg-green-100 text-green-800 border border-green-300' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    } ${gettingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {gettingLocation ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Obteniendo ubicación...
+                      </span>
+                    ) : userLocation ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                        Ubicación obtenida
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                        </svg>
+                        Obtener mi ubicación
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Selector de distancia máxima */}
+                  {userLocation && (
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="maxDistance" className="text-sm font-medium text-gray-700">
+                        Distancia máxima:
+                      </label>
+                      <select
+                        id="maxDistance"
+                        value={maxDistance || ''}
+                        onChange={(e) => setMaxDistance(e.target.value ? Number(e.target.value) : null)}
+                        className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Sin límite</option>
+                        <option value="1">1 km</option>
+                        <option value="2">2 km</option>
+                        <option value="5">5 km</option>
+                        <option value="10">10 km</option>
+                        <option value="20">20 km</option>
+                        <option value="50">50 km</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Botón para limpiar filtros */}
+                  {(userLocation || maxDistance) && (
+                    <button
+                      onClick={() => {
+                        setUserLocation(null);
+                        setMaxDistance(null);
+                        setLocationError(null);
+                      }}
+                      className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                    >
+                      Limpiar filtros
+                    </button>
+                  )}
+                </div>
+
+                {/* Mensaje de error de ubicación */}
+                {locationError && (
+                  <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-2">
+                    {locationError}
+                  </div>
+                )}
+
+                {/* Información de ubicación */}
+                {userLocation && (
+                  <div className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-2">
+                    <span className="font-medium">Ubicación:</span> {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+                    {maxDistance && (
+                      <span className="ml-3">
+                        <span className="font-medium">Filtro:</span> Puntos a máximo {maxDistance} km de distancia
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Secciones de Mis Puntos */}
             <div>
               {view === 'disponibles' && (
                 <div>
-                  <h2 className="text-xl font-semibold text-green-700 mb-4">Puntos Disponibles para Reclamar</h2>
+                  <h2 className="text-xl font-semibold text-green-700 mb-4">
+                    Puntos Disponibles para Reclamar
+                    {userLocation && maxDistance && (
+                      <span className="ml-3 text-sm font-normal text-blue-600">
+                        (filtrados por distancia: máximo {maxDistance} km)
+                      </span>
+                    )}
+                    {userLocation && !maxDistance && (
+                      <span className="ml-3 text-sm font-normal text-blue-600">
+                        (ordenados por distancia)
+                      </span>
+                    )}
+                  </h2>
                   <div className="grid gap-6 md:grid-cols-2">
                     {trulyAvailablePoints.length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">
@@ -1901,6 +2130,17 @@ const DashboardRecycler: React.FC = () => {
                                   })()
                                 : ''}</span>
                             </div>
+                            {/* Mostrar distancia si está disponible */}
+                            {userLocation && (point as CollectionPoint & { calculatedDistance?: number }).calculatedDistance !== undefined && (
+                              <div className="mt-2 flex items-center text-sm text-blue-600">
+                                <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                </svg>
+                                <span className="font-medium">
+                                  Distancia: {((point as CollectionPoint & { calculatedDistance?: number }).calculatedDistance)?.toFixed(1)} km de tu ubicación
+                                </span>
+                              </div>
+                            )}
                             {/* Información adicional del residente */}
                             {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
                               <div className="mt-2 text-sm text-gray-600">

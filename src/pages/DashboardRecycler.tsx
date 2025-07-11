@@ -1833,14 +1833,35 @@ const DashboardRecycler: React.FC = () => {
                             </div>
                             <div className="flex flex-row items-start mt-4">
                               <div className="mr-6 flex-shrink-0">
-                                <img
-                                  src={point.type === 'colective_point'
-                                    ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                                    : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png'}
-                                  alt={point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje'}
-                                  className="w-36 h-36 object-contain animate-bounce-slow"
-                                  style={{ filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
-                                />
+                                <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                                  <img
+                                    src={point.photo_url || (point.type === 'colective_point'
+                                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                                      : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
+                                    alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
+                                    className="w-32 h-38 object-cover rounded-lg shadow-md border border-green-200"
+                                    style={{ background: '#f0fdf4', filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
+                                    onError={(e) => {
+                                      // Si la imagen del material falla, usar la imagen por defecto
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = point.type === 'colective_point'
+                                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png';
+                                      target.className = target.className.replace('object-cover', 'object-contain');
+                                    }}
+                                  />
+                                 
+                                  {/* Indicador de foto del material */}
+                                  {point.photo_url && (
+                                    <div className="absolute top-2 right-2">
+                                      <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex-1">
                                 <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
@@ -1864,13 +1885,13 @@ const DashboardRecycler: React.FC = () => {
                                     }
                                     // Traducción manual para horarios tipo "Thursday, 07:30 - 17:00"
                                     const dias = [
-                                      { en: 'Monday', es: 'Lunes' },
-                                      { en: 'Tuesday', es: 'Martes' },
-                                      { en: 'Wednesday', es: 'Miércoles' },
-                                      { en: 'Thursday', es: 'Jueves' },
-                                      { en: 'Friday', es: 'Viernes' },
-                                      { en: 'Saturday', es: 'Sábado' },
-                                      { en: 'Sunday', es: 'Domingo' },
+                                      { en: 'Mondays', es: 'Lunes' },
+                                      { en: 'Tuesdays', es: 'Martes' },
+                                      { en: 'Wednesdays', es: 'Miércoles' },
+                                      { en: 'Thursdays', es: 'Jueves' },
+                                      { en: 'Fridays', es: 'Viernes' },
+                                      { en: 'Saturdays', es: 'Sábado' },
+                                      { en: 'Sundays', es: 'Domingo' },
                                     ];
                                     let texto = point.schedule;
                                     dias.forEach(d => {
@@ -1970,13 +1991,35 @@ const DashboardRecycler: React.FC = () => {
                                   </div>
                                 </div>
                                 <div className="ml-4 flex-shrink-0">
-                                  <img
-                                    src={point.type === 'colective_point'
-                                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
-                                      : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png'}
-                                    alt={point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje'}
-                                    className="w-28 h-28 object-contain bg-white shadow-none"
-                                  />
+                                  <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                                    <img
+                                      src={point.photo_url || (point.type === 'colective_point'
+                                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
+                                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
+                                      alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
+                                      className="w-28 h-28 object-cover rounded-lg shadow-md border border-green-200"
+                                      style={{ background: '#f0fdf4' }}
+                                      onError={(e) => {
+                                        // Si la imagen del material falla, usar la imagen por defecto
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = point.type === 'colective_point'
+                                          ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
+                                          : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png';
+                                        target.className = target.className.replace('object-cover', 'object-contain');
+                                      }}
+                                    />
+                                    
+                                    {/* Indicador de foto del material */}
+                                    {point.photo_url && (
+                                      <div className="absolute top-2 right-2">
+                                        <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
+                                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                                          </svg>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <div className="mt-4">
@@ -2244,14 +2287,35 @@ const DashboardRecycler: React.FC = () => {
                             </div>
                             <div className="flex flex-row items-start mt-4">
                               <div className="mr-6 flex-shrink-0">
-                                <img
-                                  src={point.type === 'colective_point'
-                                    ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
-                                    : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png'}
-                                  alt={point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje'}
-                                  className="w-36 h-36 object-contain animate-bounce-slow"
-                                  style={{ filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
-                                />
+                                <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                                  <img
+                                    src={point.photo_url || (point.type === 'colective_point'
+                                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
+                                      : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
+                                    alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
+                                    className="w-36 h-36 object-cover rounded-lg shadow-md border border-green-200"
+                                    style={{ background: '#f0fdf4', filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
+                                    onError={(e) => {
+                                      // Si la imagen del material falla, usar la imagen por defecto
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = point.type === 'colective_point'
+                                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
+                                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png';
+                                      target.className = target.className.replace('object-cover', 'object-contain');
+                                    }}
+                                  />
+                                  
+                                  {/* Indicador de foto del material */}
+                                  {point.photo_url && (
+                                    <div className="absolute top-2 right-2">
+                                      <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex-1">
                                 <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>

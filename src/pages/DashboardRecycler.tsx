@@ -564,6 +564,62 @@ const DashboardRecycler: React.FC = () => {
   const [isProcessingClaim, setIsProcessingClaim] = useState(false);
   const fetchDataRef = useRef(false);
 
+  // Función que intenta cancelar automáticamente un claim cuando vence el tiempo
+  const handleAutoExpireClaim = async (point: CollectionPoint) => {
+    if (!point || !point.claim_id) return;
+    // Evitar interferir con procesos de usuario en curso
+    if (isProcessingClaim) {
+      console.log('Auto-expire: hay una operación en curso, posponiendo cancelación automática');
+      return;
+    }
+
+    setIsProcessingClaim(true);
+    setLoading(true);
+    try {
+      // Obtener estado actual del claim desde la BD
+      const { data: claimRecord, error: fetchClaimError } = await supabase
+        .from('collection_claims')
+        .select('id, status, recycler_id, cancelled_at')
+        .eq('id', point.claim_id)
+        .maybeSingle();
+
+      if (fetchClaimError) {
+        console.error('Auto-expire: error al obtener claim:', fetchClaimError);
+        return;
+      }
+
+      if (!claimRecord) {
+        console.log('Auto-expire: claim no encontrado, refrescando datos');
+        await fetchData();
+        return;
+      }
+
+      // Si el claim sigue en 'claimed', proceder a cancelarlo
+      if (claimRecord.status === 'claimed') {
+        try {
+          await cancelClaim(claimRecord.id, point.id, 'Tiempo de reclamación vencido (cancelación automática)');
+          toast('Reclamación vencida: el punto ha sido cancelado automáticamente.', { icon: '⏰' });
+          console.log('Auto-expire: claim cancelado automáticamente', claimRecord.id);
+        } catch (cancelErr) {
+          // Manejo tolerante: mostrar aviso y continuar
+          console.warn('Auto-expire: error al cancelar claim automáticamente:', cancelErr);
+        }
+      } else {
+        console.log('Auto-expire: claim ya no está en estado claimed, estado actual:', claimRecord.status);
+      }
+
+      // Refrescar datos para actualizar la UI
+      try {
+        await fetchData();
+      } catch (refreshErr) {
+        console.warn('Auto-expire: error al refrescar datos tras cancelación automática:', refreshErr);
+      }
+    } finally {
+      setLoading(false);
+      setIsProcessingClaim(false);
+    }
+  };
+
   // Confirmar reclamo con hora de recolección
   const handleConfirmClaim = async () => {
     // Prevenir múltiples operaciones simultáneas
@@ -2272,11 +2328,20 @@ const DashboardRecycler: React.FC = () => {
                                     <CountdownTimer 
                                       targetDate={pickup_time} 
                                       onComplete={() => {
-                                        try {
-                                          fetchData();
-                                        } catch (e) {
-                                          console.warn('Error al refrescar datos tras Countdown:', e);
-                                        }
+                                        // Intentar cancelar automáticamente el claim si vence el tiempo.
+                                        // Esta lógica maneja errores silenciosamente y refresca la vista.
+                                        (async () => {
+                                          try {
+                                            await handleAutoExpireClaim(point as CollectionPoint);
+                                          } catch (e) {
+                                            console.warn('Error al procesar expiración automática del claim:', e);
+                                            try {
+                                              await fetchData();
+                                            } catch (refreshErr) {
+                                              console.warn('Auto-expire: error al refrescar datos tras fallo en expiración automática:', refreshErr);
+                                            }
+                                          }
+                                        })();
                                       }}
                                     />
                                   </ErrorBoundary>

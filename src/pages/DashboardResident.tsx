@@ -3,8 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { FaMapMarkerAlt, FaUserCircle, FaRecycle, FaWallet, FaHistory, FaPlus, FaMapPin, FaCalendarAlt, FaStar, FaEnvelope, FaPhone, FaTimes } from 'react-icons/fa';
 import { supabase } from '../lib/supabase';
 import { prepareImageForUpload, transformImage } from '../services/ImageTransformService';
-import Map from '../components/Map';
 import ChatList from '../components/ChatList';
+import Map from '../components/Map';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast';
@@ -116,6 +116,10 @@ const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
   }
   return [];
 });
+
+  // Estado para controlar solicitudes de fitBounds/centrado al Map
+  const [mapFitBounds, setMapFitBounds] = useState<[[number, number],[number, number]] | null>(null);
+  const [mapCenterToUser, setMapCenterToUser] = useState<boolean>(false);
 
 // --- Persistencia de estado del tab activo ---
 const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'ecocuenta' | 'historial' | 'mensajes'>(() => {
@@ -1809,59 +1813,66 @@ useEffect(() => {
   );
 })()}
           </div>
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <h3 className="text-xl font-bold mb-4 flex flex-col items-center justify-center text-center">
-              <span>
-                <span className="text-black">Ver Recicladores </span>
-                <span className="inline-flex items-center relative -top-1.5">
-      
-      <button
-        type="button"
-        className="px-3 py-1 rounded-full bg-green-600 text-white font-semibold shadow-md border border-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200 text-sm flex items-center gap-1 animate-pulse"
-        style={{ boxShadow: '0 0 0 2px #bbf7d0' }}
-        tabIndex={-1}
-        disabled
-      >
-        <span className="w-2 h-2 bg-white rounded-full mr-1 animate-pulse"></span>
-        En Línea
-      </button>
-    </span>
-                <span className="text-black"> en el Mapa</span>
-              </span>
-            </h3>
-            <Map
-  markers={recyclers
-    .filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true)
-    .map((rec) => ({
-      id: rec.id.toString(),
-      lat: rec.lat ?? 0,
-      lng: rec.lng ?? 0,
-      title: rec.profiles?.name || 'Reciclador',
-      avatar_url: rec.profiles?.avatar_url || undefined,
-      role: 'recycler',
-      online: rec.online === true,
-      iconUrl: '/assets/bicireciclador-Photoroom.png',
-    }))}
-  showUserLocation={true}
-  showAdminZonesButton={false}
-/>
-            {/* DEBUG: Mostrar recicladores que deberían aparecer en el mapa */}
-          <div className="mt-4 p-2 bg-yellow-50 border border-yellow-300 rounded text-xs text-yellow-900">
-            <b>Recicladores en línea con coordenadas:</b>
-            <ul>
-              {recyclers.filter(r => typeof r.lat === 'number' && typeof r.lng === 'number' && r.online === true).map(r => (
-                <li key={r.id}>
-                  {r.profiles?.name || 'Reciclador'} | lat: {r.lat}, lng: {r.lng} | online: {String(r.online)}
-                </li>
-              ))}
-            </ul>
-          </div>
-          </div>
         </div>
       )}
       {activeTab === 'recicladores' && (
         <div className="w-full max-w-4xl bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-2xl font-bold mb-6 text-center">Recicladores</h2>
+          {/* Mapa colocado arriba de las cards de recicladores */}
+          <div id="resident-recyclers-map" className="w-full mb-6 rounded-lg overflow-hidden" style={{ height: '480px' }}>
+            <Map
+              markers={recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map(r => ({
+                id: r.id,
+                lat: r.lat as number,
+                lng: r.lng as number,
+                title: r.profiles?.name || 'Reciclador',
+                avatar_url: r.profiles?.avatar_url,
+                role: r.role,
+                online: !!r.online
+              }))}
+              fitBounds={mapFitBounds}
+              centerToUser={mapCenterToUser}
+            />
+          </div>
+          <div className="flex justify-center mb-4">
+            <button
+              type="button"
+              className="px-4 py-2 rounded-full bg-green-600 text-white font-semibold shadow-md border border-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200 text-sm flex items-center gap-2"
+              onClick={() => {
+                // Scroll al mapa
+                const el = document.getElementById('resident-recyclers-map');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Preparar fitBounds si hay recicladores con coords, sino centrar en la posición del usuario
+                const points = recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng));
+                if (points.length > 0) {
+                  // calcular min/max de lat/lng
+                  const lats = points.map(p => p.lat as number);
+                  const lngs = points.map(p => p.lng as number);
+                  const minLat = Math.min(...lats);
+                  const maxLat = Math.max(...lats);
+                  const minLng = Math.min(...lngs);
+                  const maxLng = Math.max(...lngs);
+                  // add small padding
+                  const padLat = (maxLat - minLat) * 0.2 || 0.01;
+                  const padLng = (maxLng - minLng) * 0.2 || 0.01;
+                  const sw: [number, number] = [minLng - padLng, minLat - padLat];
+                  const ne: [number, number] = [maxLng + padLng, maxLat + padLat];
+                  setMapFitBounds([sw, ne]);
+                  // Resetear el flag tras un corto delay para permitir nuevas acciones futuras
+                  setTimeout(() => setMapFitBounds(null), 1500);
+                } else {
+                  // No hay recicladores con coords -> centrar en la ubicación del usuario
+                  setMapCenterToUser(true);
+                  setTimeout(() => setMapCenterToUser(false), 1500);
+                }
+              }}
+            >
+              <FaMapMarkerAlt className="w-4 h-4" />
+              <FaRecycle className="w-4 h-4" />
+              Ver recicladores en el mapa
+            </button>
+          </div>
+          <h2 className="text-2xl font-bold mb-6 text-center flex items-center justify-center gap-2"><FaRecycle className="w-6 h-6 text-green-600" />Recicladores</h2>
           {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).length === 0 ? (
             <p className="text-gray-500 text-center">No hay recicladores en línea con ubicación disponible.</p>
           ) : (
@@ -1946,6 +1957,7 @@ useEffect(() => {
               ))}
             </div>
           )}
+          {/* Mapa ya renderizado arriba; bloque duplicado eliminado */}
         </div>
       )}
       {activeTab === 'mensajes' && (
@@ -2305,7 +2317,7 @@ useEffect(() => {
             <a href="https://www.personalpay.com.ar/" target="_blank" rel="noopener noreferrer" className="bg-pink-500 hover:bg-pink-700 text-white px-3 py-1 rounded text-xs font-semibold">Personal Pay</a>
           </div>
         </div>
-      </div>
+  </div>
     </div>
   </div>
 )}

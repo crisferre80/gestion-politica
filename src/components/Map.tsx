@@ -38,6 +38,9 @@ export interface MapboxPolygonProps {
   hideDrawControls?: boolean;
   showRoute?: boolean;
   route?: Array<{ lat: number; lng: number }>;
+  // Permitir que el padre pida que el mapa haga fitBounds o que centre en la ubicación del usuario
+  fitBounds?: [[number, number], [number, number]] | null;
+  centerToUser?: boolean;
 
 }
 
@@ -49,6 +52,8 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   onMapClick,
   disableDraw = false,
   route = [],
+  fitBounds = null,
+  centerToUser = false,
 }) => {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -377,6 +382,40 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
     }
   }, [userLocation]);
 
+  // Efecto: si el padre solicita fitBounds, aplicar en el mapRef
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (fitBounds) {
+      try {
+        const fb = fitBounds as [[number, number], [number, number]];
+        if (fb && fb.length === 2 && mapRef.current) {
+          mapRef.current.fitBounds(fb, { padding: 80, duration: 800 });
+        }
+      } catch (err) {
+        console.warn('[Map] fitBounds failed:', err);
+      }
+    }
+  }, [fitBounds]);
+
+  // Efecto: si el padre pide centrar en la posición del usuario, solicitar geolocalización y volar allí
+  useEffect(() => {
+    if (!centerToUser) return;
+    if (!('geolocation' in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        if (mapRef.current) {
+          mapRef.current.flyTo({ center: [lng, lat], zoom: 15, duration: 800 });
+        }
+      },
+      (err) => {
+        console.warn('[Map] centerToUser geolocation failed:', err);
+      },
+      { enableHighAccuracy: true, maximumAge: 1000 * 60 * 5 }
+    );
+  }, [centerToUser]);
+
   // Memoizar zonas a mostrar
   const zonasParaMostrar = useMemo(() => {
     const result = showAdminZones ? adminZones : zones;
@@ -500,7 +539,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
             <div
               onMouseEnter={() => setHoveredMarker(marker)}
               onMouseLeave={() => setHoveredMarker(null)}
-              style={{ position: 'relative', width: 60, height: 60, cursor: 'pointer' }}
+              style={{ position: 'relative', width: 80, height: 80, cursor: 'pointer' }}
             >
               <div
                 style={{
@@ -525,14 +564,30 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                   alt="Avatar del reciclador"
                   style={{
                     position: 'absolute',
-                    top: '4px',
-                    left: '22px',
-                    width: '28px',
-                    height: '28px',
+                    top: '8px',
+                    left: '30px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '50%',
-                    border: '1px solid #fff',
-                    boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                    border: '2px solid #fff',
+                    zIndex: 2,
                     objectFit: 'cover',
+                  }}
+                />
+              )}
+              {/* Mostrar bicicleta grande DETRÁS del avatar (sin sombra) para que parezca que el avatar está montado */}
+              {(marker.role === 'recycler' || marker.online) && (
+                <img
+                  src={'/assets/bicireciclador-Photoroom.png'}
+                  alt="Bicicleta reciclador"
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    left: '6px',
+                    width: '56px',
+                    height: '56px',
+                    zIndex: 1,
+                    objectFit: 'contain',
                   }}
                 />
               )}

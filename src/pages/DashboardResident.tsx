@@ -4,6 +4,8 @@ import { FaMapMarkerAlt, FaUserCircle, FaRecycle, FaWallet, FaHistory, FaPlus, F
 import { supabase } from '../lib/supabase';
 import { prepareImageForUpload, transformImage } from '../services/ImageTransformService';
 import Map from '../components/Map';
+import ChatList from '../components/ChatList';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast';
 import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
@@ -64,6 +66,7 @@ export type User = {
 
 const DashboardResident = () => {
   const { user, login } = useUser();
+  const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   
@@ -115,18 +118,18 @@ const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
 });
 
 // --- Persistencia de estado del tab activo ---
-const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'ecocuenta' | 'historial'>(() => {
+const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'ecocuenta' | 'historial' | 'mensajes'>(() => {
   // Verificar si hay un parámetro de tab en la URL
   const urlParams = new URLSearchParams(location.search);
   const urlTab = urlParams.get('tab');
   
-  if (urlTab === 'puntos' || urlTab === 'recicladores' || urlTab === 'perfil' || urlTab === 'ecocuenta' || urlTab === 'historial') {
+  if (urlTab === 'puntos' || urlTab === 'recicladores' || urlTab === 'perfil' || urlTab === 'ecocuenta' || urlTab === 'historial' || urlTab === 'mensajes') {
     return urlTab;
   }
   
   // Si no hay parámetro de URL, usar el cached
   const cachedTab = sessionStorage.getItem('dashboard_resident_active_tab');
-  if (cachedTab === 'puntos' || cachedTab === 'recicladores' || cachedTab === 'perfil' || cachedTab === 'ecocuenta' || cachedTab === 'historial') {
+  if (cachedTab === 'puntos' || cachedTab === 'recicladores' || cachedTab === 'perfil' || cachedTab === 'ecocuenta' || cachedTab === 'historial' || cachedTab === 'mensajes') {
     return cachedTab;
   }
   return 'puntos';
@@ -798,6 +801,16 @@ const [showHeaderImageModal, setShowHeaderImageModal] = useState(false);
 // --- Estado para mensajes no leídos por reciclador ---
 const [unreadMessagesByRecycler, setUnreadMessagesByRecycler] = useState<Record<string, number>>({});
 
+// Estado para la lista de conversaciones en el panel de Mensajes
+const [chatPreviews, setChatPreviews] = useState<Array<{
+  userId: string;
+  name: string;
+  avatar_url?: string;
+  lastMessage?: { content: string; created_at: string } | null;
+  unreadCount: number;
+}>>([]);
+const [, setLoadingChats] = useState(false);
+
 // --- Efecto para cargar y suscribirse a mensajes no leídos ---
 useEffect(() => {
   if (!user?.id || recyclers.length === 0) return;
@@ -876,6 +889,81 @@ useEffect(() => {
     supabase.removeChannel(channel);
   };
 }, [user, recyclers]);
+
+// Cargar previsualizaciones de chat cuando el usuario abre la pestaña Mensajes
+useEffect(() => {
+  if (!user?.id || activeTab !== 'mensajes') return;
+  let isMounted = true;
+  (async () => {
+    setLoadingChats(true);
+    try {
+      // Obtener mensajes que involucren al usuario
+      const { data: messages, error } = await supabase
+        .from('messages')
+        .select('sender_id, receiver_id, content, sent_at, read')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('sent_at', { ascending: false })
+        .limit(300);
+
+      if (error) {
+        console.error('[Mensajes] Error cargando mensajes:', error);
+        setChatPreviews([]);
+        return;
+      }
+
+      // Construir mapa de conversaciones por otroUserId
+      const map: Record<string, { lastMessage?: { content: string; created_at: string }; unreadCount: number }> = {};
+      (messages || []).forEach((m: { sender_id: string; receiver_id: string; content: string; sent_at: string; read: boolean }) => {
+        const other = m.sender_id === user.id ? m.receiver_id : m.sender_id;
+        if (!other) return;
+        if (!map[other]) map[other] = { lastMessage: undefined, unreadCount: 0 };
+        // El primer mensaje (porque orden desc) es el último
+        if (!map[other].lastMessage) map[other].lastMessage = { content: m.content, created_at: m.sent_at };
+        if (m.sender_id === other && m.receiver_id === user.id && m.read === false) {
+          map[other].unreadCount += 1;
+        }
+      });
+
+      const otherUserIds = Object.keys(map);
+      if (otherUserIds.length === 0) {
+        if (isMounted) setChatPreviews([]);
+        return;
+      }
+
+      // Obtener perfiles de esos usuarios
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, name, avatar_url')
+        .in('user_id', otherUserIds as string[]);
+
+      const profileMap: Record<string, { name?: string; avatar_url?: string }> = {};
+      interface ProfilePreview {
+        user_id: string;
+        name?: string;
+        avatar_url?: string;
+      }
+      (profiles as ProfilePreview[] || []).forEach((p) => {
+        profileMap[p.user_id] = { name: p.name, avatar_url: p.avatar_url };
+      });
+
+      const previews = otherUserIds.map(id => ({
+        userId: id,
+        name: profileMap[id]?.name || 'Usuario',
+        avatar_url: profileMap[id]?.avatar_url,
+        lastMessage: map[id].lastMessage || undefined,
+        unreadCount: map[id].unreadCount || 0,
+      }));
+
+      if (isMounted) setChatPreviews(previews);
+    } catch (err) {
+      console.error('[Mensajes] Error inesperado:', err);
+      if (isMounted) setChatPreviews([]);
+    } finally {
+      if (isMounted) setLoadingChats(false);
+    }
+  })();
+  return () => { isMounted = false; };
+}, [user, activeTab]);
 
 // Limpiar badge de un reciclador al abrir el chat
 const clearUnreadForRecycler = async (recyclerUserId: string) => {
@@ -1361,6 +1449,22 @@ useEffect(() => {
             <FaHistory className="w-5 h-5" />
             Historial
           </button>
+          <button
+            className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
+              ${activeTab === 'mensajes'
+                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+            `}
+            onClick={() => setActiveTab('mensajes')}
+          >
+            <FaEnvelope className="w-5 h-5" />
+            Mensajes
+            {Object.values(unreadMessagesByRecycler).some(c => c > 0) && (
+              <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                {Object.values(unreadMessagesByRecycler).reduce((s, v) => s + (v || 0), 0)}
+              </span>
+            )}
+          </button>
         </div>
       {activeTab === 'puntos' && (
         <div className="w-full max-w-4xl">
@@ -1844,6 +1948,33 @@ useEffect(() => {
           )}
         </div>
       )}
+      {activeTab === 'mensajes' && (
+        <div className="w-full max-w-4xl bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-2xl font-bold mb-6 text-center">Mensajes</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <ChatList
+                chats={chatPreviews.map(c => ({
+                  userId: c.userId,
+                  name: c.name,
+                  avatar_url: c.avatar_url,
+                  lastMessage: c.lastMessage ? { content: c.lastMessage.content, created_at: c.lastMessage.created_at } : undefined,
+                  unreadCount: c.unreadCount || 0,
+                }))}
+                onChatSelect={(otherUserId) => {
+                  // Limpiar badge para ese reciclador
+                  clearUnreadForRecycler(otherUserId);
+                  // Navegar al chat
+                  navigate(`/chat/${otherUserId}`);
+                }}
+              />
+            </div>
+            <div className="hidden md:block p-4 border rounded-lg bg-gray-50">
+              <p className="text-gray-500">Selecciona una conversación para abrir el chat. Los recicladores pueden enviarte mensajes desde puntos reclamados.</p>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Sección Mi EcoCuenta (movida al tab ecocuenta) */}
       {activeTab === 'ecocuenta' && (
         <div className="w-full max-w-2xl bg-gradient-to-br from-green-50 via-emerald-100 to-green-200 shadow-xl rounded-3xl p-8 flex flex-col items-center mb-8 relative overflow-hidden animate-fade-in">
@@ -2313,3 +2444,6 @@ useEffect(() => {
 };
 
 export default DashboardResident;
+
+
+

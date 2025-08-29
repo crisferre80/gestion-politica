@@ -53,35 +53,35 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ targetDate, onComplete 
   const formatNumber = (num: number): string => num.toString().padStart(2, '0');
 
   return (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-3">
+    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-2 mt-2">
       <div className="flex items-center space-x-2 text-yellow-800">
-        <Clock className="h-5 w-5" />
-        <span className="font-medium">Tiempo restante para recolección:</span>
+        <Clock className="h-4 w-4" />
+        <span className="font-medium text-sm">Tiempo restante:</span>
       </div>
-      <div className="mt-2 grid grid-cols-4 gap-2">
+      <div className="mt-1 grid grid-cols-4 gap-1">
         <div className="text-center">
-          <div className="bg-white rounded-md p-2 shadow-sm">
-            <span className="text-lg font-bold text-yellow-800">{timeLeft.days}</span>
+          <div className="bg-white rounded-md p-1 shadow-sm">
+            <span className="text-base font-bold text-yellow-800">{timeLeft.days}</span>
           </div>
-          <span className="text-xs text-yellow-600 mt-1 block">Días</span>
+          <span className="text-[10px] text-yellow-600 mt-1 block">Días</span>
         </div>
         <div className="text-center">
-          <div className="bg-white rounded-md p-2 shadow-sm">
-            <span className="text-lg font-bold text-yellow-800">{formatNumber(timeLeft.hours)}</span>
+          <div className="bg-white rounded-md p-1 shadow-sm">
+            <span className="text-base font-bold text-yellow-800">{formatNumber(timeLeft.hours)}</span>
           </div>
-          <span className="text-xs text-yellow-600 mt-1 block">Horas</span>
+          <span className="text-[10px] text-yellow-600 mt-1 block">Horas</span>
         </div>
         <div className="text-center">
-          <div className="bg-white rounded-md p-2 shadow-sm">
-            <span className="text-lg font-bold text-yellow-800">{formatNumber(timeLeft.minutes)}</span>
+          <div className="bg-white rounded-md p-1 shadow-sm">
+            <span className="text-base font-bold text-yellow-800">{formatNumber(timeLeft.minutes)}</span>
           </div>
-          <span className="text-xs text-yellow-600 mt-1 block">Minutos</span>
+          <span className="text-[10px] text-yellow-600 mt-1 block">Minutos</span>
         </div>
         <div className="text-center">
-          <div className="bg-white rounded-md p-2 shadow-sm">
-            <span className="text-lg font-bold text-yellow-800">{formatNumber(timeLeft.seconds)}</span>
+          <div className="bg-white rounded-md p-1 shadow-sm">
+            <span className="text-base font-bold text-yellow-800">{formatNumber(timeLeft.seconds)}</span>
           </div>
-          <span className="text-xs text-yellow-600 mt-1 block">Segundos</span>
+          <span className="text-[10px] text-yellow-600 mt-1 block">Segundos</span>
         </div>
       </div>
     </div>

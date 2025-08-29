@@ -9,7 +9,7 @@ import HeaderRecycler from '../components/HeaderRecycler';
 import { prepareImageForUpload, transformImage } from '../services/ImageTransformService';
 import PhotoCapture from '../components/PhotoCapture';
 import ChatList from '../components/ChatList';
-import { getChatPreviews } from '../lib/chatUtils';
+import { getChatPreviews, enviarMensajeSeguro } from '../lib/chatUtils';
 import { useNavigate } from 'react-router-dom';
 import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 import MapComponent from '../components/Map';
@@ -40,189 +40,57 @@ const DashboardRecycler: React.FC = () => {
 
   const [claimedPoints, setClaimedPoints] = useState<CollectionPoint[]>([]);
   const [availablePoints, setAvailablePoints] = useState<CollectionPoint[]>([]);
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
 
-  // Estados para filtro de distancia
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [maxDistance, setMaxDistance] = useState<number | null>(null); // en kilómetros
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [gettingLocation, setGettingLocation] = useState(false);
-
-  // --- Chat state for ChatList modal ---
+  // --- Chats y notificaciones ---
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [loadingChats] = useState<boolean>(false);
   interface ChatPreview {
-    name: unknown;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    unreadCount: any;
-    avatar_url: string | undefined;
-    lastMessage: unknown;
     id: string;
     user_id: string;
-    recycler_id: string;
-    last_message?: string;
-    updated_at?: string;
-    // Add other fields as needed based on your 'chats' table structure
+    recycler_id?: string;
+    name?: string;
+    avatar_url?: string;
+  lastMessage?: { content: string; created_at: string | number | Date };
+    unreadCount?: number;
   }
   const [chatPreviews, setChatPreviews] = useState<ChatPreview[]>([]);
-  const [loadingChats, setLoadingChats] = useState(false);
-  const [showChatModal, setShowChatModal] = useState(false); // <-- Move this line up before useEffect
+  interface EventNotification {
+    id: string;
+    type: string;
+    message: string;
+    created_at?: string | number | Date;
+  }
+  const [eventNotifications, setEventNotifications] = useState<EventNotification[]>([]);
 
-  // Fetch chat previews when chat modal is opened
-  useEffect(() => {
-    if (!showChatModal || !user) return;
-    setLoadingChats(true);
-    (async () => {
-      try {
-        // Buscar todos los mensajes donde el reciclador es sender o receiver
-        const { data: messages, error } = await supabase
-          .from('messages')
-          .select('sender_id, receiver_id')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-        if (error) throw error;
-        // Extraer los user_id de los otros participantes
-        const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
-        // Obtener los previews usando la función utilitaria
-        const previews = await getChatPreviews(user.id, otherUserIds);
-        setChatPreviews(previews.map(p => ({
-          id: p.userId,
-          user_id: p.userId,
-          recycler_id: user.id,
-          name: p.name,
-          avatar_url: p.avatar_url,
-          lastMessage: p.lastMessage,
-          unreadCount: p.unreadCount
-        })));
-       
-      } catch {
-        setChatPreviews([]);
-      } finally {
-        setLoadingChats(false);
-      }
-    })();
-  }, [showChatModal, user]);
+  // --- Estado de ubicación y filtro por distancia ---
+  const [gettingLocation, setGettingLocation] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [pointToComplete, setPointToComplete] = useState<CollectionPoint | null>(null);
+  const [expandedClaimIds, setExpandedClaimIds] = useState<string[]>([]);
+  const fetchDataRef = useRef(false);
 
-  // Fetch chat previews SIEMPRE que cambie el usuario (no solo al abrir el modal)
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        // Buscar todos los mensajes donde el reciclador es sender o receiver
-        const { data: messages, error } = await supabase
-          .from('messages')
-          .select('sender_id, receiver_id')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-        if (error) throw error;
-        // Extraer los user_id de los otros participantes
-        const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
-        // Obtener los previews usando la función utilitaria
-        const previews = await getChatPreviews(user.id, otherUserIds);
-        setChatPreviews(previews.map(p => ({
-          id: p.userId,
-          user_id: p.userId,
-          recycler_id: user.id,
-          name: p.name,
-          avatar_url: p.avatar_url,
-          lastMessage: p.lastMessage,
-          unreadCount: p.unreadCount
-        })));
-      } catch {
-        setChatPreviews([]);
-      }
-    })();
-  }, [user]);
-
-  // NOTIFICACIONES DE MENSAJES NUEVOS
-
-  // --- Notificaciones de eventos del residente ---
-  const [eventNotifications, setEventNotifications] = useState<Array<{id: string, type: string, message: string, created_at: string}>>([]);
-
-  // Define ResidentProfile type at the top-level so it's accessible everywhere in the component
+  // Tipo local mínimo para perfiles de residentes usado en este archivo
   type ResidentProfile = {
-    dni: string;
     user_id: string;
     name?: string;
     email?: string;
     phone?: string;
     avatar_url?: string;
+    dni?: string;
   };
 
-  // Función para calcular distancia usando fórmula de Haversine
-  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const R = 6371; // Radio de la Tierra en kilómetros
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // Distancia en kilómetros
-  };
-
-  // Función para obtener ubicación del usuario
-  const getUserLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('La geolocalización no está soportada en este navegador');
-      return;
-    }
-
-    setGettingLocation(true);
-    setLocationError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-        setGettingLocation(false);
-        setLocationError(null);
-      },
-      (error) => {
-        setGettingLocation(false);
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setLocationError('Permiso de ubicación denegado');
-            break;
-          case error.POSITION_UNAVAILABLE:
-            setLocationError('Información de ubicación no disponible');
-            break;
-          case error.TIMEOUT:
-            setLocationError('Tiempo de espera agotado al obtener ubicación');
-            break;
-          default:
-            setLocationError('Error desconocido al obtener ubicación');
-            break;
-        }
-      },
-      { 
-        enableHighAccuracy: true, 
-        timeout: 10000, 
-        maximumAge: 300000 // 5 minutos
-      }
-    );
-  };
-  
-    // Cargar puntos reclamados y disponibles
-    const fetchData = useCallback(async () => {
-      // Prevenir múltiples llamadas simultáneas usando referencia
-      if (fetchDataRef.current) {
-        console.log('fetchData ya está en ejecución, ignorando llamada duplicada');
+  const fetchData = useCallback(async () => {
+    try {
+      // Proteger accesos a user.id: obtener una copia segura del id del usuario
+      const userId = user?.id;
+      if (!userId) {
+        // Si no hay usuario, no intentamos consultar la DB
+        setLoading(false);
         return;
       }
-      
-      fetchDataRef.current = true;
-      
-      try {
-        setLoading(true);
-        setError(null);
-        
-        if (!user) {
-          setError('Usuario no autenticado');
-          setLoading(false);
-          return;
-        }
-        
         // Verificar que las tablas existen antes de realizar consultas
         const { checkTableExists } = await import('../lib/supabase');
         const pointsTableExists = await checkTableExists('collection_points');
@@ -243,7 +111,7 @@ const DashboardRecycler: React.FC = () => {
         const { data: claimsData, error: claimsError } = await supabase
           .from('collection_claims')
           .select('*')
-          .eq('recycler_id', user.id) // Cambiado a recycler_id
+          .eq('recycler_id', userId) // Cambiado a recycler_id
           .order('created_at', { ascending: false }); // OK: solo columna raíz
         console.log('DEBUG: claimsData (recycler):', claimsData);
         if (claimsError) throw claimsError;
@@ -385,7 +253,7 @@ const DashboardRecycler: React.FC = () => {
       if (claimsData && claimsData.length > 0) {
         const now = new Date();
         penalizedPointIds = claimsData
-          .filter(c => c.status === 'cancelled' && c.cancelled_at && c.recycler_id === user.id) // Solo cancelaciones de este reciclador
+          .filter(c => c.status === 'cancelled' && c.cancelled_at && c.recycler_id === userId) // Solo cancelaciones de este reciclador
           .filter(c => {
             const cancelledAt = new Date(c.cancelled_at);
             return (now.getTime() - cancelledAt.getTime()) < 3 * 60 * 60 * 1000; // 3 horas
@@ -522,6 +390,42 @@ const DashboardRecycler: React.FC = () => {
     }
   }, [user]);
 
+  // Función para calcular distancia (km) entre dos coordenadas (Haversine)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const toRad = (v: number) => v * Math.PI / 180;
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Obtener la ubicación del usuario y manejar estado asociado
+  const getUserLocation = async () => {
+    if (!('geolocation' in navigator)) {
+      setLocationError('Geolocalización no disponible en este navegador');
+      return;
+    }
+    setGettingLocation(true);
+    setLocationError(null);
+    return new Promise<void>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setGettingLocation(false);
+          resolve();
+        },
+        (err) => {
+          setLocationError(err.message || 'Error obteniendo ubicación');
+          setGettingLocation(false);
+          resolve();
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  };
+
   // Inicialización de Supabase y carga de datos
   useEffect(() => {
     if (!user) return;
@@ -562,7 +466,6 @@ const DashboardRecycler: React.FC = () => {
   
   // Estado para controlar operaciones en curso y evitar conflictos
   const [isProcessingClaim, setIsProcessingClaim] = useState(false);
-  const fetchDataRef = useRef(false);
 
   // Función que intenta cancelar automáticamente un claim cuando vence el tiempo
   const handleAutoExpireClaim = async (point: CollectionPoint) => {
@@ -600,6 +503,44 @@ const DashboardRecycler: React.FC = () => {
           await cancelClaim(claimRecord.id, point.id, 'Tiempo de reclamación vencido (cancelación automática)');
           toast('Reclamación vencida: el punto ha sido cancelado automáticamente.', { icon: '⏰' });
           console.log('Auto-expire: claim cancelado automáticamente', claimRecord.id);
+
+          // Enviar mensaje automático al residente notificando la cancelación
+          try {
+            if (user?.id && point.user_id) {
+              const messageText = 'La reclamación de tu punto ha sido cancelada automáticamente porque el reciclador no retiró a tiempo.';
+              try {
+                await enviarMensajeSeguro(user.id, point.user_id, messageText);
+                console.log('Auto-expire: mensaje automático enviado al residente', point.user_id);
+                toast.success('Se notificó al residente sobre la cancelación');
+                // Actualizar previews de chat localmente
+                try {
+                  const previews = await getChatPreviews(user.id, [point.user_id]);
+                  setChatPreviews(prev => {
+                    const others = prev.filter(p => p.user_id !== point.user_id);
+                    const mapped = (previews || []).map(p => ({
+                      id: p.userId,
+                      user_id: p.userId,
+                      recycler_id: user.id,
+                      name: p.name,
+                      avatar_url: p.avatar_url,
+                      lastMessage: p.lastMessage,
+                      unreadCount: p.unreadCount
+                    }));
+                    return [...mapped, ...others];
+                  });
+                } catch (previewErr) {
+                  console.warn('Auto-expire: no se pudo actualizar previews tras enviar mensaje automático:', previewErr);
+                }
+              } catch (msgErr) {
+                console.warn('Auto-expire: error al enviar mensaje automático con enviarMensajeSeguro:', msgErr);
+              }
+            } else {
+              console.warn('Auto-expire: no hay user.id o point.user_id para enviar notificación');
+            }
+          } catch (msgEx) {
+            console.warn('Auto-expire: excepción al intentar notificar al residente:', msgEx);
+          }
+
         } catch (cancelErr) {
           // Manejo tolerante: mostrar aviso y continuar
           console.warn('Auto-expire: error al cancelar claim automáticamente:', cancelErr);
@@ -867,7 +808,7 @@ const DashboardRecycler: React.FC = () => {
 
   // --- PRESENCIA EN TIEMPO REAL ---
   useEffect(() => {
-    if (!user?.id) return;
+  if (!user?.id) return;
     // Marcar online al entrar
     supabase.from('profiles').update({ online: true }).eq('user_id', user.id);
     // Timer de inactividad: 60 minutos
@@ -936,7 +877,7 @@ const DashboardRecycler: React.FC = () => {
         event: '*',
         schema: 'public',
         table: 'collection_claims',
-        filter: `user_id=eq.${user.id}`,
+        filter: `user_id=eq.${user?.id}`,
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setEventNotifications(prev => [
@@ -955,7 +896,7 @@ const DashboardRecycler: React.FC = () => {
         event: '*',
         schema: 'public',
         table: 'recycler_ratings',
-        filter: `resident_id=eq.${user.id}`,
+  filter: `resident_id=eq.${user?.id}`,
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setEventNotifications(prev => [
@@ -972,7 +913,7 @@ const DashboardRecycler: React.FC = () => {
 
   // Suscripción en tiempo real a collection_points y collection_claims para actualización instantánea
   useEffect(() => {
-    if (!user?.id) return;
+  if (!user?.id) return;
     
     // Suscripción a collection_points con debounce para evitar actualizaciones excesivas
     const channelPoints = supabase.channel('recycler-collection-points')
@@ -1035,16 +976,16 @@ const DashboardRecycler: React.FC = () => {
         event: '*',
         schema: 'public',
         table: 'messages',
-        filter: `sender_id=eq.${user.id}`,
+  filter: `sender_id=eq.${user?.id}`,
       }, async () => {
         try {
           const { data: messages, error } = await supabase
             .from('messages')
             .select('sender_id, receiver_id')
-            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+            .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`);
           if (error) throw error;
-          const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
-          const previews = await getChatPreviews(user.id, otherUserIds);
+          const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user?.id)));
+          const previews = await getChatPreviews(user?.id || '', otherUserIds);
           setChatPreviews(previews.map(p => ({
             id: p.userId,
             user_id: p.userId,
@@ -1064,16 +1005,16 @@ const DashboardRecycler: React.FC = () => {
         event: '*',
         schema: 'public',
         table: 'messages',
-        filter: `receiver_id=eq.${user.id}`,
+  filter: `receiver_id=eq.${user?.id}`,
       }, async () => {
         try {
           const { data: messages, error } = await supabase
             .from('messages')
             .select('sender_id, receiver_id')
-            .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+            .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`);
           if (error) throw error;
-          const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user.id)));
-          const previews = await getChatPreviews(user.id, otherUserIds);
+          const otherUserIds = Array.from(new Set((messages || []).flatMap(m => [m.sender_id, m.receiver_id]).filter(id => id !== user?.id)));
+          const previews = await getChatPreviews(user?.id || '', otherUserIds);
           setChatPreviews(previews.map(p => ({
             id: p.userId,
             user_id: p.userId,
@@ -1899,7 +1840,7 @@ const DashboardRecycler: React.FC = () => {
                 <ul className="space-y-1">
                   {eventNotifications.slice(0, 5).map(ev => (
                     <li key={ev.id} className="text-sm flex items-center gap-2">
-                      <span className="font-semibold">[{new Date(ev.created_at).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}]</span>
+                      <span className="font-semibold">[{ev.created_at ? new Date(ev.created_at).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '—'}]</span>
                       <span>{ev.message}</span>
                     </li>
                   ))}
@@ -2256,170 +2197,125 @@ const DashboardRecycler: React.FC = () => {
                         const creator_email = point.creator_email || '';
                         const creator_dni = point.creator_dni || point.profiles?.dni || 'No informado';
                         const pickup_time = point.pickup_time ? new Date(point.pickup_time) : null;
-                        // Render robusto
+                        // Collapsed/expanded UX
+                        const isExpanded = expandedClaimIds.includes(point.id);
+                        const toggleExpanded = (id: string) => {
+                          setExpandedClaimIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+                        };
+
                         return (
                           <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-                            <div className="p-6">
-                              {/* Info principal */}
-                              <div className="flex items-start justify-between">
-                                <div className="flex items-start space-x-3">
-                                  <img
-                                    src={point.type === 'colective_point'
-                                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                                      : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png'}
-                                    alt="Punto de Recolección"
-                                    className="w-9 h-9 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
-                                  />
+                            {/* Compact header - siempre visible, clickeable */}
+                            <div onClick={() => toggleExpanded(point.id)} className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center space-x-3">
+                                  <img src={point.type === 'colective_point' ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png' : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png'} alt="Punto" className="w-8 h-8" />
                                   <div>
-                                    <h3 className="text-lg font-medium text-gray-900">{address}</h3>
-                                    <p className="mt-1 text-sm text-gray-500">{district}</p>
+                                    <div className="text-sm font-medium text-gray-900">{address}</div>
+                                    <div className="text-xs text-gray-500">{district} · {materials.slice(0,3).join(', ')}{materials.length > 3 ? '...' : ''}</div>
                                   </div>
                                 </div>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
                               </div>
-                              <div className="flex flex-row justify-between items-start mt-4">
-                                <div className="flex-1">
-                                  <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {materials.map((material, idx) => (
-                                      <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
-                                    ))}
+                              <div className="text-xs text-gray-500">{creator_name} · {pickup_time ? pickup_time.toLocaleString() : 'Sin horario'}</div>
+                            </div>
+
+                            {/* Expanded content (original full card) */}
+                            {isExpanded && (
+                              <div className="p-6">
+                                {/* Reuse existing detailed content */}
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-start space-x-3">
+                                    <img
+                                      src={point.type === 'colective_point'
+                                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png'}
+                                      alt="Punto de Recolección"
+                                      className="w-9 h-9 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
+                                    />
+                                    <div>
+                                      <h3 className="text-lg font-medium text-gray-900">{address}</h3>
+                                      <p className="mt-1 text-sm text-gray-500">{district}</p>
+                                    </div>
+                                  </div>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Reclamado</span>
+                                </div>
+                                <div className="flex flex-row justify-between items-start mt-4">
+                                  <div className="flex-1">
+                                    <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {materials.map((material, idx) => (
+                                        <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="ml-4 flex-shrink-0">
+                                    <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                                      <img
+                                        src={point.photo_url || (point.type === 'colective_point'
+                                          ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
+                                          : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
+                                        alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
+                                        className="w-28 h-28 object-cover rounded-lg shadow-md border border-green-200"
+                                        style={{ background: '#f0fdf4' }}
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.src = point.type === 'colective_point'
+                                            ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
+                                            : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png';
+                                          target.className = target.className.replace('object-cover', 'object-contain');
+                                        }}
+                                      />
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="ml-4 flex-shrink-0">
-                                  <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
-                                    <img
-                                      src={point.photo_url || (point.type === 'colective_point'
-                                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
-                                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
-                                      alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
-                                      className="w-28 h-28 object-cover rounded-lg shadow-md border border-green-200"
-                                      style={{ background: '#f0fdf4' }}
-                                      onError={(e) => {
-                                        // Si la imagen del material falla, usar la imagen por defecto
-                                        const target = e.target as HTMLImageElement;
-                                        target.src = point.type === 'colective_point'
-                                          ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
-                                          : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png';
-                                        target.className = target.className.replace('object-cover', 'object-contain');
-                                      }}
-                                    />
-                                    
-                                    {/* Indicador de foto del material */}
-                                    {point.photo_url && (
-                                      <div className="absolute top-2 right-2">
-                                        <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
-                                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                                          </svg>
-                                        </div>
+                                <div className="mt-4">
+                                  {pickup_time && (
+                                    <div className="text-xs text-gray-500">Retiro programado: {pickup_time.toLocaleString()}</div>
+                                  )}
+                                  {point.status === 'claimed' && pickup_time && (
+                                    <ErrorBoundary fallback={<div className="text-red-600 text-xs mt-2">⚠️ Error en el temporizador de retiro. Verifica la fecha/hora seleccionada.</div>}>
+                                      <CountdownTimer targetDate={pickup_time} onComplete={async () => { try { await handleAutoExpireClaim(point as CollectionPoint); } catch (e) { console.warn('Error al procesar expiración automática del claim:', e); try { await fetchData(); } catch (refreshErr) { console.warn('Error al refrescar tras fallo en auto-expire:', refreshErr); } } }} />
+                                    </ErrorBoundary>
+                                  )}
+                                  {!pickup_time && <div className="text-yellow-600 text-xs mt-2">⚠️ Fecha/hora de retiro no configurada o inválida. Por favor, selecciona una fecha válida al reclamar el punto.</div>}
+                                </div>
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center text-sm text-gray-500">
+                                      <img src={creator_avatar} alt={creator_name} className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm" />
+                                      <span>{creator_name}</span>
+                                    </div>
+                                    <div className="flex items-center text-sm text-gray-500">
+                                      <Mail className="h-4 w-4 mr-2" />
+                                      <a href={`mailto:${creator_email}`} className="text-green-600 hover:text-green-700">{creator_email}</a>
+                                    </div>
+                                    {point.profiles?.phone && (
+                                      <div className="flex items-center text-sm text-gray-500">
+                                        <Phone className="h-4 w-4 mr-1" />
+                                        <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
                                       </div>
                                     )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="mt-4">
-                                {pickup_time && (
-                                  <div className="text-xs text-gray-500">Retiro programado: {pickup_time.toLocaleString()}</div>
-                                )}
-                                {/* CountdownTimer robusto */}
-                                {point.status === 'claimed' && pickup_time && (
-                                  <ErrorBoundary fallback={<div className="text-red-600 text-xs mt-2">⚠️ Error en el temporizador de retiro. Verifica la fecha/hora seleccionada.</div>}>
-                                    <CountdownTimer 
-                                      targetDate={pickup_time} 
-                                      onComplete={() => {
-                                        // Intentar cancelar automáticamente el claim si vence el tiempo.
-                                        // Esta lógica maneja errores silenciosamente y refresca la vista.
-                                        (async () => {
-                                          try {
-                                            await handleAutoExpireClaim(point as CollectionPoint);
-                                          } catch (e) {
-                                            console.warn('Error al procesar expiración automática del claim:', e);
-                                            try {
-                                              await fetchData();
-                                            } catch (refreshErr) {
-                                              console.warn('Auto-expire: error al refrescar datos tras fallo en expiración automática:', refreshErr);
-                                            }
-                                          }
-                                        })();
-                                      }}
-                                    />
-                                  </ErrorBoundary>
-                                )}
-                                {/* Advertencia si el datapicker está mal configurado */}
-                                {!pickup_time && <div className="text-yellow-600 text-xs mt-2">⚠️ Fecha/hora de retiro no configurada o inválida. Por favor, selecciona una fecha válida al reclamar el punto.</div>}
-                              </div>
-                              {/* Info residente */}
-                              <div className="mt-6 pt-6 border-t border-gray-200">
-                                <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
-                                <div className="space-y-2">
-                                  <div className="flex items-center text-sm text-gray-500">
-                                    <img
-                                      src={creator_avatar}
-                                      alt={creator_name}
-                                      className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
-                                    />
-                                    <span>{creator_name}</span>
-                                  </div>
-                                  <div className="flex items-center text-sm text-gray-500">
-                                    <Mail className="h-4 w-4 mr-2" />
-                                    <a href={`mailto:${creator_email}`} className="text-green-600 hover:text-green-700">{creator_email}</a>
-                                  </div>
-                                  {point.profiles?.phone && (
                                     <div className="flex items-center text-sm text-gray-500">
-                                      <Phone className="h-4 w-4 mr-1" />
-                                      <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                      <span className="font-semibold mr-2">DNI:</span> {creator_dni}
                                     </div>
-                                  )}
-                                  <div className="flex items-center text-sm text-gray-500">
-                                    <span className="font-semibold mr-2">DNI:</span> {creator_dni}
                                   </div>
                                 </div>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  <button onClick={() => { const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id); if (isValidUuid(point.claim_id) && isValidUuid(point.id)) { setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' }); setShowCancelClaimModal(true); } else { setError('Error: No se puede cancelar, IDs inválidos.'); } }} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow">Cancelar reclamo</button>
+                                  <button onClick={() => { setPointToComplete(point); setShowCompleteModal(true); }} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow">Marcar como retirado!</button>
+                                  <button onClick={() => { const residentUserId = point.user_id || point.profiles?.user_id; if (residentUserId) { navigate(`/chat/${residentUserId}`); } else { setError('No se encontró el usuario residente para chatear.'); } }} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow">Mensaje al Residente</button>
+                                  {typeof point.lng === 'number' && typeof point.lat === 'number' ? (
+                                    <button onClick={e => { e.stopPropagation(); const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`; window.open(url, '_blank', 'noopener,noreferrer'); }} title="Abrir ruta de navegación en Google Maps" className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-600 rounded hover:bg-green-100 transition-colors shadow-sm text-green-800 font-bold text-xs">
+                                      <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-7 w-7 animate-bounce-map" />
+                                      <span>Ruta Google Maps</span>
+                                    </button>
+                                  ) : (
+                                    <span className="ml-2 text-xs text-gray-400 italic">Ubicación no disponible</span>
+                                  )}
+                                </div>
                               </div>
-                              {/* Botones de acción */}
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                <button
-                                  onClick={() => {
-                                    // Solo abrir el modal si ambos IDs son UUIDs válidos
-                                    const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
-                                    if (isValidUuid(point.claim_id) && isValidUuid(point.id)) {
-                                      setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' });
-                                      setShowCancelClaimModal(true);
-                                    } else {
-                                      setError('Error: No se puede cancelar, IDs inválidos.');
-                                    }
-                                  }}
-                                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow"
-                                >
-                                  Cancelar reclamo
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setPointToComplete(point);
-                                    setShowCompleteModal(true);
-                                  }}
-                                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
-                                >
-                                  Marcar como retirado!
-                                </button>
-                                {typeof point.lng === 'number' && typeof point.lat === 'number' ? (
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`;
-                                      window.open(url, '_blank', 'noopener,noreferrer');
-                                    }}
-                                    title="Abrir ruta de navegación en Google Maps"
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-600 rounded hover:bg-green-100 transition-colors shadow-sm text-green-800 font-bold text-xs"
-                                  >
-                                    <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-7 w-7 animate-bounce-map" />
-                                    <span>Ruta Google Maps</span>
-                                  </button>
-                                ) : (
-                                  <span className="ml-2 text-xs text-gray-400 italic">Ubicación no disponible</span>
-                                )}
-                              </div>
-                            </div>
+                            )}
                           </div>
                         );
                       })

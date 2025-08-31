@@ -1,8 +1,8 @@
-# Configuración del Bucket "points" para Fotos de Puntos de Recolección
+# Configuración del Bucket "points" para Fotos de Centros de Movilizaciòn
 
 ## Resumen de Cambios
 
-Se han realizado los siguientes cambios para que las fotos de los puntos de recolección se almacenen correctamente en el bucket "points" de Supabase Storage:
+Se han realizado los siguientes cambios para que las fotos de los Centros de Movilizaciòn se almacenen correctamente en el bucket "points" de Supabase Storage:
 
 ### 1. Cambios en el Código
 
@@ -49,7 +49,7 @@ Script para configurar el bucket "points" con las políticas de acceso correctas
 
 ### Paso 3: Verificar el Funcionamiento
 1. Reinicia la aplicación
-2. Ve a "Agregar Punto de Recolección"
+2. Ve a "Agregar centro de Recolección"
 3. Sube una foto del material
 4. Verifica que la foto se muestre correctamente en la lista de puntos
 
@@ -59,7 +59,7 @@ Ahora tienes una estructura organizada de buckets en Supabase Storage:
 
 - **`avatars`**: Fotos de perfil de usuarios
 - **`header-img`**: Imágenes de cabecera de perfiles
-- **`points`**: Fotos de materiales en puntos de recolección
+- **`points`**: Fotos de materiales en Centros de Movilizaciòn
 
 ## Beneficios
 

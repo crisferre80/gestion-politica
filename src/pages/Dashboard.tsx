@@ -4,7 +4,6 @@ import { useUser } from '../context/UserContext';
 import DashboardRecycler from './DashboardRecycler';
 import DashboardResident from './DashboardResident';
 import AdminPanel from './AdminPanel';
-import DashboardInstitutional from './DashboardInstitutional';
 
 const Dashboard: React.FC = () => {
   const { user } = useUser();
@@ -13,7 +12,7 @@ const Dashboard: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-xl text-gray-600 mb-4">Debes iniciar sesión para ver esta página</p>
-          <Link to="/login" className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+          <Link to="/login" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
             Iniciar sesión
           </Link>
         </div>
@@ -26,9 +25,7 @@ const Dashboard: React.FC = () => {
   if (user.type === 'recycler') {
     return <DashboardRecycler />;
   }
-  if (user.type === 'resident_institutional') {
-    return <DashboardInstitutional />;
-  }
+  // Cualquier otro tipo (antes existía 'resident_institutional') se muestra como Referente (DashboardResident)
   return <DashboardResident />;
 };
 

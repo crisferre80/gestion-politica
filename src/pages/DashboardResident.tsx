@@ -8,9 +8,7 @@ import Map from '../components/Map';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { toast } from 'react-hot-toast';
-import RecyclerRatingsModal from '../components/RecyclerRatingsModal';
 import PhotoCapture from '../components/PhotoCapture';
-import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 import EstadisticasPanel from '../components/EstadisticasPanel';
 import { getAvatarUrl } from '../utils/feedbackHelper';
 
@@ -104,7 +102,7 @@ const DashboardResident = () => {
     // Add more specific fields if needed
   };
   
-    // --- Estado de recicladores en línea con persistencia en sessionStorage ---
+    // --- Estado de Dirigentes en línea con persistencia en sessionStorage ---
 const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
   const cached = sessionStorage.getItem('recyclers_online');
   if (cached) {
@@ -122,24 +120,24 @@ const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
   const [mapCenterToUser, setMapCenterToUser] = useState<boolean>(false);
 
 // --- Persistencia de estado del tab activo ---
-const [activeTab, setActiveTab] = useState<'puntos' | 'recicladores' | 'perfil' | 'ecocuenta' | 'historial' | 'mensajes'>(() => {
+const [activeTab, setActiveTab] = useState<'puntos' | 'Dirigentes' | 'perfil' | 'ecocuenta' | 'historial' | 'mensajes'>(() => {
   // Verificar si hay un parámetro de tab en la URL
   const urlParams = new URLSearchParams(location.search);
   const urlTab = urlParams.get('tab');
   
-  if (urlTab === 'puntos' || urlTab === 'recicladores' || urlTab === 'perfil' || urlTab === 'ecocuenta' || urlTab === 'historial' || urlTab === 'mensajes') {
+  if (urlTab === 'puntos' || urlTab === 'Dirigentes' || urlTab === 'perfil' || urlTab === 'ecocuenta' || urlTab === 'historial' || urlTab === 'mensajes') {
     return urlTab;
   }
   
   // Si no hay parámetro de URL, usar el cached
   const cachedTab = sessionStorage.getItem('dashboard_resident_active_tab');
-  if (cachedTab === 'puntos' || cachedTab === 'recicladores' || cachedTab === 'perfil' || cachedTab === 'ecocuenta' || cachedTab === 'historial' || cachedTab === 'mensajes') {
+  if (cachedTab === 'puntos' || cachedTab === 'Dirigentes' || cachedTab === 'perfil' || cachedTab === 'ecocuenta' || cachedTab === 'historial' || cachedTab === 'mensajes') {
     return cachedTab;
   }
   return 'puntos';
 });
 
-// --- Sincronizar cambios de recicladores y tab con sessionStorage ---
+// --- Sincronizar cambios de Dirigentes y tab con sessionStorage ---
 useEffect(() => {
   sessionStorage.setItem('recyclers_online', JSON.stringify(recyclers));
 }, [recyclers]);
@@ -153,11 +151,11 @@ useEffect(() => {
   useEffect(() => {
     // const fetchCollectionPoints = async () => {
     //   const { data, error } = await supabase
-    //     .from('collection_points')
+  //     .from('concentration_points')
     //     .select('*')
     //     .eq('user_id', user?.id);
     //   if (error) {
-    //     setError('Error al cargar los puntos de recolección');
+    //     setError('Error al cargar los Centros de Movilizaciòn');
     //   } else {
     //     setCollectionPoints(data);
     //   }
@@ -170,9 +168,9 @@ useEffect(() => {
   // Suscripción realtime SIEMPRE (no depende del tab)
   useEffect(() => {
     // --- Lógica mejorada: fetch inmediato tras cualquier cambio relevante (INSERT, UPDATE, DELETE) ---
-    // IMPORTANTE: Esta suscripción + polling garantiza que los recicladores en línea se actualicen en tiempo real en el panel del residente.
-    // Si alguna vez se pierde la actualización inmediata de recicladores, restaurar este bloque con polling + fetch tras cada evento realtime.
-    // Esta es la forma más robusta para reflejar cambios de sesión de recicladores sin recargar la página.
+    // IMPORTANTE: Esta suscripción + polling garantiza que los Dirigentes en línea se actualicen en tiempo real en el panel del Dirigente.
+    // Si alguna vez se pierde la actualización inmediata de Dirigentes, restaurar este bloque con polling + fetch tras cada evento realtime.
+    // Esta es la forma más robusta para reflejar cambios de sesión de Dirigentes sin recargar la página.
     let isMounted = true;
     const fetchOnlineRecyclers = async () => {
       const { data, error } = await supabase
@@ -244,19 +242,19 @@ useEffect(() => {
       )
       .subscribe((status, err) => {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[REALTIME] Estado suscripción recicladores:', status);
-          if (err) console.error('[REALTIME] Error suscripción recicladores:', err);
+          console.log('[REALTIME] Estado suscripción Dirigentes:', status);
+          if (err) console.error('[REALTIME] Error suscripción Dirigentes:', err);
         }
 
         if (status === 'SUBSCRIBED') {
           reconnectAttempts = 0; // Reset attempts on successful connection
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          console.warn('[REALTIME] Conexión recicladores perdida. Estado:', status);
+          console.warn('[REALTIME] Conexión Dirigentes perdida. Estado:', status);
           
           // Intentar reconectar si no hemos excedido el límite
           if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
-            const delay = Math.min(2000 * reconnectAttempts, 10000); // Backoff más corto para recicladores
+            const delay = Math.min(2000 * reconnectAttempts, 10000); // Backoff más corto para Dirigentes
             
             reconnectTimeout = setTimeout(() => {
               supabase.removeChannel(channel);
@@ -319,7 +317,7 @@ useEffect(() => {
     
     try {
       const { data, error } = await supabase
-        .from('collection_points')
+  .from('concentration_points')
         .select(`
           *,
           claim:collection_claims!collection_point_id(
@@ -432,11 +430,11 @@ useEffect(() => {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'collection_points',
+  table: 'concentration_points',
         filter: `user_id=eq.${user.id}`,
       }, (payload) => {
         if (isDebugMode) {
-          console.log('[REALTIME] Cambio en collection_points para usuario:', payload);
+          console.log('[REALTIME] Cambio en concentration_points para usuario:', payload);
         }
         // Actualizar inmediatamente solo para cambios en nuestros puntos
         fetchDetailedPoints();
@@ -457,7 +455,7 @@ useEffect(() => {
         // Verificar si es un punto del usuario actual usando una sola consulta con join
         try {
           const { data: pointData } = await supabase
-            .from('collection_points')
+            .from('concentration_points')
             .select(`
               id, address, user_id,
               recycler:profiles(name, avatar_url)
@@ -514,7 +512,7 @@ useEffect(() => {
         if (status === 'completed') {
           try {
             const { data: pointData } = await supabase
-              .from('collection_points')
+              .from('concentration_points')
               .select('id, address, user_id')
               .eq('id', collectionPointId)
               .eq('user_id', user.id)
@@ -544,7 +542,7 @@ useEffect(() => {
           // Para otros cambios de estado, solo actualizar datos si es nuestro punto
           try {
             const { data: pointExists } = await supabase
-              .from('collection_points')
+              .from('concentration_points')
               .select('id')
               .eq('id', collectionPointId)
               .eq('user_id', user.id)
@@ -627,7 +625,7 @@ useEffect(() => {
   // Filtrado por sub-tab
   const now = new Date();
   // Normaliza claim: si es array, toma el primero; si es objeto, lo deja igual
-// Tipos para los claims y recicladores
+// Tipos para los claims y Dirigentes
 interface RecyclerType {
   dni?: string;
   id?: string;
@@ -734,7 +732,7 @@ const puntosDemorados = detailedPoints.filter(p => {
     try {
       // 1. Crear un nuevo punto disponible (NO copiar campos de reclamo)
       const { data: newPoint, error: createError } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .insert({
           address: point.address,
           district: point.district,
@@ -756,7 +754,7 @@ const puntosDemorados = detailedPoints.filter(p => {
       }
       // 2. Eliminar el punto retirado de la base de datos
       await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .delete()
         .eq('id', point.id);
       // 3. Actualizar el estado local: quitar el retirado y agregar el nuevo disponible
@@ -776,7 +774,7 @@ const puntosDemorados = detailedPoints.filter(p => {
     try {
       // Elimina el punto de recolección
       await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .delete()
         .eq('id', point.id);
       toast.success('Punto eliminado correctamente.');
@@ -790,10 +788,7 @@ const puntosDemorados = detailedPoints.filter(p => {
 
   // (Eliminada función handleClaimPoint porque no se utiliza)
 
-// --- Calificación de recicladores ---
-const [showRatingsModal, setShowRatingsModal] = useState(false);
-const [ratingsModalTarget, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
-const [showMyRecyclerRatingsModal, setShowMyRecyclerRatingsModal] = useState<{ recyclerId: string; recyclerName?: string; avatarUrl?: string } | false>(false);
+// ratings removed
 
 // --- Estado para el modal de donación ---
 const [showDonationModal, setShowDonationModal] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string; alias?: string } | null>(null);
@@ -823,7 +818,7 @@ useEffect(() => {
   const fetchUnread = async () => {
     const recyclerUserIds = recyclers.map(r => r.user_id).filter(Boolean);
     if (recyclerUserIds.length === 0) return;
-    // Buscar mensajes no leídos enviados por cada reciclador al residente
+    // Buscar mensajes no leídos enviados por cada reciclador al Dirigente
     const { data, error } = await supabase
       .from('messages')
       .select('sender_id, receiver_id, read')
@@ -981,9 +976,9 @@ const clearUnreadForRecycler = async (recyclerUserId: string) => {
   setUnreadMessagesByRecycler(prev => ({ ...prev, [recyclerUserId]: 0 }));
 };
 
-// Limpiar todos los badges al abrir la pestaña de recicladores
+// Limpiar todos los badges al abrir la pestaña de Dirigentes
 useEffect(() => {
-  if (activeTab === 'recicladores') {
+  if (activeTab === 'Dirigentes') {
     (async () => {
       if (!user?.id) return;
       const recyclerUserIds = recyclers.map(r => r.user_id).filter(Boolean);
@@ -1146,14 +1141,14 @@ useEffect(() => {
     }
   }
 
-  // Suscripción a cambios en puntos de recolección
+  // Suscripción a cambios en Centros de Movilizaciòn
   useEffect(() => {
     if (!user?.id) return;
 
     const pointsSubscription = supabase
-      .channel('collection_points_general')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_points' }, payload => {
-        console.log('Evento general en puntos de recolección:', payload);
+      .channel('concentration_points_general')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'concentration_points' }, payload => {
+        console.log('Evento general en Centros de Movilizaciòn:', payload);
         // Actualizar estado o lógica según sea necesario
       })
       .subscribe();
@@ -1189,7 +1184,7 @@ useEffect(() => {
   const [isAssociatedToCollectivePoint, setIsAssociatedToCollectivePoint] = useState<boolean>(false);
   const [collectivePointInfo, setCollectivePointInfo] = useState<{ address: string; institutionalName: string } | null>(null);
 
-  // --- Verificar si el residente está asociado a un punto colectivo ---
+  // --- Verificar si el Dirigente está asociado a un punto colectivo ---
   useEffect(() => {
     async function checkCollectivePointAssociation() {
       if (!user?.id || !user?.address) {
@@ -1200,12 +1195,12 @@ useEffect(() => {
 
       // Buscar si existe un punto colectivo con la misma dirección del usuario
       const { data: collectivePoint, error } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select(`
           id, 
           address, 
           type,
-          profiles!collection_points_user_id_fkey(name)
+          profiles!concentration_points_user_id_fkey(name)
         `)
         .eq('address', user.address)
         .eq('type', 'colective_point')
@@ -1327,7 +1322,7 @@ useEffect(() => {
           {/* Botón para cambiar imagen del header */}
           <button
             onClick={() => setShowHeaderImageModal(true)}
-            className="cursor-pointer bg-green-600 text-white px-3 py-2 rounded shadow hover:bg-green-700 transition-all text-sm flex items-center gap-2"
+            className="cursor-pointer bg-blue-600 text-white px-3 py-2 rounded shadow hover:bg-blue-700 transition-all text-sm flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 19.5V7.125c0-.621.504-1.125 1.125-1.125h3.38c.414 0 .788-.252.94-.639l.57-1.522A1.125 1.125 0 018.21 3.75h7.58c.482 0 .915.304 1.07.764l.57 1.522c.152.387.526.639.94.639h3.38c.621 0 1.125.504 1.125 1.125V19.5a1.125 1.125 0 01-1.125 1.125H3.375A1.125 1.125 0 012.25 19.5z" />
@@ -1337,7 +1332,7 @@ useEffect(() => {
           </button>
         </div>
         {/* Imagen de cabecera grande */}
-        <div className="w-full h-40 md:h-56 rounded-2xl overflow-hidden flex items-center justify-center bg-green-100 border-2 border-green-300 mb-4 relative" style={{ minHeight: '160px', maxHeight: '220px' }}>
+        <div className="w-full h-40 md:h-56 rounded-2xl overflow-hidden flex items-center justify-center bg-blue-100 border-2 border-blue-300 mb-4 relative" style={{ minHeight: '160px', maxHeight: '220px' }}>
           <img
             src={user?.header_image_url || 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png'}
             alt="Imagen de cabecera"
@@ -1355,8 +1350,8 @@ useEffect(() => {
           </div>
         </div>
         <div className="flex flex-col items-center justify-center w-full mt-8">
-          <h2 className="text-3xl font-extrabold text-green-700 mb-1">{user?.name || 'Residente'}</h2>
-          <p className="text-gray-500 capitalize text-lg">{user?.type === 'resident' ? 'Residente' : user?.type || 'Usuario'}</p>
+          <h2 className="text-3xl font-extrabold text-blue-700 mb-1">{user?.name || 'Dirigente'}</h2>
+          <p className="text-gray-500 capitalize text-lg">{user?.type === 'resident' ? 'Dirigente' : user?.type || 'Usuario'}</p>
           {/* Etiqueta de asociación a punto colectivo */}
           {isAssociatedToCollectivePoint && collectivePointInfo && (
             <div className="mt-2">
@@ -1373,30 +1368,30 @@ useEffect(() => {
           )}
         </div>
       </div>
-      <Link to="/collection-points" className="block px-6 py-4 rounded-md font-bold text-green-700 hover:bg-green-700 hover:text-white">
+      <Link to="/collection-points" className="block px-6 py-4 rounded-md font-bold text-blue-700 hover:bg-blue-700 hover:text-white">
         <img
           src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747796657/icon_map.mp4_uphkzx.gif"
           alt="Mapa"
           className="inline-block w-15 h-12 mr-4 rounded-md align-middle"
           style={{ verticalAlign: 'middle' }}
         />
-        Puntos de Recolección ( Global )
+        Centros de Movilizaciòn ( Global )
       </Link>
 
       {/* Separador visual */}
       <div className="my-6 w-full max-w-4xl">
-        <hr className="border-t-2 border-green-100" />
+        <hr className="border-t-2 border-blue-100" />
       </div>
 
       <div
-        className="flex flex-wrap md:flex-nowrap gap-2 md:gap-1 mb-10 overflow-x-auto scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent px-3 md:px-8"
+        className="flex flex-wrap md:flex-nowrap gap-2 md:gap-1 mb-10 overflow-x-auto scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent px-3 md:px-8"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
           <button
             className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
               ${activeTab === 'puntos'
-                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
-                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+                ? 'bg-blue-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-blue-700 ring-2 ring-blue-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-blue-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
             `}
             onClick={() => setActiveTab('puntos')}
           >
@@ -1405,14 +1400,14 @@ useEffect(() => {
           </button>
           <button
             className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
-              ${activeTab === 'recicladores'
-                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
-                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+              ${activeTab === 'Dirigentes'
+                ? 'bg-blue-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-blue-700 ring-2 ring-blue-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-blue-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
             `}
-            onClick={() => setActiveTab('recicladores')}
+            onClick={() => setActiveTab('Dirigentes')}
           >
             <FaRecycle className="w-5 h-5" />
-            Recicladores
+            Dirigentes
             {/* Badge rojo si hay mensajes no leídos */}
             {Object.values(unreadMessagesByRecycler).some(count => count > 0) && (
               <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center font-bold shadow-lg border-2 border-white animate-pulse z-10">
@@ -1423,8 +1418,8 @@ useEffect(() => {
           <button
             className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
               ${activeTab === 'perfil'
-                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
-                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+                ? 'bg-blue-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-blue-700 ring-2 ring-blue-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-blue-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
             `}
             onClick={() => setActiveTab('perfil')}
           >
@@ -1434,8 +1429,8 @@ useEffect(() => {
           <button
             className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
               ${activeTab === 'ecocuenta'
-                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
-                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+                ? 'bg-blue-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-blue-700 ring-2 ring-blue-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-blue-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
             `}
             onClick={() => setActiveTab('ecocuenta')}
           >
@@ -1445,8 +1440,8 @@ useEffect(() => {
           <button
             className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
               ${activeTab === 'historial'
-                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
-                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+                ? 'bg-blue-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-blue-700 ring-2 ring-blue-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-blue-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
             `}
             onClick={() => setActiveTab('historial')}
           >
@@ -1456,8 +1451,8 @@ useEffect(() => {
           <button
             className={`flex-1 min-w-[140px] md:min-w-0 px-4 py-2 rounded-xl font-semibold transition-all duration-200 relative text-center whitespace-nowrap flex items-center justify-center gap-2 border-2
               ${activeTab === 'mensajes'
-                ? 'bg-green-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-green-700 ring-2 ring-green-300/40 scale-105 active-tab-effect'
-                : 'bg-gray-200 text-gray-700 hover:bg-green-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
+                ? 'bg-blue-600 text-white shadow-[0_4px_16px_0_rgba(34,197,94,0.25),0_1.5px_0_0_#059669_inset] border-blue-700 ring-2 ring-blue-300/40 scale-105 active-tab-effect'
+                : 'bg-gray-200 text-gray-700 hover:bg-blue-100 shadow-[0_2px_8px_0_rgba(0,0,0,0.10),0_1.5px_0_0_#e5e7eb_inset] border-gray-300 hover:shadow-[0_4px_16px_0_rgba(34,197,94,0.10),0_1.5px_0_0_#bbf7d0_inset]'}
             `}
             onClick={() => setActiveTab('mensajes')}
           >
@@ -1524,26 +1519,26 @@ useEffect(() => {
           </div>
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">Mis Puntos de Recolección</h2>
+              <h2 className="text-2xl font-bold">Mis Centros de Movilizaciòn</h2>
               {isUpdatingRealtime && (
-                <div className="flex items-center gap-2 text-green-600 text-sm font-semibold animate-fade-in">
+                <div className="flex items-center gap-2 text-blue-600 text-sm font-semibold animate-fade-in">
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                   Sincronizando datos...
                 </div>
               )}
             </div>
-            {/* Enlace para agregar punto: elimina el paso de función por state */}
+            {/* Enlace para Agregar centro: elimina el paso de función por state */}
             <Link
               to="/add-collection-point"
-              className="bg-green-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-green-700 focus:ring-4 focus:ring-green-400 focus:outline-none shadow-xl transition-all duration-300 w-fit mb-4 group animate-bounce animate-delay-500 animate-once animate-ease-in-out animate-fill-both animate-fast animate-important border-2 border-green-400 scale-105 hover:scale-110 ring-4 ring-green-300/40 hover:ring-green-500/60"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-blue-700 focus:ring-4 focus:ring-blue-400 focus:outline-none shadow-xl transition-all duration-300 w-fit mb-4 group animate-bounce animate-delay-500 animate-once animate-ease-in-out animate-fill-both animate-fast animate-important border-2 border-blue-400 scale-105 hover:scale-110 ring-4 ring-blue-300/40 hover:ring-blue-500/60"
               style={{ minWidth: 'unset', maxWidth: '220px', boxShadow: '0 0 0 4px #bbf7d0, 0 8px 24px 0 rgba(34,197,94,0.15)' }}
             >
               <FaPlus className="h-4 w-4 mr-1 group-hover:rotate-90 transition-transform duration-300" />
-              <span className="font-bold tracking-wide text-base animate-pulse">Agregar Punto</span>
+              <span className="font-bold tracking-wide text-base animate-pulse">Agregar centro</span>
             </Link>
             {(() => {
               let pointsToShow = puntosTodos;
@@ -1583,7 +1578,7 @@ useEffect(() => {
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-300">Disponible</span>
                             )}
                             {point.status === 'completed' && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold border border-green-300">Retirado</span>
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-300">Retirado</span>
                             )}
                             {activePointsTab === 'retirados' && (
                               <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-semibold border border-purple-300">
@@ -1659,7 +1654,7 @@ useEffect(() => {
                                   onClick={async () => {
                                     await handleMakeAvailableAgain(point);
                                   }}
-                                  className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md animate-bounce"
+                                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md animate-bounce"
                                 >
                                   Disponible
                                 </button>
@@ -1669,11 +1664,11 @@ useEffect(() => {
                         </div>
                         {/* Imagen del material o imagen por defecto */}
                         <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
-                          <div className={`relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}> 
+                          <div className={`relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-blue-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}> 
                             <img
                               src={point.photo_url || "https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"}
                               alt={point.photo_url ? "Foto del material" : "Punto de Recolección"}
-                              className={`w-40 h-28 object-cover rounded-lg shadow-md border border-green-200 ${isInactive ? 'grayscale' : ''}`}
+                              className={`w-40 h-28 object-cover rounded-lg shadow-md border border-blue-200 ${isInactive ? 'grayscale' : ''}`}
                               style={{ background: '#f0fdf4' }}
                               onError={(e) => {
                                 // Si la imagen del material falla, usar la imagen por defecto
@@ -1689,7 +1684,7 @@ useEffect(() => {
                                   {point.materials.slice(0, 2).map((material, idx) => (
                                     <span
                                       key={idx}
-                                      className="inline-block px-2 py-0.2 bg-green-500/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm border border-white/40"
+                                      className="inline-block px-2 py-0.2 bg-blue-500/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm border border-white/40"
                                       style={{ fontSize: '9px' }}
                                     >
                                       {material}
@@ -1710,7 +1705,7 @@ useEffect(() => {
                             {/* Indicador de foto del material */}
                             {point.photo_url && (
                               <div className="absolute top-2 right-2">
-                                <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
+                                <div className="bg-blue-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
                                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                                   </svg>
@@ -1726,7 +1721,7 @@ useEffect(() => {
                             {activePointsTab === 'demorados' && (
                               <button
                                 onClick={() => handleMakeAvailableAgain(point)}
-                                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md animate-bounce w-full md:w-auto text-sm font-semibold"
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md animate-bounce w-full md:w-auto text-sm font-semibold"
                               >
                                 ✅ Disponible
                               </button>
@@ -1736,7 +1731,7 @@ useEffect(() => {
                             {activePointsTab === 'retirados' && (
                               <>
                                 <button
-                                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 shadow-md w-full text-sm font-semibold flex items-center justify-center gap-2"
+                                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md w-full text-sm font-semibold flex items-center justify-center gap-2"
                                   onClick={() => handleMakeAvailableAgain(point)}
                                   type="button"
                                 >
@@ -1759,7 +1754,7 @@ useEffect(() => {
                                         onClick={() => {
                                           if (recyclerId) {
                                             setRatingTarget({ recyclerId, recyclerName, avatarUrl });
-                                            setShowRatingsModal(true);
+                                            // ratings removed
                                           } else {
                                             toast.error('No se pudo encontrar información del reciclador para calificar');
                                           }
@@ -1815,9 +1810,9 @@ useEffect(() => {
           </div>
         </div>
       )}
-      {activeTab === 'recicladores' && (
+      {activeTab === 'Dirigentes' && (
         <div className="w-full max-w-4xl bg-white shadow-md rounded-lg p-6">
-          {/* Mapa colocado arriba de las cards de recicladores */}
+          {/* Mapa colocado arriba de las cards de Dirigentes */}
           <div id="resident-recyclers-map" className="w-full mb-6 rounded-lg overflow-hidden" style={{ height: '480px' }}>
             <Map
               markers={recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map(r => ({
@@ -1836,13 +1831,13 @@ useEffect(() => {
           <div className="flex justify-center mb-4">
             <button
               type="button"
-              className="px-4 py-2 rounded-full bg-green-600 text-white font-semibold shadow-md border border-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200 text-sm flex items-center gap-2"
+              className="px-4 py-2 rounded-full bg-blue-600 text-white font-semibold shadow-md border border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 text-sm flex items-center gap-2"
               onClick={() => {
                 // Scroll al mapa
                 const el = document.getElementById('resident-recyclers-map');
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                // Preparar fitBounds si hay recicladores con coords, sino centrar en la posición del usuario
+                // Preparar fitBounds si hay Dirigentes con coords, sino centrar en la posición del usuario
                 const points = recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng));
                 if (points.length > 0) {
                   // calcular min/max de lat/lng
@@ -1861,7 +1856,7 @@ useEffect(() => {
                   // Resetear el flag tras un corto delay para permitir nuevas acciones futuras
                   setTimeout(() => setMapFitBounds(null), 1500);
                 } else {
-                  // No hay recicladores con coords -> centrar en la ubicación del usuario
+                  // No hay Dirigentes con coords -> centrar en la ubicación del usuario
                   setMapCenterToUser(true);
                   setTimeout(() => setMapCenterToUser(false), 1500);
                 }
@@ -1869,12 +1864,12 @@ useEffect(() => {
             >
               <FaMapMarkerAlt className="w-4 h-4" />
               <FaRecycle className="w-4 h-4" />
-              Ver recicladores en el mapa
+              Ver Dirigentes en el mapa
             </button>
           </div>
-          <h2 className="text-2xl font-bold mb-6 text-center flex items-center justify-center gap-2"><FaRecycle className="w-6 h-6 text-green-600" />Recicladores</h2>
+          <h2 className="text-2xl font-bold mb-6 text-center flex items-center justify-center gap-2"><FaRecycle className="w-6 h-6 text-blue-600" />Dirigentes</h2>
           {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).length === 0 ? (
-            <p className="text-gray-500 text-center">No hay recicladores en línea con ubicación disponible.</p>
+            <p className="text-gray-500 text-center">No hay Dirigentes en línea con ubicación disponible.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {recyclers.filter(r => r.role === 'recycler' && r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number' && !isNaN(r.lat) && !isNaN(r.lng)).map((rec) => (
@@ -1885,12 +1880,12 @@ useEffect(() => {
                       ●
                     </span>
                   )}
-                  <div className="w-20 h-20 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
+                  <div className="w-20 h-20 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-blue-600">
                     <img src={getAvatarUrl(rec.profiles?.avatar_url, rec.profiles?.name, '22c55e', 'fff')} 
                          alt="Foto de perfil" 
                          className="w-full h-full object-cover" />
                   </div>
-                  <h3 className="text-lg font-semibold text-green-700 mb-1 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-blue-700 mb-1 flex items-center gap-2">
                     {rec.profiles?.name || 'Reciclador'}
                     {/* Badge de mensajes no leídos */}
                     {unreadMessagesByRecycler[rec.user_id || ''] > 0 && (
@@ -1904,11 +1899,7 @@ useEffect(() => {
                     type="button"
                     className="flex items-center gap-2 mb-2 focus:outline-none hover:bg-yellow-50 rounded px-2 py-1 transition"
                     title="Ver calificaciones de este reciclador"
-                    onClick={() => setShowMyRecyclerRatingsModal({
-                      recyclerId: rec.id, // id interno de profiles
-                      recyclerName: rec.profiles?.name || 'Reciclador',
-                      avatarUrl: rec.profiles?.avatar_url
-                    })}
+                    onClick={() => {/* ratings removed */}}
                   >
                     <span className="flex items-center">
                       <FaStar className="h-5 w-5 text-yellow-400 mr-1" />
@@ -1933,7 +1924,7 @@ useEffect(() => {
                   {rec.user_id && /^[0-9a-fA-F-]{36}$/.test(rec.user_id) ? (
                     <Link
                       to={`/chat/${rec.user_id}`}
-                      className="mt-3 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-60 disabled:pointer-events-none relative"
+                      className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-60 disabled:pointer-events-none relative"
                       onClick={() => clearUnreadForRecycler(rec.user_id!)}
                     >
                       Enviar mensaje
@@ -1982,31 +1973,31 @@ useEffect(() => {
               />
             </div>
             <div className="hidden md:block p-4 border rounded-lg bg-gray-50">
-              <p className="text-gray-500">Selecciona una conversación para abrir el chat. Los recicladores pueden enviarte mensajes desde puntos reclamados.</p>
+              <p className="text-gray-500">Selecciona una conversación para abrir el chat. Los Dirigentes pueden enviarte mensajes desde puntos reclamados.</p>
             </div>
           </div>
         </div>
       )}
       {/* Sección Mi EcoCuenta (movida al tab ecocuenta) */}
       {activeTab === 'ecocuenta' && (
-        <div className="w-full max-w-2xl bg-gradient-to-br from-green-50 via-emerald-100 to-green-200 shadow-xl rounded-3xl p-8 flex flex-col items-center mb-8 relative overflow-hidden animate-fade-in">
+        <div className="w-full max-w-2xl bg-gradient-to-br from-blue-50 via-emerald-100 to-blue-200 shadow-xl rounded-3xl p-8 flex flex-col items-center mb-8 relative overflow-hidden animate-fade-in">
           {/* Animación de confeti al ganar recompensa */}
           {ecoRewardVisible && ecoReward && (
             <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1749495577/6ob_mwjq0t.gif" alt="Confeti" className="absolute top-0 left-0 w-full h-32 object-cover pointer-events-none animate-bounce-in" style={{zIndex:1}} />
           )}
-          <h2 className="text-3xl font-extrabold mb-4 text-green-700 drop-shadow-lg flex items-center gap-2 animate-bounce-in">
+          <h2 className="text-3xl font-extrabold mb-4 text-blue-700 drop-shadow-lg flex items-center gap-2 animate-bounce-in">
             <svg className="w-8 h-8 text-emerald-500 animate-spin-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="2" stroke="currentColor" fill="none" /><path d="M12 6v6l4 2" strokeWidth="2" stroke="currentColor" fill="none" /></svg>
             Mi EcoCuenta
           </h2>
           <div className="flex flex-col items-center gap-2 w-full">
-            <span className="text-6xl font-extrabold text-green-600 drop-shadow-lg animate-grow">{ecoCreditos}</span>
+            <span className="text-6xl font-extrabold text-blue-600 drop-shadow-lg animate-grow">{ecoCreditos}</span>
             <span className="text-gray-700 font-semibold text-lg tracking-wide">EcoCreditos acumulados</span>
             {/* Barra de progreso visual */}
             <div className="w-full max-w-xs mt-4 mb-2">
-              <div className="h-4 bg-green-200 rounded-full overflow-hidden shadow-inner">
-                <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-700" style={{ width: `${Math.min(ecoCreditos, 50) * 2}%` }}></div>
+              <div className="h-4 bg-blue-200 rounded-full overflow-hidden shadow-inner">
+                <div className="h-full bg-gradient-to-r from-blue-400 to-emerald-500 transition-all duration-700" style={{ width: `${Math.min(ecoCreditos, 50) * 2}%` }}></div>
               </div>
-              <div className="flex justify-between text-xs text-green-700 font-bold mt-1">
+              <div className="flex justify-between text-xs text-blue-700 font-bold mt-1">
                 <span>0</span>
                 <span>50</span>
               </div>
@@ -2027,7 +2018,7 @@ useEffect(() => {
                 <circle cx="60" cy="60" r="54" fill="none" stroke="#22c55e" strokeWidth="8" strokeDasharray="339.292" strokeDashoffset="{339.292 - (ecoCreditos/50)*339.292}" style={{transition:'stroke-dashoffset 0.7s'}} />
                 <text x="60" y="68" textAnchor="middle" fontSize="2.2em" fill="#16a34a" fontWeight="bold">{ecoCreditos}</text>
               </svg>
-              <span className="text-green-700 font-semibold mt-2">Progreso hacia tu recompensa</span>
+              <span className="text-blue-700 font-semibold mt-2">Progreso hacia tu recompensa</span>
             </div>
           </div>
         </div>
@@ -2039,7 +2030,7 @@ useEffect(() => {
           
           {/* Avatar actual */}
           <div className="mb-6 flex flex-col items-center">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-green-300 shadow-lg mb-4">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-blue-300 shadow-lg mb-4">
               <img
                 src={getAvatarUrl(user?.avatar_url, user?.name)}
                 alt="Foto de perfil actual"
@@ -2162,7 +2153,7 @@ useEffect(() => {
                     id="name"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
                     required
                   />
                 </div>
@@ -2173,7 +2164,7 @@ useEffect(() => {
                     id="email"
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
                     required
                   />
                 </div>
@@ -2186,7 +2177,7 @@ useEffect(() => {
                     id="phone"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
                     required
                   />
                 </div>
@@ -2197,7 +2188,7 @@ useEffect(() => {
                     id="address"
                     value={editAddress}
                     onChange={(e) => setEditAddress(e.target.value)}
-                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                    className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
                     required
                   />
                 </div>
@@ -2208,7 +2199,7 @@ useEffect(() => {
                   id="bio"
                   value={editBio}
                   onChange={(e) => setEditBio(e.target.value)}
-                  className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none resize-none"
+                  className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"
                   rows={3}
                 />
               </div>
@@ -2219,13 +2210,13 @@ useEffect(() => {
                   id="materials"
                   value={editMaterials}
                   onChange={(e) => setEditMaterials(e.target.value)}
-                  className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none"
+                  className="mt-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-400 focus:outline-none"
                   placeholder="Separados por comas"
                 />
               </div>
               <button
                 type="submit"
-                className="mt-4 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-400 focus:outline-none shadow-md transition-all duration-200"
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-400 focus:outline-none shadow-md transition-all duration-200"
               >
                 Actualizar Perfil
               </button>
@@ -2234,24 +2225,7 @@ useEffect(() => {
         </div>
       )}
       {/* Modal de calificación de reciclador, SIEMPRE disponible */}
-      {showRatingsModal && ratingsModalTarget && (
-        <RecyclerRatingsModal
-          recyclerId={ratingsModalTarget.recyclerId}
-          recyclerName={ratingsModalTarget.recyclerName}
-          avatarUrl={ratingsModalTarget.avatarUrl}
-          open={showRatingsModal}
-          onClose={() => setShowRatingsModal(false)}
-        />
-      )}
-      {showMyRecyclerRatingsModal && (
-        <MyRecyclerRatingsModal
-          open={!!showMyRecyclerRatingsModal}
-          onClose={() => setShowMyRecyclerRatingsModal(false)}
-          recyclerId={showMyRecyclerRatingsModal.recyclerId}
-          recyclerName={showMyRecyclerRatingsModal.recyclerName}
-          avatarUrl={showMyRecyclerRatingsModal.avatarUrl}
-        />
-      )}
+  {/* ratings modals removed */}
       {/* Modal de donación */}
       {showDonationModal && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -2324,11 +2298,11 @@ useEffect(() => {
       {activeTab === 'historial' && user?.id && (
         <div className="w-full max-w-4xl mx-auto flex flex-col items-center">
           <div className="w-full flex flex-col items-center justify-center">
-            <h2 className="text-2xl font-bold mb-4 text-green-700 text-center">Historial de Movimientos</h2>
+            <h2 className="text-2xl font-bold mb-4 text-blue-700 text-center">Historial de Movimientos</h2>
             <div className="space-y-8 w-full">
               {/* Puntos Creados */}
               <div>
-                <h3 className="text-lg font-semibold text-green-800 mb-2 text-center">Puntos Creados</h3>
+                <h3 className="text-lg font-semibold text-blue-800 mb-2 text-center">Puntos Creados</h3>
                 {detailedPoints.length === 0 ? (
                   <p className="text-gray-500 text-center">No has creado puntos aún.</p>
                 ) : (

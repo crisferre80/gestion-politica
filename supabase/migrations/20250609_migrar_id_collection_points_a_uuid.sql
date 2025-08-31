@@ -2,7 +2,7 @@
 -- Fecha: 2025-06-09
 
 -- 1. Eliminar políticas que dependen de id (y que bloquean el ALTER)
-DROP POLICY IF EXISTS "Residente o reciclador puede actualizar punto" ON public.collection_points;
+DROP POLICY IF EXISTS "Dirigente o reciclador puede actualizar punto" ON public.collection_points;
 DROP POLICY IF EXISTS "Usuarios pueden actualizar solo sus propios puntos" ON public.collection_points;
 DROP POLICY IF EXISTS "Usuarios pueden eliminar solo sus propios puntos" ON public.collection_points;
 DROP POLICY IF EXISTS "Reciclador puede ver puntos reclamados" ON public.collection_points;
@@ -49,7 +49,7 @@ CREATE POLICY "Reciclador puede ver puntos reclamados"
     )
   );
 
-CREATE POLICY "Residente o reciclador puede actualizar punto"
+CREATE POLICY "Dirigente o reciclador puede actualizar punto"
   ON public.collection_points
   FOR UPDATE
   TO public

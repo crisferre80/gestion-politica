@@ -31,7 +31,7 @@ const EstadisticasPanel: React.FC<EstadisticasPanelProps> = ({ userId }) => {
       try {
         // Puntos creados por mes SOLO del usuario
         const { data: createdPoints } = await supabase
-          .from('collection_points')
+          .from('concentration_points')
           .select('id, created_at, user_id, status')
           .eq('user_id', userId);
         // Reclamos por mes y estado SOLO del usuario
@@ -79,14 +79,14 @@ const EstadisticasPanel: React.FC<EstadisticasPanelProps> = ({ userId }) => {
     fetchStats();
   }, [userId]);
 
-  if (loading) return <div className="text-center text-green-700">Cargando estadísticas...</div>;
+  if (loading) return <div className="text-center text-blue-700">Cargando estadísticas...</div>;
   if (error) return <div className="text-center text-red-600">{error}</div>;
   if (!stats) return null;
 
   return (
     <div className="space-y-10">
       <div className="bg-white rounded-xl p-6 shadow">
-        <h2 className="text-xl font-bold text-green-700 mb-2 flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Puntos y Reclamos por Mes</h2>
+        <h2 className="text-xl font-bold text-blue-700 mb-2 flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Puntos y Reclamos por Mes</h2>
         <Bar
           data={{
             labels: stats.months,

@@ -1,14 +1,14 @@
 # Manual de Usuario - EcoNecta
 
-Bienvenido a EcoNecta, la plataforma para la gestión eficiente de reciclaje y puntos de recolección. Este documento describe las funciones principales de la aplicación y cómo utilizarlas, tanto para residentes como para recicladores y administradores.
+Bienvenido a EcoNecta, la plataforma para la gestión eficiente de reciclaje y Centros de Movilizaciòn. Este documento describe las funciones principales de la aplicación y cómo utilizarlas, tanto para Dirigentes como para Dirigentes y administradores.
 
 ---
 
 ## Índice
 1. [Ingreso y Registro](#ingreso-y-registro)
-2. [Panel de Residente](#panel-de-residente)
-   - [Puntos de Recolección](#puntos-de-recolección)
-   - [Recicladores en Línea](#recicladores-en-línea)
+2. [Panel de Dirigente](#panel-de-Dirigente)
+   - [Centros de Movilizaciòn](#puntos-de-recolección)
+   - [Dirigentes en Línea](#Dirigentes-en-línea)
    - [Mi Perfil](#mi-perfil)
    - [Historial](#historial)
 3. [Panel de Reciclador](#panel-de-reciclador)
@@ -20,16 +20,16 @@ Bienvenido a EcoNecta, la plataforma para la gestión eficiente de reciclaje y p
 ---
 
 ## 1. Ingreso y Registro
-- Puedes registrarte como **residente** o **reciclador**.
-- El registro requiere nombre, correo electrónico, contraseña y, para recicladores, información adicional de contacto y materiales que recicla.
+- Puedes registrarte como **Dirigente** o **reciclador**.
+- El registro requiere nombre, correo electrónico, contraseña y, para Dirigentes, información adicional de contacto y materiales que recicla.
 - El acceso se realiza desde la pantalla principal.
 
-## 2. Panel de Residente
-Al ingresar como residente, accedes a un panel con varias pestañas:
+## 2. Panel de Dirigente
+Al ingresar como Dirigente, accedes a un panel con varias pestañas:
 
-### Puntos de Recolección
-- **Ver tus puntos:** Lista todos los puntos de recolección que has creado.
-- **Agregar punto:** Botón para registrar un nuevo punto de recolección, indicando dirección, materiales, horario y notas.
+### Centros de Movilizaciòn
+- **Ver tus puntos:** Lista todos los Centros de Movilizaciòn que has creado.
+- **Agregar centro:** Botón para registrar un nuevo punto de recolección, indicando dirección, materiales, horario y notas.
 - **Estados de puntos:**
   - **Disponible:** A la espera de ser reclamado por un reciclador.
   - **Reclamado:** Un reciclador ha aceptado el retiro.
@@ -37,9 +37,9 @@ Al ingresar como residente, accedes a un panel con varias pestañas:
   - **Retirado:** El punto fue retirado y completado.
 - **Acciones:** Puedes eliminar puntos disponibles, volver a poner como disponible un punto retirado, y ver detalles del reciclador reclamante.
 
-### Recicladores en Línea
-- **Mapa:** Visualiza en tiempo real los recicladores conectados y su ubicación.
-- **Lista:** Muestra recicladores en línea, su información de contacto, materiales, calificaciones y opción de enviar mensaje.
+### Dirigentes en Línea
+- **Mapa:** Visualiza en tiempo real los Dirigentes conectados y su ubicación.
+- **Lista:** Muestra Dirigentes en línea, su información de contacto, materiales, calificaciones y opción de enviar mensaje.
 - **Mensajes no leídos:** Se indica con un badge rojo si tienes mensajes pendientes de leer de algún reciclador.
 
 ### Mi Perfil
@@ -53,33 +53,33 @@ Al ingresar como residente, accedes a un panel con varias pestañas:
 - (Próximamente) Consulta el historial de tus puntos y retiros realizados.
 
 ## 3. Panel de Reciclador
-- **Ver puntos disponibles:** Lista y mapa de puntos de recolección cercanos.
+- **Ver puntos disponibles:** Lista y mapa de Centros de Movilizaciòn cercanos.
 - **Reclamar punto:** Acepta un punto para su retiro.
 - **Actualizar estado:** Marca el punto como retirado al completar la recolección.
-- **Calificaciones:** Recibe y visualiza calificaciones de los residentes.
+- **Calificaciones:** Recibe y visualiza calificaciones de los Dirigentes.
 - **Perfil:** Edita tus datos y materiales reciclados.
 
 ## 4. Panel de Administrador
-- **Gestión de usuarios:** Visualiza y administra residentes y recicladores.
+- **Gestión de usuarios:** Visualiza y administra Dirigentes y Dirigentes.
 - **Zonas y estadísticas:** Acceso a reportes, zonas de cobertura y estadísticas de reciclaje.
 - **Notificaciones:** Envía mensajes globales o segmentados.
 
 ## 5. Mensajería y Notificaciones
-- **Chat residente-reciclador:** Comunicación directa entre ambas partes, con notificación de mensajes no leídos.
+- **Chat Dirigente-reciclador:** Comunicación directa entre ambas partes, con notificación de mensajes no leídos.
 - **Notificaciones:** Alertas sobre cambios de estado, nuevos puntos, y mensajes importantes.
 
 ## 6. EcoCréditos y Recompensas
-- **Acumulación:** Por cada punto retirado, el residente suma EcoCréditos.
+- **Acumulación:** Por cada punto retirado, el Dirigente suma EcoCréditos.
 - **Recompensas:** Al alcanzar múltiplos de 50 EcoCréditos, se notifica y habilita el canje por plantas o árboles.
 - **Visualización:** Barra de progreso y animaciones motivacionales.
 
 ## 7. Preguntas Frecuentes
 - **¿Cómo agrego un punto?**
-  - Desde la pestaña "Mis Puntos", haz clic en "Agregar Punto" y completa el formulario.
+  - Desde la pestaña "Mis Puntos", haz clic en "Agregar centro" y completa el formulario.
 - **¿Cómo contacto a un reciclador?**
-  - Desde la pestaña "Recicladores", selecciona uno en línea y haz clic en "Enviar mensaje".
-- **¿Por qué no veo recicladores en línea?**
-  - Puede que no haya recicladores conectados en ese momento o no tengan ubicación disponible.
+  - Desde la pestaña "Dirigentes", selecciona uno en línea y haz clic en "Enviar mensaje".
+- **¿Por qué no veo Dirigentes en línea?**
+  - Puede que no haya Dirigentes conectados en ese momento o no tengan ubicación disponible.
 - **¿Cómo obtengo recompensas?**
   - Acumula EcoCréditos y sigue las instrucciones en la sección "Mi EcoCuenta".
 

@@ -30,7 +30,7 @@ const ChatList: React.FC<ChatListProps> = ({ chats, onChatSelect, selectedUserId
             key={chat.userId}
             onClick={() => onChatSelect(chat.userId)}
             className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${
-              selectedUserId === chat.userId ? 'bg-green-50' : ''
+              selectedUserId === chat.userId ? 'bg-blue-50' : ''
             }`}
           >
             <div className="flex items-center space-x-4">
@@ -42,8 +42,8 @@ const ChatList: React.FC<ChatListProps> = ({ chats, onChatSelect, selectedUserId
                     className="h-10 w-10 rounded-full"
                   />
                 ) : (
-                  <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                    <User className="h-6 w-6 text-green-600" />
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <User className="h-6 w-6 text-blue-600" />
                   </div>
                 )}
               </div>
@@ -67,7 +67,7 @@ const ChatList: React.FC<ChatListProps> = ({ chats, onChatSelect, selectedUserId
               </div>
               {chat.unreadCount > 0 && (
                 <div className="ml-2">
-                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-green-100 text-green-800 text-xs font-medium">
+                  <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
                     {chat.unreadCount}
                   </span>
                 </div>

@@ -1,13 +1,13 @@
-TÉRMINOS Y CONDICIONES DE USO – ASURA EcoNecta2
+TÉRMINOS Y CONDICIONES DE USO – Gestion Dirigencial y Politica
 1. Aceptación de los Términos
-El presente documento establece los Términos y Condiciones de uso de la aplicación móvil Asura EcoNecta2, en adelante “la Aplicación” o “el Servicio”, desarrollada por el equipo de ASURA (Asociación Sindical Única de Recicladores Argentinos). Al acceder, instalar o usar la aplicación, usted (“el Usuario”), acepta regirse por estos términos y condiciones. Si no está de acuerdo, no deberá utilizar la Aplicación.
+El presente documento establece los Términos y Condiciones de uso de la aplicación móvil Gestion Dirigencial y Politica, en adelante “la Aplicación” o “el Servicio”, desarrollada por el equipo de ASURA (Asociación Sindical Única de Dirigentes Argentinos). Al acceder, instalar o usar la aplicación, usted (“el Usuario”), acepta regirse por estos términos y condiciones. Si no está de acuerdo, no deberá utilizar la Aplicación.
 
 2. Descripción del Servicio
-Asura EcoNecta2 es una aplicación móvil gratuita destinada a conectar residencias, empresas y recolectores urbanos, optimizando la gestión domiciliaria y el transporte de residuos reciclables mediante tecnología de geolocalización y funcionalidades interactivas.
+Gestion Dirigencial y Politica es una aplicación móvil gratuita destinada a conectar residencias, empresas y recolectores urbanos, optimizando la gestión domiciliaria y el transporte de residuos reciclables mediante tecnología de geolocalización y funcionalidades interactivas.
 
 El Servicio permite:
 
-A los residentes: registrar solicitudes de recolección, seguir el estado de sus pedidos, calificar el servicio y acumular eco-créditos.
+A los Dirigentes: registrar solicitudes de recolección, seguir el estado de sus pedidos, calificar el servicio y acumular eco-créditos.
 
 A los recolectores: ver rutas asignadas, marcar puntos completados, gestionar su perfil y comunicarse con la administración.
 
@@ -16,7 +16,7 @@ A las empresas recicladoras: optimizar la recepción de materiales y promover la
 3. Registro y Cuentas de Usuario
 Para acceder a las funcionalidades de la app, se requiere:
 
-Descargar Asura EcoNecta2 desde un enlace oficial o escaneando el código QR.
+Descargar Gestion Dirigencial y Politica desde un enlace oficial o escaneando el código QR.
 
 Crear una cuenta según el perfil correspondiente (vecino/empresa o recolector urbano).
 
@@ -40,9 +40,9 @@ Mantener el respeto en todo intercambio de mensajes o denuncias dentro de la apl
 Aceptar que todas las denuncias son confidenciales y serán gestionadas exclusivamente por el equipo de ASURA.
 
 5. Funcionalidades de la Aplicación
-Para Residentes y Empresas:
+Para Dirigentes y Empresas:
 
-Crear puntos de recolección con ubicación, tipo de residuo y horario preferente.
+Crear Centros de Movilizaciòn con ubicación, tipo de residuo y horario preferente.
 
 Ver el estado de sus pedidos: Disponible, Reclamado, Demorado o Retirado.
 
@@ -65,7 +65,7 @@ Comunicar incidencias o sugerencias al administrador.
 Gestionar su perfil y suscripciones.
 
 6. Eco Créditos y Recompensas
-El sistema de eco-créditos recompensa a los residentes que clasifican y entregan residuos correctamente. Estos créditos pueden ser canjeados por beneficios que la entidad ASURA determine en su momento, y están sujetos a revisión y validación.
+El sistema de eco-créditos recompensa a los Dirigentes que clasifican y entregan residuos correctamente. Estos créditos pueden ser canjeados por beneficios que la entidad ASURA determine en su momento, y están sujetos a revisión y validación.
 
 7. Política de Privacidad y Datos
 Los datos personales ingresados en la app son confidenciales y utilizados exclusivamente para la operación del servicio. ASURA garantiza la protección de la privacidad de los usuarios de acuerdo con las normativas locales vigentes.
@@ -82,7 +82,7 @@ Inexactitudes en las rutas generadas por herramientas externas como Google Maps 
 
 Retrasos ocasionados por causas ajenas al sistema (clima, tráfico, etc.).
 
-Incumplimientos entre usuarios (por ejemplo, ausencia del residente en la hora acordada).
+Incumplimientos entre usuarios (por ejemplo, ausencia del Dirigente en la hora acordada).
 
 10. Modificaciones de los Términos
 ASURA se reserva el derecho a modificar estos Términos y Condiciones en cualquier momento. Las modificaciones serán notificadas mediante la propia aplicación y/o canales oficiales.
@@ -90,4 +90,4 @@ ASURA se reserva el derecho a modificar estos Términos y Condiciones en cualqui
 11. Legislación Aplicable
 Este acuerdo se rige por las leyes de la República Argentina. Cualquier controversia será resuelta en los tribunales ordinarios con jurisdicción en la Ciudad Capital de Santiago del Estero, salvo pacto en contrario.
 
-© 2025 Asura EcoNecta2. Todos los derechos reservados.
+© 2025 Gestion Dirigencial y Politica. Todos los derechos reservados.

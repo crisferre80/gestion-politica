@@ -150,7 +150,7 @@ export type Database = {
           },
         ]
       }
-      collection_points: {
+      concentration_points: {
         Row: {
           additional_info: string | null
           address: string | null
@@ -213,21 +213,21 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "collection_points_recycler_id_fkey"
+            foreignKeyName: "concentration_points_recycler_id_fkey"
             columns: ["recycler_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
           {
-            foreignKeyName: "collection_points_user_id_fkey"
+            foreignKeyName: "concentration_points_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
           {
-            foreignKeyName: "fk_collection_points_claim_id"
+            foreignKeyName: "fk_concentration_points_claim_id"
             columns: ["claim_id"]
             isOneToOne: false
             referencedRelation: "collection_claims"

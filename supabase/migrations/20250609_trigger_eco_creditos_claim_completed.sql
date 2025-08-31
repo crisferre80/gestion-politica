@@ -1,4 +1,4 @@
--- 2025-06-09: Trigger para sumar 10 EcoCreditos al residente cuando un claim pasa a 'completed'
+-- 2025-06-09: Trigger para sumar 10 EcoCreditos al Dirigente cuando un claim pasa a 'completed'
 
 CREATE OR REPLACE FUNCTION sumar_eco_creditos_al_completar_claim()
 RETURNS TRIGGER AS $$

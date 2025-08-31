@@ -9,7 +9,7 @@ import { enviarMensajeSeguro } from '../lib/chatUtils';
 const Chat = () => {
   // El parámetro debe ser el user_id (UUID de Supabase Auth)
   const { otherUserId } = useParams<{ otherUserId: string }>(); // Debe ser user_id
-  const { user } = useUser(); // El residente autenticado
+  const { user } = useUser(); // El Dirigente autenticado
   const { messages, fetchConversation } = useMessages();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,7 +76,7 @@ const Chat = () => {
           await createNotification({
             user_id: otherUserId,
             title: 'Nuevo mensaje',
-            content: `Has recibido un nuevo mensaje de ${user?.name || 'un residente'}.`,
+            content: `Has recibido un nuevo mensaje de ${user?.name || 'un Dirigente'}.`,
             type: 'new_message',
             related_id: myUserId,
             user_name: user?.name,
@@ -105,10 +105,10 @@ const Chat = () => {
 
   return (
     <div className="max-w-3xl mx-auto p-0 md:p-6 bg-white rounded-2xl shadow-xl flex flex-col md:flex-row gap-0 md:gap-6 border border-gray-200">
-      {/* Botón para volver al panel del residente */}
+      {/* Botón para volver al panel del Dirigente */}
       <div className="w-full flex items-center mb-2">
         <button
-          className="flex items-center gap-2 px-3 py-1 bg-green-100 hover:bg-green-200 text-green-800 rounded-md font-semibold shadow-sm border border-green-300 mt-2 mb-2 ml-2"
+          className="flex items-center gap-2 px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md font-semibold shadow-sm border border-blue-300 mt-2 mb-2 ml-2"
           onClick={() => {
             if (window.history.length > 2) {
               navigate(-1);
@@ -123,9 +123,9 @@ const Chat = () => {
         </button>
       </div>
       {/* Conversación principal */}
-      <div className="flex flex-col w-full md:w-2/3 border-b md:border-b-0 md:border-r border-gray-200 px-4 py-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none">
+      <div className="flex flex-col w-full md:w-2/3 border-b md:border-b-0 md:border-r border-gray-200 px-4 py-6 bg-gradient-to-br from-blue-50 to-blue-50 rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-green-400 bg-white flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-blue-400 bg-white flex items-center justify-center">
             {otherProfile.avatar_url ? (
               <img src={otherProfile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
             ) : (
@@ -133,7 +133,7 @@ const Chat = () => {
             )}
           </div>
           <div>
-            <h2 className="text-lg md:text-xl font-bold text-green-800 mb-0 leading-tight">{otherProfile.name || 'Usuario'}</h2>
+            <h2 className="text-lg md:text-xl font-bold text-blue-800 mb-0 leading-tight">{otherProfile.name || 'Usuario'}</h2>
             <span className="text-xs text-gray-500">Chat privado</span>
           </div>
         </div>
@@ -142,7 +142,7 @@ const Chat = () => {
           {loading ? (
             <div className="h-64 flex items-center justify-center border p-2 mb-4 bg-gray-50 rounded-lg">Cargando...</div>
           ) : (
-            <div className="h-96 md:h-[32rem] overflow-y-auto border p-3 mb-4 bg-white rounded-lg shadow-inner flex flex-col gap-2 scrollbar-thin scrollbar-thumb-green-200 scrollbar-track-transparent">
+            <div className="h-96 md:h-[32rem] overflow-y-auto border p-3 mb-4 bg-white rounded-lg shadow-inner flex flex-col gap-2 scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent">
               {messages.map(msg => {
                 const isMe = msg.senderId === myUserId;
                 const profile = isMe ? myProfile : otherProfile;
@@ -151,7 +151,7 @@ const Chat = () => {
                     key={msg.id}
                     className={`flex items-end gap-2 ${isMe ? 'justify-end flex-row-reverse' : ''}`}
                   >
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-green-600">
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 border-2 border-blue-600">
                       {profile.avatar_url ? (
                         <img src={profile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
                       ) : (
@@ -170,7 +170,7 @@ const Chat = () => {
                       <span
                         className={`px-4 py-2 rounded-2xl block break-words shadow text-sm ${
                           isMe
-                            ? 'bg-gradient-to-br from-green-400 to-green-600 text-white rounded-br-md'
+                            ? 'bg-gradient-to-br from-blue-400 to-blue-600 text-white rounded-br-md'
                             : 'bg-gray-100 text-gray-900 rounded-bl-md'
                         }`}
                       >
@@ -202,7 +202,7 @@ const Chat = () => {
           />
           <button
             type="submit"
-            className="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-xl font-semibold shadow disabled:opacity-50 transition"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-xl font-semibold shadow disabled:opacity-50 transition"
             disabled={loading || !input.trim()}
           >
             Enviar

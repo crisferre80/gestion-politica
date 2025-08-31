@@ -152,22 +152,22 @@ const AdminPanel: React.FC = () => {
 
   const fetchCollectionPoints = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from('collection_points').select('*');
+    const { data, error } = await supabase.from('concentration_points').select('*');
       if (error) {
-        console.error('Error al cargar puntos de recolección:', error.message);
-        alert(`Error al cargar puntos de recolección: ${error.message}`);
+        console.error('Error al cargar Centros de Movilizaciòn:', error.message);
+        alert(`Error al cargar Centros de Movilizaciòn: ${error.message}`);
         return;
       }
       if (data) {
         setCollectionPoints(data);
       }
     } catch (err) {
-      console.error('Error inesperado al cargar puntos de recolección:', err);
-      alert('Error inesperado al cargar puntos de recolección. Verifique la conexión con el servidor.');
+      console.error('Error inesperado al cargar Centros de Movilizaciòn:', err);
+      alert('Error inesperado al cargar Centros de Movilizaciòn. Verifique la conexión con el servidor.');
     }
   }, []);
 
-  // Cargar usuarios y puntos de recolección
+  // Cargar usuarios y Centros de Movilizaciòn
   useEffect(() => {
     fetchUsersAndPoints();
   }, [selectedUser, fetchUsersAndPoints]);
@@ -192,15 +192,15 @@ const AdminPanel: React.FC = () => {
     checkEmailService();
   }, []);
 
-  // Agregar suscripción en tiempo real a la tabla collection_points
+  // Agregar suscripción en tiempo real a la tabla concentration_points
   useEffect(() => {
-    const subscription = supabase
-        .channel('collection_points')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_points' }, (payload) => {
-            console.log('Cambio detectado en collection_points:', payload);
-            fetchCollectionPoints(); // Refrescar puntos de recolección
-        })
-        .subscribe();
+  const subscription = supabase
+    .channel('concentration_points')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'concentration_points' }, (payload) => {
+      console.log('Cambio detectado en concentration_points:', payload);
+      fetchCollectionPoints(); // Refrescar Centros de Movilizaci2n
+    })
+    .subscribe();
 
     return () => {
         supabase.removeChannel(subscription);
@@ -237,9 +237,9 @@ const AdminPanel: React.FC = () => {
       let filteredUsers = users;
 
       // Filtrar usuarios según el tipo de notificación seleccionado
-      if (notifType === 'Recicladores') {
+      if (notifType === 'Dirigentes') {
         filteredUsers = users.filter(user => user.role === 'recycler');
-      } else if (notifType === 'Residentes') {
+      } else if (notifType === 'Referentes') {
         filteredUsers = users.filter(user => user.role === 'resident');
       } else if (notifType === 'Individual' && selectedUser) {
         filteredUsers = [selectedUser];
@@ -309,7 +309,7 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // Cargar recicladores para asignación
+  // Cargar Dirigentes para asignación
   useEffect(() => {
     const fetchRecyclers = async () => {
       const { data } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url').eq('role', 'recycler');
@@ -332,7 +332,7 @@ const AdminPanel: React.FC = () => {
   const assignCollectionPointToRecycler = async (recyclerId: string, pointId: string) => {
     try {
       const { error } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .update({ recycler_id: recyclerId })
         .eq('id', pointId);
 
@@ -364,12 +364,12 @@ const AdminPanel: React.FC = () => {
   const fetchResidentPoints = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select('*')
         .eq('user_id', userId);
 
       if (error) {
-        throw new Error(`Error al obtener puntos de recolección: ${error.message}`);
+        throw new Error(`Error al obtener Centros de Movilizaciòn: ${error.message}`);
       }
 
       setResidentPoints(data || []);
@@ -838,11 +838,11 @@ const AdminPanel: React.FC = () => {
                 onClick={() => setUserFilter("recycler")}
                 className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
                   userFilter === "recycler" 
-                    ? "bg-green-600 text-white" 
+                    ? "bg-blue-600 text-white" 
                     : "bg-gray-200 text-gray-800 hover:bg-gray-300"
                 }`}
               >
-                Recicladores
+                Dirigentes
               </button>
               <button
                 onClick={() => setUserFilter("resident")}
@@ -852,17 +852,7 @@ const AdminPanel: React.FC = () => {
                     : "bg-gray-200 text-gray-800 hover:bg-gray-300"
                 }`}
               >
-                Residentes
-              </button>
-              <button
-                onClick={() => setUserFilter("resident_institutional")}
-                className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
-                  userFilter === "resident_institutional" 
-                    ? "bg-purple-600 text-white" 
-                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                }`}
-              >
-                Residentes Institucionales
+                Referentes
               </button>
             </div>
           </div>
@@ -878,12 +868,12 @@ const AdminPanel: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-lg font-semibold truncate">{user.name}</p>
                       <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                      <p className="text-sm font-medium" style={{ color: user.role === 'admin' ? 'blue' : user.role === 'recycler' ? 'green' : user.role === 'resident_institutional' ? 'purple' : 'orange' }}>
-                        {user.role === 'admin' ? 'Administrador' : user.role === 'recycler' ? 'Reciclador' : user.role === 'resident_institutional' ? 'Residente Institucional' : 'Residente'}
+                      <p className="text-sm font-medium" style={{ color: user.role === 'admin' ? 'blue' : user.role === 'recycler' ? 'blue' : user.role === 'resident_institutional' ? 'purple' : 'orange' }}>
+                        {user.role === 'admin' ? 'Administrador' : user.role === 'recycler' ? 'Reciclador' : user.role === 'resident_institutional' ? 'Dirigente Institucional' : 'Dirigente'}
                       </p>
                       {user.role === 'resident' && (
                         <div className="mt-2">
-                          <h4 className="text-sm font-semibold">Puntos de Recolección:</h4>
+                          <h4 className="text-sm font-semibold">Centros de Movilizaciòn:</h4>
                           <ul className="list-disc pl-5">
                             {collectionPoints.filter(point => point.user_id === user.user_id).map(point => (
                               <li key={point.id}>{point.location}</li>
@@ -984,16 +974,16 @@ const AdminPanel: React.FC = () => {
                     <span>Individual</span>
                   </button>
                   <button
-                    onClick={() => setNotifType('Recicladores')} // Cambiar a notifType
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Recicladores' ? 'bg-green-800 text-white' : 'bg-green-600 text-gray-200'}`}
+                    onClick={() => setNotifType('Dirigentes')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Dirigentes' ? 'bg-blue-800 text-white' : 'bg-blue-600 text-gray-200'}`}
                   >
-                    <span>Recicladores</span>
+                    <span>Dirigentes</span>
                   </button>
                   <button
-                    onClick={() => setNotifType('Residentes')} // Cambiar a notifType
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Residentes' ? 'bg-orange-800 text-white' : 'bg-orange-600 text-gray-200'}`}
+                    onClick={() => setNotifType('Referentes')}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-2 ${notifType === 'Referentes' ? 'bg-orange-800 text-white' : 'bg-orange-600 text-gray-200'}`}
                   >
-                    <span>Residentes</span>
+                    <span>Referentes</span>
                   </button>
                 </div>
                 <div className="mt-4">
@@ -1005,9 +995,9 @@ const AdminPanel: React.FC = () => {
                       onClick={() => {
                         // Filtrar usuarios según el tipo seleccionado
                         let filteredUsers = users;
-                        if (notifType === 'Recicladores') {
+                        if (notifType === 'Dirigentes') {
                           filteredUsers = users.filter(user => user.role === 'recycler');
-                        } else if (notifType === 'Residentes') {
+                        } else if (notifType === 'Referentes') {
                           filteredUsers = users.filter(user => user.role === 'resident');
                         }
                         
@@ -1034,7 +1024,7 @@ const AdminPanel: React.FC = () => {
                       id="send-email"
                       checked={sendEmail}
                       onChange={(e) => setSendEmail(e.target.checked)}
-                      className="h-5 w-5 text-green-600 rounded"
+                      className="h-5 w-5 text-blue-600 rounded"
                       disabled={emailServiceStatus !== 'available'}
                     />
                     <label htmlFor="send-email" className="ml-2 text-gray-700">
@@ -1266,9 +1256,9 @@ const AdminPanel: React.FC = () => {
       {showPointsModal && (
         <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
           <div className="bg-white rounded-lg p-4 w-96 sm:w-[32rem]">
-            <h3 className="text-lg font-semibold mb-4">Puntos de Recolección</h3>
+            <h3 className="text-lg font-semibold mb-4">Centros de Movilizaciòn</h3>
             {residentPoints.length === 0 ? (
-              <p className="text-sm text-gray-500">No hay puntos de recolección creados por este residente.</p>
+              <p className="text-sm text-gray-500">No hay Centros de Movilizaciòn creados por este Dirigente.</p>
             ) : (
               <ul className="space-y-2">
                 {residentPoints.map((point: CollectionPoint) => (
@@ -1285,7 +1275,7 @@ const AdminPanel: React.FC = () => {
                     </select>
                     <button
                       onClick={() => selectedRecycler && handleAssignPoint(selectedRecycler.id, point.id)}
-                      className="px-2 py-1 text-xs rounded-lg bg-green-600 text-white font-semibold"
+                      className="px-2 py-1 text-xs rounded-lg bg-blue-600 text-white font-semibold"
                     >
                       Asignar
                     </button>

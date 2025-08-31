@@ -33,9 +33,9 @@ const FeedbackForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-green-50 py-8 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-blue-50 py-8 px-4">
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-4 text-green-700 text-center">Reclamos y Sugerencias</h2>
+        <h2 className="text-2xl font-bold mb-4 text-blue-700 text-center">Reclamos y Sugerencias</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-gray-700 font-semibold mb-1">Tipo</label>
@@ -79,10 +79,10 @@ const FeedbackForm: React.FC = () => {
             />
           </div>
           {error && <div className="text-red-600 text-sm">{error}</div>}
-          {success && <div className="text-green-600 text-sm">¡Tu mensaje fue enviado correctamente!</div>}
+          {success && <div className="text-blue-600 text-sm">¡Tu mensaje fue enviado correctamente!</div>}
           <button
             type="submit"
-            className="w-full bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700 transition"
+            className="w-full bg-blue-600 text-white font-bold py-2 rounded hover:bg-blue-700 transition"
             disabled={loading}
           >
             {loading ? 'Enviando...' : 'Enviar'}

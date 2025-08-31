@@ -253,7 +253,7 @@ const AdminAdsGrid: React.FC<AdminAdsGridProps> = ({ ads, onUpdate }) => {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 w-full sm:w-auto"
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 w-full sm:w-auto"
       >
         {saving ? 'Guardando...' : 'Guardar grilla'}
       </button>

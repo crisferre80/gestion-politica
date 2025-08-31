@@ -205,7 +205,7 @@ CREATE POLICY "Usuarios ven su perfil o admin"
     id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
--- 2. Cualquier usuario puede ver perfiles de residentes de puntos disponibles
+-- 2. Cualquier usuario puede ver perfiles de Dirigentes de puntos disponibles
 DROP POLICY IF EXISTS "Cualquier usuario ve perfiles de puntos disponibles" ON profiles;
 CREATE POLICY "Cualquier usuario ve perfiles de puntos disponibles"
   ON profiles
@@ -216,7 +216,7 @@ CREATE POLICY "Cualquier usuario ve perfiles de puntos disponibles"
     OR id IN (SELECT user_id FROM collection_points WHERE status = 'available')
   );
 
--- 3. Cualquier usuario puede ver puntos de recolección disponibles
+-- 3. Cualquier usuario puede ver Centros de Movilizaciòn disponibles
 DROP POLICY IF EXISTS "Cualquier usuario ve puntos disponibles" ON collection_points;
 CREATE POLICY "Cualquier usuario ve puntos disponibles"
   ON collection_points
@@ -234,14 +234,14 @@ CREATE POLICY "Usuarios crean puntos propios"
   FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
--- 5. Recicladores pueden reclamar puntos
-DROP POLICY IF EXISTS "Recicladores pueden reclamar puntos" ON collection_claims;
-CREATE POLICY "Recicladores pueden reclamar puntos"
+-- 5. Dirigentes pueden reclamar puntos
+DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON collection_claims;
+CREATE POLICY "Dirigentes pueden reclamar puntos"
   ON collection_claims
   FOR INSERT
   WITH CHECK (recycler_id = auth.uid());
 
--- 6. Recicladores y residentes pueden ver sus claims y el admin todos
+-- 6. Dirigentes y Dirigentes pueden ver sus claims y el admin todos
 DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON collection_claims;
 CREATE POLICY "Usuarios ven claims propios o admin"
   ON collection_claims
@@ -272,15 +272,15 @@ CREATE POLICY "Usuarios pueden enviar mensajes"
   FOR INSERT
   WITH CHECK (sender_id = auth.uid());
 
--- 9. Ratings: todos pueden ver, solo residentes pueden calificar
-DROP POLICY IF EXISTS "Usuarios pueden ver ratings de recicladores" ON recycler_ratings;
-CREATE POLICY "Usuarios pueden ver ratings de recicladores"
+-- 9. Ratings: todos pueden ver, solo Dirigentes pueden calificar
+DROP POLICY IF EXISTS "Usuarios pueden ver ratings de Dirigentes" ON recycler_ratings;
+CREATE POLICY "Usuarios pueden ver ratings de Dirigentes"
   ON recycler_ratings
   FOR SELECT
   USING (true);
 
-DROP POLICY IF EXISTS "Usuarios pueden calificar recicladores" ON recycler_ratings;
-CREATE POLICY "Usuarios pueden calificar recicladores"
+DROP POLICY IF EXISTS "Usuarios pueden calificar Dirigentes" ON recycler_ratings;
+CREATE POLICY "Usuarios pueden calificar Dirigentes"
   ON recycler_ratings
   FOR INSERT
   WITH CHECK (rater_id = auth.uid());

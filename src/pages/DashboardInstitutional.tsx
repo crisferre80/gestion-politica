@@ -26,7 +26,7 @@ type ProfileRealtimePayload = {
   role?: string;
 };
 
-// Panel exclusivo para residentes institucionales (empresas, edificios, instituciones)
+// Panel exclusivo para Dirigentes institucionales (empresas, edificios, instituciones)
 const DashboardInstitutional: React.FC = () => {
   const { user } = useUser();
   type CollectionPoint = {
@@ -74,7 +74,7 @@ const DashboardInstitutional: React.FC = () => {
   const [recyclers, setRecyclers] = useState<Recycler[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
 
-  // Estado para detalle de residente seleccionado
+  // Estado para detalle de Dirigente seleccionado
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [residentPoints, setResidentPoints] = useState<CollectionPoint[]>([]);
   const [residentLoading, setResidentLoading] = useState(false);
@@ -101,11 +101,14 @@ const DashboardInstitutional: React.FC = () => {
   }, [showContactMenu]);
 
   useEffect(() => {
-    if (!user || user.type !== 'resident_institutional') return;
+    // Permitimos el acceso aquí a Dirigentes ('recycler') y a Referentes que puedan gestionar un punto colectivo.
+    if (!user) return;
+    // Si no es recycler ni resident, salir
+    if (user.type !== 'recycler' && user.type !== 'resident') return;
     const fetchData = async () => {
       // Buscar el punto colectivo creado por este usuario
       const { data: points } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select('*')
         .eq('user_id', user.id)
         .limit(1);
@@ -141,7 +144,7 @@ const DashboardInstitutional: React.FC = () => {
           setCollectivePointClaim(null);
         }
       }
-      // Buscar residentes asociados a la misma dirección
+      // Buscar Dirigentes asociados a la misma dirección
       if (points && points.length > 0) {
         console.log('Punto colectivo encontrado:', points[0]);
         const { data: residents, error: residentsError } = await supabase
@@ -151,9 +154,9 @@ const DashboardInstitutional: React.FC = () => {
           .neq('user_id', user.id);
         
         if (residentsError) {
-          console.error('Error al buscar residentes asociados:', residentsError);
+          console.error('Error al buscar Dirigentes asociados:', residentsError);
         } else {
-          console.log('Residentes asociados encontrados:', residents);
+          console.log('Dirigentes asociados encontrados:', residents);
           setAssociatedResidents(residents || []);
         }
       }
@@ -165,7 +168,7 @@ const DashboardInstitutional: React.FC = () => {
   const handleDeletePoint = async () => {
     if (!collectivePoint) return;
     if (window.confirm('¿Estás seguro de que quieres eliminar este punto colectivo? Esta acción es irreversible.')) {
-      const { error } = await supabase.from('collection_points').delete().eq('id', collectivePoint.id);
+  const { error } = await supabase.from('concentration_points').delete().eq('id', collectivePoint.id);
       if (error) {
         alert('Error al eliminar el punto: ' + error.message);
       } else {
@@ -175,7 +178,7 @@ const DashboardInstitutional: React.FC = () => {
     }
   };
 
-  // Suscripción realtime a recicladores online
+  // Suscripción realtime a Dirigentes online
   useEffect(() => {
     const channel = supabase.channel('recyclers-profiles-institutional')
       .on(
@@ -326,7 +329,7 @@ const DashboardInstitutional: React.FC = () => {
     };
   }, [showContactMenu]);
 
-  // Carga inicial de recicladores online con coordenadas válidas
+  // Carga inicial de Dirigentes online con coordenadas válidas
   useEffect(() => {
     const fetchRecyclers = async () => {
       const { data, error } = await supabase
@@ -335,7 +338,7 @@ const DashboardInstitutional: React.FC = () => {
         .eq('role', 'recycler')
         .eq('online', true);
       if (error) {
-        console.error('[INSTITUTIONAL] Error al cargar recicladores:', error);
+        console.error('[INSTITUTIONAL] Error al cargar Dirigentes:', error);
         return;
       }
       if (data && Array.isArray(data)) {
@@ -365,19 +368,19 @@ const DashboardInstitutional: React.FC = () => {
     fetchRecyclers();
   }, []);
 
-  // Calcular totales de materiales y bultos de todos los residentes asociados
+  // Calcular totales de materiales y bultos de todos los Dirigentes asociados
   useEffect(() => {
     const fetchTotals = async () => {
       if (associatedResidents.length === 0) {
         setTotals({ materiales: {}, bultos: 0 });
         return;
       }
-      // Buscar todos los puntos de recolección de los residentes asociados
+      // Buscar todos los Centros de Movilizaciòn de los Dirigentes asociados
       const userIds = associatedResidents.map(r => r.user_id || r.id);
       console.log('Calculando totales para user_ids:', userIds);
       
       const { data: points } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select('*')
         .in('user_id', userIds);
       // Sumar materiales y bultos
@@ -398,9 +401,9 @@ const DashboardInstitutional: React.FC = () => {
     fetchTotals();
   }, [associatedResidents]);
 
-  // Al seleccionar un residente, buscar todos sus puntos de recolección
+  // Al seleccionar un Dirigente, buscar todos sus Centros de Movilizaciòn
   const handleSelectResident = async (res: Resident) => {
-    console.log('Seleccionando residente:', res);
+    console.log('Seleccionando Dirigente:', res);
     setSelectedResident(res);
     setResidentLoading(true);
     setResidentPoints([]);
@@ -411,14 +414,14 @@ const DashboardInstitutional: React.FC = () => {
       console.log('Buscando puntos para user_id:', userIdToSearch);
       
       const { data: points, error } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select('*')
         .eq('user_id', userIdToSearch);
       
       if (error) {
-        console.error('Error al buscar puntos del residente:', error);
+        console.error('Error al buscar puntos del Dirigente:', error);
       } else {
-        console.log('Puntos encontrados para el residente:', points);
+        console.log('Puntos encontrados para el Dirigente:', points);
         setResidentPoints(points || []);
       }
     } catch (err) {
@@ -445,10 +448,10 @@ const DashboardInstitutional: React.FC = () => {
           <p className="text-lg text-gray-500">Panel Institucional</p>
         </div>
       </div>
-      {/* Botón Agregar Punto Colectivo arriba y visible */}
+      {/* Botón Agregar centro Colectivo arriba y visible */}
       <div className="flex gap-4 mb-6">
-        <Link to="/add-collection-point" className="px-4 py-2 bg-green-600 text-white rounded flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Agregar Punto Colectivo
+        <Link to="/add-collection-point" className="px-4 py-2 bg-blue-600 text-white rounded flex items-center gap-2">
+          <Plus className="w-4 h-4" /> Agregar centro Colectivo
         </Link>
       </div>
       {loading ? (
@@ -476,7 +479,7 @@ const DashboardInstitutional: React.FC = () => {
                     <h3 className="font-semibold text-gray-700 mb-2">Materiales clasificados:</h3>
                     <div className="flex flex-wrap gap-2">
                       {collectivePoint.materials?.map((material) => (
-                        <span key={material} className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        <span key={material} className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                           {material}
                         </span>
                       ))}
@@ -531,7 +534,7 @@ const DashboardInstitutional: React.FC = () => {
                           console.log('Toggleando menú:', !showContactMenu);
                           setShowContactMenu(!showContactMenu);
                         }}
-                        className="px-3 py-2 bg-green-600 text-white rounded-md flex items-center gap-2 hover:bg-green-700 transition-colors text-sm font-semibold shadow-sm"
+                        className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
                         data-contact-menu
                       >
                         <Phone className="w-4 h-4" />
@@ -595,7 +598,7 @@ const DashboardInstitutional: React.FC = () => {
                               className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                               data-contact-menu
                             >
-                              <svg className="w-4 h-4 mr-3 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 mr-3 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
                               </svg>
                               WhatsApp
@@ -649,13 +652,13 @@ const DashboardInstitutional: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-3 p-2 bg-orange-100 rounded text-xs text-orange-800">
-                  <strong>Nota:</strong> El punto colectivo está siendo atendido por un reciclador. No puedes eliminar el punto ni invitar nuevos residentes hasta que la recolección se complete.
+                  <strong>Nota:</strong> El punto colectivo está siendo atendido por un reciclador. No puedes eliminar el punto ni invitar nuevos Dirigentes hasta que la recolección se complete.
                 </div>
               </div>
             )}
           </div>
           <div className="bg-white rounded-lg shadow p-4 mb-6">
-            <h2 className="text-xl font-semibold mb-2">Residentes Asociados</h2>
+            <h2 className="text-xl font-semibold mb-2">Dirigentes Asociados</h2>
             {associatedResidents.length > 0 ? (
               <ul className="divide-y">
                 {associatedResidents.map(res => (
@@ -666,10 +669,10 @@ const DashboardInstitutional: React.FC = () => {
                     <span>{res.name} ({res.email})</span>
                     <button
                       className="ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs flex items-center gap-1"
-                      title="Eliminar residente"
+                      title="Eliminar Dirigente"
                       onClick={async (e) => {
                         e.stopPropagation();
-                        if (window.confirm('¿Eliminar la asociación de este residente?')) {
+                        if (window.confirm('¿Eliminar la asociación de este Dirigente?')) {
                           const { error } = await supabase
                             .from('profiles')
                             .update({ address: null })
@@ -688,14 +691,14 @@ const DashboardInstitutional: React.FC = () => {
                 ))}
               </ul>
             ) : (
-              <div>No hay residentes asociados a este punto colectivo.</div>
+              <div>No hay Dirigentes asociados a este punto colectivo.</div>
             )}
-            {/* Detalle del residente seleccionado */}
+            {/* Detalle del Dirigente seleccionado */}
             {selectedResident && (
               <div className="mt-4 p-4 bg-gray-50 rounded shadow">
-                <h3 className="font-bold text-lg mb-2">Puntos de Recolección de {selectedResident.name}</h3>
+                <h3 className="font-bold text-lg mb-2">Centros de Movilizaciòn de {selectedResident.name}</h3>
                 {residentLoading ? (
-                  <div>Cargando puntos de recolección...</div>
+                  <div>Cargando Centros de Movilizaciòn...</div>
                 ) : residentPoints.length > 0 ? (
                   <div className="space-y-3">
                     {residentPoints.map((point, index) => (
@@ -721,8 +724,8 @@ const DashboardInstitutional: React.FC = () => {
                               <span className={`ml-2 px-2 py-1 rounded text-xs ${
                                 point.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                 point.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                point.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                point.status === 'available' ? 'bg-green-100 text-green-800' :
+                                point.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                                point.status === 'available' ? 'bg-blue-100 text-blue-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
                                 {point.status === 'pending' ? 'Pendiente' :
@@ -746,13 +749,13 @@ const DashboardInstitutional: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div>Este residente no tiene puntos de recolección propios.</div>
+                  <div>Este Dirigente no tiene Centros de Movilizaciòn propios.</div>
                 )}
                 <button className="mt-2 px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm" onClick={() => setSelectedResident(null)}>Cerrar</button>
               </div>
             )}
-            {/* Totales de materiales y bultos de todos los residentes */}
-            <div className="mt-4 p-4 bg-green-50 rounded shadow">
+            {/* Totales de materiales y bultos de todos los Dirigentes */}
+            <div className="mt-4 p-4 bg-blue-50 rounded shadow">
               <h3 className="font-bold text-lg mb-2">Totales del Punto Colectivo</h3>
               <div className="mb-2"><b>Bultos totales:</b> {totals.bultos}</div>
               <div><b>Materiales totales:</b> {Object.keys(totals.materiales).length === 0 ? 'N/A' : (
@@ -765,7 +768,7 @@ const DashboardInstitutional: React.FC = () => {
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4 mb-6">
-            <h2 className="text-xl font-semibold mb-2">Recicladores Online</h2>
+            <h2 className="text-xl font-semibold mb-2">Dirigentes Online</h2>
             <Map
               markers={[
                 ...recyclers
@@ -801,18 +804,18 @@ const DashboardInstitutional: React.FC = () => {
             />
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               {recyclers.filter(r => r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number').length === 0 ? (
-                <div className="col-span-2 text-center text-gray-500">No hay recicladores en línea con ubicación disponible.</div>
+                <div className="col-span-2 text-center text-gray-500">No hay Dirigentes en línea con ubicación disponible.</div>
               ) : (
                 recyclers.filter(r => r.online === true && typeof r.lat === 'number' && typeof r.lng === 'number').map((rec) => (
                   <div key={rec.id} className="border rounded-lg p-4 flex flex-col items-center bg-gray-50 shadow-sm relative">
-                    <div className="w-20 h-20 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-green-600">
+                    <div className="w-20 h-20 rounded-full overflow-hidden mb-3 flex items-center justify-center bg-gray-200 border-2 border-blue-600">
                       {rec.avatar_url ? (
                         <img src={rec.avatar_url} alt="Foto de perfil" className="w-full h-full object-cover" />
                       ) : (
                         <UserIcon className="w-10 h-10 text-gray-400" />
                       )}
                     </div>
-                    <h3 className="text-lg font-semibold text-green-700 mb-1 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-blue-700 mb-1 flex items-center gap-2">
                       {rec.name || 'Reciclador'}
                     </h3>
                     {rec.email && (
@@ -832,7 +835,7 @@ const DashboardInstitutional: React.FC = () => {
             <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
               <div className="bg-white p-8 rounded-lg shadow-xl text-center max-w-md mx-4">
                 <h3 className="text-2xl font-bold mb-4">Adhesión al Punto Colectivo</h3>
-                <p className="mb-6 text-gray-600">Pide al residente que escaneé este código QR para asociarse a tu punto de recolección.</p>
+                <p className="mb-6 text-gray-600">Pide al Dirigente que escaneé este código QR para asociarse a tu punto de recolección.</p>
                 <div style={{ background: 'white', padding: '16px', display: 'inline-block' }}>
                   <QRCode
                     value={`${window.location.origin}/join-point/${collectivePoint.id}`}

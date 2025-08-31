@@ -22,20 +22,21 @@ const JoinPoint: React.FC = () => {
       }
 
       if (!user) {
-        setError('Debes iniciar sesión como residente para unirte a un punto.');
+        setError('Debes iniciar sesión para unirte a un punto.');
         setLoading(false);
         return;
       }
 
-      if (user.type !== 'resident') {
-        setError('Solo los residentes pueden unirse a puntos colectivos.');
+      // Solo los Dirigentes (role 'recycler') pueden unirse a puntos colectivos
+      if (user.type !== 'recycler') {
+        setError('Solo los Dirigentes pueden unirse a puntos colectivos.');
         setLoading(false);
         return;
       }
 
       // Obtener detalles del punto de recolección
       const { data: pointData, error: pointError } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select('address, user_id')
         .eq('id', pointId)
         .single();
@@ -69,7 +70,7 @@ const JoinPoint: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Actualizar el perfil del residente con la dirección del punto
+    // Actualizar el perfil del Dirigente con la dirección del punto
     const { error: updateError } = await supabase
       .from('profiles')
       .update({ address: pointInfo.address })
@@ -98,7 +99,7 @@ const JoinPoint: React.FC = () => {
       return (
           <div className="flex justify-center items-center h-screen">
               <div className="text-center p-8 bg-white rounded-lg shadow-lg">
-                  <h2 className="text-2xl font-bold text-green-600 mb-4">¡Te has unido con éxito!</h2>
+                  <h2 className="text-2xl font-bold text-blue-600 mb-4">¡Te has unido con éxito!</h2>
                   <p className="text-gray-700">Ahora estás asociado al punto de recolección.</p>
                   <p className="text-gray-500 mt-2">Serás redirigido a tu panel en unos segundos...</p>
               </div>
@@ -118,7 +119,7 @@ const JoinPoint: React.FC = () => {
         <div className="flex justify-center gap-4">
           <button
             onClick={handleConfirm}
-            className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+            className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
           >
             Sí, unirme
           </button>

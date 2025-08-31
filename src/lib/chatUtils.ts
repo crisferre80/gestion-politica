@@ -12,9 +12,9 @@ export interface ChatPreview {
 }
 
 /**
- * Obtiene el último mensaje y el número de mensajes no leídos para cada residente con el que el reciclador tiene conversación.
+ * Obtiene el último mensaje y el número de mensajes no leídos para cada Dirigente con el que el reciclador tiene conversación.
  * @param recyclerUserId string (user_id del reciclador)
- * @param residentUserIds string[] (user_id de los residentes)
+ * @param residentUserIds string[] (user_id de los Dirigentes)
  */
 export async function getChatPreviews(recyclerUserId: string, residentUserIds: string[]) {
   // Buscar los id internos de profiles
@@ -30,12 +30,12 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
     profileMap[p.user_id] = { id: p.id, name: p.name, avatar_url: p.avatar_url };
   }
 
-  // Para cada residente, obtener el último mensaje y los no leídos
+  // Para cada Dirigente, obtener el último mensaje y los no leídos
   const previews: ChatPreview[] = [];
   for (const residentUserId of residentUserIds) {
     const residentProfile = profileMap[residentUserId];
     if (!residentProfile) continue;
-    // Buscar mensajes entre reciclador y residente (usando user_id, no id interno)
+    // Buscar mensajes entre reciclador y Dirigente (usando user_id, no id interno)
     const { data: messages } = await supabase
       .from('messages')
       .select('content, sent_at, sender_id, receiver_id, read')
@@ -49,7 +49,7 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
         content: messages[0].content,
         created_at: messages[0].sent_at,
       };
-      // Mensajes no leídos enviados por el residente al reciclador (usando user_id)
+      // Mensajes no leídos enviados por el Dirigente al reciclador (usando user_id)
       unreadCount = messages.filter(
         m => m.sender_id === residentUserId && m.receiver_id === recyclerUserId && m.read === false
       ).length;

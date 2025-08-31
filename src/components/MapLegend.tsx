@@ -7,7 +7,7 @@ const MapLegend: React.FC = () => {
       <h3 className="text-sm font-medium text-gray-700 mb-2">Leyenda</h3>
       <div className="space-y-2">
         <div className="flex items-center">
-          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-2">
+          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-2">
             <User className="h-4 w-4 text-white" />
           </div>
           <span className="text-sm text-gray-600">Punto Disponible</span>
@@ -19,7 +19,7 @@ const MapLegend: React.FC = () => {
           <span className="text-sm text-gray-600">Punto Reclamado</span>
         </div>
         <div className="flex items-center">
-          <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center mr-2">
+          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mr-2">
             <CheckCircle className="h-4 w-4 text-white" />
           </div>
           <span className="text-sm text-gray-600">Punto Retirado</span>

@@ -199,23 +199,20 @@ const AddCollectionPoint: React.FC = () => {
     const markers = [];
     if (user?.lat && user?.lng) {
       markers.push({
-        id: 'ubicacion-residente',
+        id: 'ubicacion-Dirigente',
         lat: typeof user.lat === 'string' ? parseFloat(user.lat) : user.lat,
         lng: typeof user.lng === 'string' ? parseFloat(user.lng) : user.lng,
         title: 'Tu ubicación',
         iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
       });
     }
-    if (selectedLocation) {
+  if (selectedLocation) {
       markers.push({
         id: 'nuevo-punto',
         lat: selectedLocation.lat,
         lng: selectedLocation.lng,
         title: 'Nuevo Punto de Recolección',
-        iconUrl:
-          user?.type === 'resident_institutional'
-            ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-            : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
       });
     }
     return markers;
@@ -316,7 +313,7 @@ const AddCollectionPoint: React.FC = () => {
       // Guardar la foto en la base de datos si existe
       let photoUrl: string | null = null;
       if (materialPhotoFile) {
-        // Subir a Supabase Storage (bucket 'points' para fotos de puntos de recolección)
+        // Subir a Supabase Storage (bucket 'points' para fotos de Centros de Movilizaciòn)
         const fileName = `photo_${user.id}_${Date.now()}.jpg`;
         const { error: uploadError } = await supabase.storage.from('points').upload(fileName, materialPhotoFile, { upsert: true });
         if (uploadError) {
@@ -328,7 +325,7 @@ const AddCollectionPoint: React.FC = () => {
       }
 
       const { error: supabaseError, data: newPoint } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .insert([
           {
             user_id: user.id, // Usar el UID de Supabase
@@ -340,7 +337,9 @@ const AddCollectionPoint: React.FC = () => {
             additional_info: additionalInfo,
             lat: selectedLocation.lat,
             lng: selectedLocation.lng,
-            ...(user.type === 'resident_institutional' ? { type: 'colective_point' } : {}),
+            // Si se necesita marcar como punto colectivo, solo permitir que el creador lo indique explícitamente.
+            // Mantener compatibilidad: usuarios con role 'recycler' son Dirigentes y pueden crear puntos.
+            ...(isAssociatedToCollectivePoint ? { type: 'colective_point' } : {}),
             photo_url: photoUrl
           }
         ])
@@ -348,7 +347,7 @@ const AddCollectionPoint: React.FC = () => {
         .single();
 
       if (supabaseError) throw supabaseError;
-      // Notificación para el residente (creador)
+      // Notificación para el Dirigente (creador)
       try {
         await createNotification({
           user_id: user.id, // Notificar al UID correcto
@@ -362,7 +361,7 @@ const AddCollectionPoint: React.FC = () => {
       } catch {
         toast.error('El punto se creó, pero no se pudo enviar la notificación al creador.');
       }
-      // Notificación para todos los recicladores activos
+      // Notificación para todos los Dirigentes activos
       const { data: recyclers } = await supabase
         .from('profiles')
         .select('user_id')
@@ -376,7 +375,7 @@ const AddCollectionPoint: React.FC = () => {
               content: `Se ha creado un nuevo punto de recolección en ${address}.`,
               type: 'new_collection_point',
               related_id: newPoint?.id
-              // No email/name for recicladores here
+              // No email/name for Dirigentes here
             });
           } catch {
             toast.error(`No se pudo notificar al reciclador (${recycler.user_id}).`);
@@ -403,7 +402,7 @@ const AddCollectionPoint: React.FC = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
-  // Verificar si el residente está asociado a un punto colectivo
+  // Verificar si el Dirigente está asociado a un punto colectivo
   useEffect(() => {
     async function checkCollectivePointAssociation() {
       if (!user?.id || !user?.address) {
@@ -414,14 +413,14 @@ const AddCollectionPoint: React.FC = () => {
 
       // Buscar si existe un punto colectivo con la misma dirección del usuario
       const { data: collectivePoint, error } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select(`
           id, 
           address, 
           type,
           lat,
           lng,
-          profiles!collection_points_user_id_fkey(name)
+          profiles!concentration_points_user_id_fkey(name)
         `)
         .eq('address', user.address)
         .eq('type', 'colective_point')
@@ -503,7 +502,7 @@ const AddCollectionPoint: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p className="text-xl text-gray-600 mb-4">Debes iniciar sesión para agregar un punto de recolección</p>
-          <Link to="/login" className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+          <Link to="/login" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
             Iniciar sesión
           </Link>
         </div>
@@ -514,16 +513,16 @@ const AddCollectionPoint: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Link to="/dashboard" className="flex items-center text-green-600 hover:text-green-700 mb-6">
+        <Link to="/dashboard" className="flex items-center text-blue-600 hover:text-blue-700 mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver al panel
         </Link>
         
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="bg-green-600 text-white p-6">
-            <h1 className="text-2xl font-bold">Agregar Punto de Recolección</h1>
-            <p className="text-green-100 mt-1">
-              Registra un nuevo punto donde los recicladores pueden recoger tus materiales reciclables
+          <div className="bg-blue-600 text-white p-6">
+            <h1 className="text-2xl font-bold">Agregar centro de Recolección</h1>
+            <p className="text-blue-100 mt-1">
+              Registra un nuevo punto donde los Dirigentes pueden recoger tus materiales reciclables
             </p>
           </div>
           
@@ -538,7 +537,7 @@ const AddCollectionPoint: React.FC = () => {
               </div>
             )}
             
-            {/* Aviso para residentes asociados a punto colectivo */}
+            {/* Aviso para Dirigentes asociados a punto colectivo */}
             {isAssociatedToCollectivePoint && collectivePointInfo && (
               <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
                 <div className="flex items-start">
@@ -600,7 +599,7 @@ const AddCollectionPoint: React.FC = () => {
                       setShowAddressSuggestions(true);
                     }
                   }}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="Ej: Av. Siempreviva 742"
                   disabled={isAssociatedToCollectivePoint} // Deshabilitar si está asociado a un punto colectivo
                 />
@@ -640,7 +639,7 @@ const AddCollectionPoint: React.FC = () => {
                       setShowDistrictSuggestions(true);
                     }
                   }}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder={isAssociatedToCollectivePoint ? "Se completará automáticamente" : "Ej: Centro"}
                   disabled={isAssociatedToCollectivePoint} // Deshabilitar si está asociado a un punto colectivo
                 />
@@ -681,7 +680,7 @@ const AddCollectionPoint: React.FC = () => {
                       onClick={() => toggleMaterial(material)}
                       className={`px-3 py-1 rounded-full text-sm ${
                         materials.includes(material)
-                          ? 'bg-green-600 text-white'
+                          ? 'bg-blue-600 text-white'
                           : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                       }`}
                     >
@@ -699,7 +698,7 @@ const AddCollectionPoint: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setBultos(Math.max(1, bultos - 1))}
-                    className="w-10 h-10 flex items-center justify-center bg-green-600 text-white rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md transition-all duration-200 active:scale-95"
+                    className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 active:scale-95"
                     disabled={bultos <= 1}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -715,7 +714,7 @@ const AddCollectionPoint: React.FC = () => {
                       max="50"
                       value={bultos}
                       onChange={(e) => setBultos(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
-                      className="w-full text-center border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm font-semibold text-lg"
+                      className="w-full text-center border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-semibold text-lg"
                       placeholder="1"
                     />
                   </div>
@@ -723,7 +722,7 @@ const AddCollectionPoint: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setBultos(Math.min(50, bultos + 1))}
-                    className="w-10 h-10 flex items-center justify-center bg-green-600 text-white rounded-full hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-md transition-all duration-200 active:scale-95"
+                    className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md transition-all duration-200 active:scale-95"
                     disabled={bultos >= 50}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -767,7 +766,7 @@ const AddCollectionPoint: React.FC = () => {
                     <DatePicker
                       selected={collectionDate}
                       onChange={(date) => setCollectionDate(date)}
-                      className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                      className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                       placeholderText="Seleccionar día"
                       dateFormat="EEEE"
                       showPopperArrow={false}
@@ -779,7 +778,7 @@ const AddCollectionPoint: React.FC = () => {
                     <label className="block text-sm text-gray-500 mb-1">Hora inicio</label>
                     <div className="flex gap-2">
                       <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
                         value={collectionTimeStart ? collectionTimeStart.getHours() : ''}
                         onChange={e => {
                           const hour = parseInt(e.target.value);
@@ -794,7 +793,7 @@ const AddCollectionPoint: React.FC = () => {
                         ))}
                       </select>
                       <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
                         value={collectionTimeStart ? collectionTimeStart.getMinutes() : ''}
                         onChange={e => {
                           const min = parseInt(e.target.value);
@@ -814,7 +813,7 @@ const AddCollectionPoint: React.FC = () => {
                     <label className="block text-sm text-gray-500 mb-1">Hora fin</label>
                     <div className="flex gap-2">
                       <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
                         value={collectionTimeEnd ? collectionTimeEnd.getHours() : ''}
                         onChange={e => {
                           const hour = parseInt(e.target.value);
@@ -829,7 +828,7 @@ const AddCollectionPoint: React.FC = () => {
                         ))}
                       </select>
                       <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm w-1/2"
+                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
                         value={collectionTimeEnd ? collectionTimeEnd.getMinutes() : ''}
                         onChange={e => {
                           const min = parseInt(e.target.value);
@@ -857,7 +856,7 @@ const AddCollectionPoint: React.FC = () => {
                   rows={4}
                   value={additionalInfo}
                   onChange={(e) => setAdditionalInfo(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Instrucciones especiales, referencias para ubicar el lugar, etc."
                 />
               </div>
@@ -865,14 +864,14 @@ const AddCollectionPoint: React.FC = () => {
               <div className="flex justify-end">
                 <Link
                   to="/dashboard"
-                  className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Cancelar
                 </Link>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                  className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
                   {loading ? 'Guardando...' : 'Guardar'}
                 </button>

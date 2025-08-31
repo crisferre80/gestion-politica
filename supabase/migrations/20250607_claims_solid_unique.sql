@@ -1,4 +1,4 @@
--- Migración: Refuerzo de unicidad y lógica sólida para claims de puntos de recolección
+-- Migración: Refuerzo de unicidad y lógica sólida para claims de Centros de Movilizaciòn
 -- Fecha: 2025-06-07
 
 -- 1. Restricción única: solo un claim activo por punto de recolección

@@ -228,7 +228,7 @@ export default function Notifications() {
           className={`
             flex items-start gap-3 p-4 rounded-2xl shadow-xl 
             ${isMobile ? 'border-t-8' : 'border-l-8'} 
-            border-green-500 bg-gradient-to-br from-green-50 via-white to-green-100 
+            border-blue-500 bg-gradient-to-br from-blue-50 via-white to-blue-100 
             relative transition-all duration-300 
             ${closingNotifications.has(n.id) 
               ? (isMobile ? 'animate-slide-out-mobile' : 'animate-slide-out') 
@@ -251,12 +251,12 @@ export default function Notifications() {
           onTouchEnd={isMobile ? handleTouchEnd : undefined}
         >
           <div className="flex flex-col items-center justify-center mr-2">
-            <span className="bg-green-500 text-white rounded-full p-2 shadow-lg flex items-center justify-center">
-              <Recycle className="w-6 h-6 text-green-100 animate-spin-slow" />
+            <span className="bg-blue-500 text-white rounded-full p-2 shadow-lg flex items-center justify-center">
+              <Recycle className="w-6 h-6 text-blue-100 animate-spin-slow" />
             </span>
           </div>
           <div className="flex-1">
-            <div className="font-bold text-green-800 text-base flex items-center gap-2">
+            <div className="font-bold text-blue-800 text-base flex items-center gap-2">
               {n.title}
             </div>
             <div className="text-sm text-gray-700 mb-1">{n.content}</div>
@@ -270,11 +270,11 @@ export default function Notifications() {
                   minute: '2-digit'
                 }).format(new Date(n.created_at))}
               </span>
-              <span className="text-xs text-green-700 font-semibold italic">EcoNecta2</span>
+              <span className="text-xs text-blue-700 font-semibold italic">EcoNecta2</span>
             </div>
           </div>
           <button
-            className="ml-2 text-gray-400 hover:text-green-600 transition-colors text-xl"
+            className="ml-2 text-gray-400 hover:text-blue-600 transition-colors text-xl"
             onClick={() => handleCloseWithAnimation(n.id)}
             aria-label="Marcar como leída"
           >

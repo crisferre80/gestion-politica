@@ -30,15 +30,15 @@ const Estadisticas: React.FC = () => {
       try {
         // Puntos creados por mes
         const { data: createdPoints } = await supabase
-          .from('collection_points')
+          .from('concentration_points')
           .select('id, created_at, user_id, status');
         // Reclamos por mes y estado
         const { data: claims } = await supabase
           .from('collection_claims')
           .select('id, created_at, status, completed_at, cancelled_at');
-        // Residentes más comprometidos
+        // Dirigentes más comprometidos
         const { data: residentPoints } = await supabase
-          .from('collection_points')
+          .from('concentration_points')
           .select('user_id');
         // Procesamiento de datos
         const now = new Date();
@@ -70,7 +70,7 @@ const Estadisticas: React.FC = () => {
         });
         // Bultos por mes (igual a completed)
         const bultosByMonth = { ...claimsByStatus.completed };
-        // Residentes más comprometidos
+        // Dirigentes más comprometidos
         const residentCount: Record<string, number> = {};
         (residentPoints || []).forEach(p => {
           if (!p.user_id) return;
@@ -106,13 +106,13 @@ const Estadisticas: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-5xl mx-auto">
-        <h1 className="text-3xl font-bold text-green-800 mb-6 flex items-center gap-2">
+        <h1 className="text-3xl font-bold text-blue-800 mb-6 flex items-center gap-2">
           <Award className="w-8 h-8 text-yellow-400" /> Estadísticas Generales
         </h1>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="w-12 h-12 border-4 border-green-300 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <span className="text-green-700 font-semibold">Cargando estadísticas...</span>
+            <div className="w-12 h-12 border-4 border-blue-300 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <span className="text-blue-700 font-semibold">Cargando estadísticas...</span>
           </div>
         ) : error ? (
           <div className="text-red-600 font-semibold">{error}</div>
@@ -120,7 +120,7 @@ const Estadisticas: React.FC = () => {
           <div className="space-y-10">
             {/* Gráfico de barras: Puntos creados y reclamos por mes */}
             <div className="bg-white rounded-xl p-6 shadow">
-              <h2 className="text-xl font-bold text-green-700 mb-2 flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Puntos y Reclamos por Mes</h2>
+              <h2 className="text-xl font-bold text-blue-700 mb-2 flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Puntos y Reclamos por Mes</h2>
               <Bar
                 data={{
                   labels: stats.months,
@@ -205,9 +205,9 @@ const Estadisticas: React.FC = () => {
                 height={300}
               />
             </div>
-            {/* Residentes más comprometidos */}
+            {/* Dirigentes más comprometidos */}
             <div className="bg-white rounded-xl p-6 shadow flex flex-col items-center">
-              <h2 className="text-xl font-bold text-green-700 mb-2 flex items-center gap-2"><Users className="w-5 h-5" /> Residentes más comprometidos</h2>
+              <h2 className="text-xl font-bold text-blue-700 mb-2 flex items-center gap-2"><Users className="w-5 h-5" /> Dirigentes más comprometidos</h2>
               <Bar
                 data={{
                   labels: stats.topResidents.map((r: TopResident) => r.name),

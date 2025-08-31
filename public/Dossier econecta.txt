@@ -1,10 +1,10 @@
-Dossier Institucional - ASURA EcoNecta2
-�Qu� es Asura EcoNecta2?
-Es una app m�vil que conecta a ciudadanos, recicladores y empresas para gestionar residuos
+Dossier Institucional - Gestion Dirigencial y Politica
+�Qu� es Gestion Dirigencial y Politica?
+Es una app m�vil que conecta a ciudadanos, Dirigentes y empresas para gestionar residuos
 reciclables de forma eficiente, segura y trazable. Permite solicitar recolecci�n, visualizar rutas,
 enviar feedback y obtener eco-cr�ditos.
 �Qui�nes somos?
-ASURA es la Asociaci�n Sindical �nica de Recicladores Argentinos, una organizaci�n que lucha
+ASURA es la Asociaci�n Sindical �nica de Dirigentes Argentinos, una organizaci�n que lucha
 por la dignificaci�n del trabajo reciclador y el desarrollo de herramientas tecnol�gicas que
 promuevan la inclusi�n social y el cuidado ambiental.
 �Por qu� ser Sponsor?
@@ -19,6 +19,6 @@ Formatos de Sponsoreo Disponibles
 - Sponsor Institucional (Redes, Medios, Eventos Locales)
 Contacto
 Cristian Ra�l Ferreyra
-L�der de Proyecto Asura EcoNecta2
+L�der de Proyecto Gestion Dirigencial y Politica
 asurasantiago@gmail.com
 3855042155

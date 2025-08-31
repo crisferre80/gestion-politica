@@ -11,7 +11,7 @@ La funcionalidad "Ver Zonas del Administrador" está disponible en el **Dashboar
    - O usar la página de prueba: `http://localhost:5174/test-zones`
 
 ### 2. **Activar el Mapa Principal** (Solo en dashboard-recycler)
-   - Buscar la sección "Mapa de Puntos de Recolección"
+   - Buscar la sección "Mapa de Centros de Movilizaciòn"
    - Hacer click en el botón **"Ver mapa"**
    - El mapa se expandirá mostrando todos los puntos disponibles y reclamados
 

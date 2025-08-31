@@ -11,7 +11,6 @@ import PhotoCapture from '../components/PhotoCapture';
 import ChatList from '../components/ChatList';
 import { getChatPreviews, enviarMensajeSeguro } from '../lib/chatUtils';
 import { useNavigate } from 'react-router-dom';
-import MyRecyclerRatingsModal from '../components/MyRecyclerRatingsModal';
 import MapComponent from '../components/Map';
 import { toast } from 'react-hot-toast';
 
@@ -72,7 +71,7 @@ const DashboardRecycler: React.FC = () => {
   const [expandedClaimIds, setExpandedClaimIds] = useState<string[]>([]);
   const fetchDataRef = useRef(false);
 
-  // Tipo local mínimo para perfiles de residentes usado en este archivo
+  // Tipo local mínimo para perfiles de Dirigentes usado en este archivo
   type ResidentProfile = {
     user_id: string;
     name?: string;
@@ -93,11 +92,11 @@ const DashboardRecycler: React.FC = () => {
       }
         // Verificar que las tablas existen antes de realizar consultas
         const { checkTableExists } = await import('../lib/supabase');
-        const pointsTableExists = await checkTableExists('collection_points');
+  const pointsTableExists = await checkTableExists('concentration_points');
         const claimsTableExists = await checkTableExists('collection_claims');
         
         if (!pointsTableExists) {
-          setError('La tabla collection_points no existe en la base de datos. Verifica la conexión a Supabase y la configuración del esquema.');
+          setError('La tabla concentration_points no existe en la base de datos. Verifica la conexión a Supabase y la configuración del esquema.');
           setLoading(false);
           return;
         }
@@ -115,19 +114,19 @@ const DashboardRecycler: React.FC = () => {
           .order('created_at', { ascending: false }); // OK: solo columna raíz
         console.log('DEBUG: claimsData (recycler):', claimsData);
         if (claimsError) throw claimsError;
-        // Para cada claim, obtener el punto y el perfil del residente
+        // Para cada claim, obtener el punto y el perfil del Dirigente
         let claimed: CollectionPoint[] = [];
         let profilesById: Record<string, ResidentProfile> = {}; // <-- Declarar solo una vez aquí
         if (claimsData && claimsData.length > 0) {
           // Obtener todos los point_user_id únicos
           const pointIds = claimsData.map(claim => claim.collection_point_id);
           const { data: pointsData, error: pointsError } = await supabase
-            .from('collection_points')
+            .from('concentration_points')
             .select('*')
             .in('id', pointIds);
           console.log('DEBUG: pointsData (claimed):', pointsData);
           if (pointsError) throw pointsError;
-          // Obtener todos los user_id de los residentes
+          // Obtener todos los user_id de los Dirigentes
           const residentUserIds = [...new Set(pointsData.map(p => p.user_id))];
           if (residentUserIds.length > 0) {
             const { data: profilesData, error: profilesError } = await supabase
@@ -182,7 +181,7 @@ const DashboardRecycler: React.FC = () => {
         console.log('DEBUG: claimed array:', claimed);
       // Puntos disponibles (igual que antes)
       const { data: availableData, error: availableError } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select('*')
         .eq('status', 'available')
         .order('created_at', { ascending: false });
@@ -266,10 +265,10 @@ const DashboardRecycler: React.FC = () => {
       // Debug: mostrar cuántos puntos quedan tras el filtro de penalización
       console.log('DEBUG: Puntos disponibles tras filtro de penalización:', trulyAvailablePointsRaw.length, trulyAvailablePointsRaw.map(p => p.id));
       
-      // NUEVO FILTRO: Excluir puntos de residentes asociados a puntos colectivos
+      // NUEVO FILTRO: Excluir puntos de Dirigentes asociados a puntos colectivos
       // Primero obtener todos los puntos colectivos existentes
       const { data: collectivePoints, error: collectiveError } = await supabase
-        .from('collection_points')
+        .from('concentration_points')
         .select('address, type')
         .eq('type', 'colective_point');
       
@@ -504,14 +503,14 @@ const DashboardRecycler: React.FC = () => {
           toast('Reclamación vencida: el punto ha sido cancelado automáticamente.', { icon: '⏰' });
           console.log('Auto-expire: claim cancelado automáticamente', claimRecord.id);
 
-          // Enviar mensaje automático al residente notificando la cancelación
+          // Enviar mensaje automático al Dirigente notificando la cancelación
           try {
             if (user?.id && point.user_id) {
               const messageText = 'La reclamación de tu punto ha sido cancelada automáticamente porque el reciclador no retiró a tiempo.';
               try {
                 await enviarMensajeSeguro(user.id, point.user_id, messageText);
-                console.log('Auto-expire: mensaje automático enviado al residente', point.user_id);
-                toast.success('Se notificó al residente sobre la cancelación');
+                console.log('Auto-expire: mensaje automático enviado al Dirigente', point.user_id);
+                toast.success('Se notificó al Dirigente sobre la cancelación');
                 // Actualizar previews de chat localmente
                 try {
                   const previews = await getChatPreviews(user.id, [point.user_id]);
@@ -538,7 +537,7 @@ const DashboardRecycler: React.FC = () => {
               console.warn('Auto-expire: no hay user.id o point.user_id para enviar notificación');
             }
           } catch (msgEx) {
-            console.warn('Auto-expire: excepción al intentar notificar al residente:', msgEx);
+            console.warn('Auto-expire: excepción al intentar notificar al Dirigente:', msgEx);
           }
 
         } catch (cancelErr) {
@@ -616,7 +615,7 @@ const DashboardRecycler: React.FC = () => {
         pointBeingClaimed.id, // collection_point_id (UUID string)
         user.id, // recycler_user_id (UUID string)
         pickupTime,
-        pointBeingClaimed.user_id // user_id del residente dueño del punto (UUID string)
+        pointBeingClaimed.user_id // user_id del Dirigente dueño del punto (UUID string)
       );
       
       console.log('Punto reclamado exitosamente');
@@ -868,7 +867,7 @@ const DashboardRecycler: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [user]);
 
-  // Escuchar eventos relevantes del residente (puntos reclamados, calificaciones, etc.)
+  // Escuchar eventos relevantes del Dirigente (puntos reclamados, calificaciones, etc.)
   useEffect(() => {
     if (!user?.id) return;
     // Suscribirse a eventos de collection_claims y recycler_ratings relacionados con el usuario
@@ -881,7 +880,7 @@ const DashboardRecycler: React.FC = () => {
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setEventNotifications(prev => [
-            { id: payload.new.id, type: 'claim', message: 'Un reciclador ha reclamado tu punto de recolección.', created_at: payload.new.created_at },
+            { id: payload.new.id, type: 'claim', message: 'Un reciclador ha reclamado tu punto de recolecci\u00f3n.', created_at: payload.new.created_at },
             ...prev
           ]);
         }
@@ -892,35 +891,22 @@ const DashboardRecycler: React.FC = () => {
           ]);
         }
       })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'recycler_ratings',
-  filter: `resident_id=eq.${user?.id}`,
-      }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setEventNotifications(prev => [
-            { id: payload.new.id, type: 'rating', message: 'Has calificado a un reciclador.', created_at: payload.new.created_at },
-            ...prev
-          ]);
-        }
-      })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [user]);
 
-  // Suscripción en tiempo real a collection_points y collection_claims para actualización instantánea
+  // Suscripción en tiempo real a concentration_points y collection_claims para actualización instantánea
   useEffect(() => {
   if (!user?.id) return;
     
-    // Suscripción a collection_points con debounce para evitar actualizaciones excesivas
+  // Suscripción a concentration_points con debounce para evitar actualizaciones excesivas
     const channelPoints = supabase.channel('recycler-collection-points')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'collection_points',
+  table: 'concentration_points',
       }, () => {
         // Solo actualizar si no hay operaciones en curso
         if (!isProcessingClaim) {
@@ -1042,24 +1028,11 @@ const DashboardRecycler: React.FC = () => {
 
   // --- MODALES Y ESTADOS PARA ACCIONES DEL HEADER ---
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  const [showPointsStatsModal, setShowPointsStatsModal] = useState(false);
-  const [profileId, setProfileId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user && user.profileId) {
-      setProfileId(user.profileId);
-    } else if (user && user.id) {
-      // Buscar el id interno del perfil si no está en el contexto
-      (async () => {
-        const { data } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (data && data.id) setProfileId(data.id);
-      })();
-    }
-  }, [user]);
+  // El efecto que manejaba profileId fue retirado porque la aplicación ya no usa
+  // un state local profileId en este componente tras la eliminación del modal
+  // de ratings. Si en el futuro se necesita acceder al id del perfil interno,
+  // usar user.profileId (desde el contexto) o reintroducir un estado con uso.
 
   // --- COMPONENTE EditProfileForm ---
   // Define un tipo local para el perfil completo del reciclador (eliminado porque no se usa)
@@ -1244,7 +1217,7 @@ const DashboardRecycler: React.FC = () => {
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex flex-col items-center gap-2 mb-4">
-          <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-green-400 bg-white">
+          <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-blue-400 bg-white">
             <img 
               src={form.avatar_url || '/default-avatar.png'} 
               alt="Avatar" 
@@ -1328,10 +1301,10 @@ const DashboardRecycler: React.FC = () => {
           <textarea name="bio" value={form.bio} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md p-2" rows={2} />
         </div>
         {error && <div className="text-red-600 text-sm">{error}</div>}
-        {success && <div className="text-green-600 text-sm">¡Perfil actualizado!</div>}
+        {success && <div className="text-blue-600 text-sm">¡Perfil actualizado!</div>}
         <div className="flex justify-end gap-2 mt-4">
           <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cancelar</button>
-          <button type="submit" disabled={loading} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow">
+          <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow">
             {loading ? 'Actualizando...' : 'Actualizar perfil'}
           </button>
         </div>
@@ -1585,7 +1558,7 @@ const DashboardRecycler: React.FC = () => {
   console.log('DEBUG: availablePoints:', availablePoints);
   console.log('DEBUG: trulyAvailablePoints (after distance filter):', trulyAvailablePoints);
 
-  // Handler para cambio de vista que limpia el residente enfocado
+  // Handler para cambio de vista que limpia el Dirigente enfocado
   const handleSetView = (newView: string) => {
     setViewState(newView);
   };
@@ -1648,15 +1621,15 @@ const DashboardRecycler: React.FC = () => {
 
         {/* Mensaje de éxito al reclamar */}
         {claimSuccess && (
-          <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-md">
+          <div className="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded-md">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-green-800">
+                <p className="text-sm font-medium text-blue-800">
                   ¡Punto reclamado exitosamente! Se ha añadido a tu lista de puntos reclamados.
                 </p>
               </div>
@@ -1664,22 +1637,22 @@ const DashboardRecycler: React.FC = () => {
           </div>
         )}
 
-        {/* --- MAPA DE PUNTOS DE RECOLECCIÓN --- */}
+        {/* --- MAPA DE Centros de Movilizaciòn --- */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-2xl font-bold text-green-700 flex items-center gap-2">
-              <svg className="w-7 h-7 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 12.414a4 4 0 10-1.414 1.414l4.243 4.243a1 1 0 001.414-1.414z" /></svg>
-              Mapa de Puntos de Recolección
+            <h2 className="text-2xl font-bold text-blue-700 flex items-center gap-2">
+              <svg className="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 12.414a4 4 0 10-1.414 1.414l4.243 4.243a1 1 0 001.414-1.414z" /></svg>
+              Mapa de Centros de Movilizaciòn
             </h2>
             <button
-              className="px-3 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 font-semibold text-sm"
+              className="px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 font-semibold text-sm"
               onClick={() => setShowAllPointsMap((v) => !v)}
             >
               {showAllPointsMap ? 'Ocultar mapa' : 'Ver mapa'}
             </button>
           </div>
           {showAllPointsMap && (
-            <div className="w-full h-96 rounded-lg overflow-hidden border border-green-300 shadow mb-2 animate-fade-in">
+            <div className="w-full h-96 rounded-lg overflow-hidden border border-blue-300 shadow mb-2 animate-fade-in">
               <Map
                 markers={[
                   ...availablePoints.map(p => ({
@@ -1688,7 +1661,7 @@ const DashboardRecycler: React.FC = () => {
                     lng: Number(p.lng),
                     title: p.address,
                     avatar_url: p.creator_avatar || undefined,
-                    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+                    iconUrl: '/assets/logo%20cm%20pj.png',
                     status: 'disponible',
                     iconsize: [96, 96]
                   })),
@@ -1698,7 +1671,7 @@ const DashboardRecycler: React.FC = () => {
                     lng: Number(p.lng),
                     title: p.address,
                     avatar_url: p.creator_avatar || undefined,
-                    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750101287/Punto_de_Recoleccion_reclamado_Marcador_m3c4rd.png',
+                    iconUrl: '/assets/logo%20cm%20pj.png',
                     status: p.claim_status,
                     iconsize: [96, 96]
                     // iconsize: [60, 60] // Uncomment and use this if your Map component supports iconSize as an array
@@ -1713,25 +1686,25 @@ const DashboardRecycler: React.FC = () => {
         </div>
         {/* --- FIN MAPA --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <h1 className="text-3xl font-bold text-green-800">Panel del Reciclador</h1>
+          <h1 className="text-3xl font-bold text-blue-800">Panel del Reciclador</h1>
           <div className="flex items-center gap-4">
-            <span className="inline-block px-3 py-1 rounded-full bg-green-200 text-green-800 text-xs font-semibold tracking-wide">Reciclador</span>
+            <span className="inline-block px-3 py-1 rounded-full bg-blue-200 text-blue-800 text-xs font-semibold tracking-wide">Reciclador</span>
           </div>
         </div>
         <div className="bg-white shadow rounded-lg overflow-hidden">
           {/* Header profesional del reciclador */}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 px-8 py-8 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 px-8 py-8 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
             <div className="flex-shrink-0">
-              <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-green-400 bg-white shadow">
+              <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-blue-400 bg-white shadow">
                 <img src={getAvatarUrl(user?.avatar_url, user?.name)} alt="Foto de perfil" className="w-full h-full object-cover" />
               </div>
             </div>
             <div className="flex-1 min-w-0 w-full">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 w-full">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl md:text-3xl font-bold text-green-800 mb-1">{user?.name || 'Reciclador'}</h1>
+                  <h1 className="text-2xl md:text-3xl font-bold text-blue-800 mb-1">{user?.name || 'Reciclador'}</h1>
                   {user?.online ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-500 text-white text-xs font-semibold ml-2 animate-pulse">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs font-semibold ml-2 animate-pulse">
                       <span className="w-2 h-2 bg-white rounded-full mr-1"></span>En Línea
                     </span>
                   ) : (
@@ -1746,18 +1719,18 @@ const DashboardRecycler: React.FC = () => {
               </div>
               <div className="mt-2 flex flex-wrap gap-x-8 gap-y-2 text-gray-700 text-sm">
                 <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-green-500" />
+                  <Mail className="h-4 w-4 text-blue-500" />
                   <span>{user?.email}</span>
                 </div>
                 {user?.phone && (
                   <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-green-500" />
+                    <Phone className="h-4 w-4 text-blue-500" />
                     <span>{user.phone}</span>
                   </div>
                 )}
                 {user?.address && (
                   <div className="flex items-center gap-2">
-                    <MapIcon className="h-4 w-4 text-green-500" />
+                    <MapIcon className="h-4 w-4 text-blue-500" />
                     <span>{user.address}</span>
                   </div>
                 )}
@@ -1775,22 +1748,17 @@ const DashboardRecycler: React.FC = () => {
                     Editar Perfil
                   </button>
                   <button
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
                     onClick={() => navigate('/estadisticas')}
                   >
                     Ver Estadísticas
                   </button>
-                  <button
-                    className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 font-semibold shadow"
-                    onClick={() => setShowPointsStatsModal(true)}
-                  >
-                    Mis calificaciones
-                  </button>
+                  {/* calificaciones removed */}
                   <button
                     className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2 relative"
                     onClick={() => setShowChatModal(true)}
                     // disabled={!canChatWithResident}
-                    // title={canChatWithResident ? "Abrir chat con residente" : "Solo disponible si el residente habilita el chat"}
+                    // title={canChatWithResident ? "Abrir chat con Dirigente" : "Solo disponible si el Dirigente habilita el chat"}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4.28 1.07A1 1 0 013 19.13V17.6c0-.29.13-.56.35-.74A7.97 7.97 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     Mensajes
@@ -1822,8 +1790,8 @@ const DashboardRecycler: React.FC = () => {
           <div className="p-6">
             {claimSuccess && (
               <div className="flex items-center justify-center mb-6 animate-bounce-in">
-                <div className="bg-green-100 border border-green-400 text-green-800 px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
-                  <svg className="w-7 h-7 text-green-600 animate-ping" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <div className="bg-blue-100 border border-blue-400 text-blue-800 px-6 py-3 rounded-lg shadow-lg flex items-center gap-3">
+                  <svg className="w-7 h-7 text-blue-600 animate-ping" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                   <span className="font-semibold text-lg">¡Punto reclamado exitosamente!</span>
                 </div>
               </div>
@@ -1833,7 +1801,7 @@ const DashboardRecycler: React.FC = () => {
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
-            {/* Mostrar notificaciones de eventos del residente */}
+            {/* Mostrar notificaciones de eventos del Dirigente */}
             {eventNotifications.length > 0 && (
               <div className="mb-4 w-full max-w-2xl bg-blue-50 border border-blue-300 text-blue-800 px-4 py-3 rounded relative" role="alert">
                 <h4 className="font-bold mb-2">Notificaciones recientes</h4>
@@ -1853,13 +1821,13 @@ const DashboardRecycler: React.FC = () => {
                 onClick={() => handleSetView('disponibles')}
                 className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 min-w-[140px] text-sm
                   ${view === 'disponibles'
-                    ? 'bg-green-600 text-white shadow-lg scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}
+                    ? 'bg-blue-600 text-white shadow-lg scale-105'
+                    : 'bg-gray-100 text-gray-700 hover:bg-blue-100 hover:text-blue-700'}
                 `}
               >
                 Disponibles
                 {trulyAvailablePoints.length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 text-xs bg-green-800 text-white rounded-full">
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-blue-800 text-white rounded-full">
                     {trulyAvailablePoints.length}
                   </span>
                 )}
@@ -1923,7 +1891,7 @@ const DashboardRecycler: React.FC = () => {
                     disabled={gettingLocation}
                     className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 text-sm ${
                       userLocation 
-                        ? 'bg-green-100 text-green-800 border border-green-300' 
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300' 
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     } ${gettingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
@@ -1999,7 +1967,7 @@ const DashboardRecycler: React.FC = () => {
 
                 {/* Información de ubicación */}
                 {userLocation && (
-                  <div className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-2">
+                  <div className="mt-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md p-2">
                     <span className="font-medium">Ubicación:</span> {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
                     {maxDistance && (
                       <span className="ml-3">
@@ -2015,7 +1983,7 @@ const DashboardRecycler: React.FC = () => {
             <div>
               {view === 'disponibles' && (
                 <div>
-                  <h2 className="text-xl font-semibold text-green-700 mb-4">
+                  <h2 className="text-xl font-semibold text-blue-700 mb-4">
                     Puntos Disponibles para Reclamar
                     {userLocation && maxDistance && (
                       <span className="ml-3 text-sm font-normal text-blue-600">
@@ -2035,7 +2003,7 @@ const DashboardRecycler: React.FC = () => {
                       </div>
                     ) : (
                       trulyAvailablePoints.map(point => (
-                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">
+                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-blue-400">
                           <div className="p-6">
                             {/* Info principal */}
                             <div className="flex items-start justify-between">
@@ -2048,7 +2016,7 @@ const DashboardRecycler: React.FC = () => {
                                   className="w-12 h-12 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.2"
                                 />
                                 <div>
-                                  <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
+                                  <h3 className="text-lg font-bold text-blue-800">{point.address}</h3>
                                   <p className="mt-1 text-sm text-gray-500">{point.district}</p>
                                 </div>
                               </div>
@@ -2059,13 +2027,13 @@ const DashboardRecycler: React.FC = () => {
                             </div>
                             <div className="flex flex-row items-start mt-4">
                               <div className="mr-6 flex-shrink-0">
-                                <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                                <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-blue-300 hover:shadow-lg rounded-lg">
                                   <img
                                     src={point.photo_url || (point.type === 'colective_point'
                                       ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
                                       : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
                                     alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
-                                    className="w-32 h-38 object-cover rounded-lg shadow-md border border-green-200"
+                                    className="w-32 h-38 object-cover rounded-lg shadow-md border border-blue-200"
                                     style={{ background: '#f0fdf4', filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
                                     onError={(e) => {
                                       // Si la imagen del material falla, usar la imagen por defecto
@@ -2080,7 +2048,7 @@ const DashboardRecycler: React.FC = () => {
                                   {/* Indicador de foto del material */}
                                   {point.photo_url && (
                                     <div className="absolute top-2 right-2">
-                                      <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
+                                      <div className="bg-blue-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
                                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                           <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                                         </svg>
@@ -2093,7 +2061,7 @@ const DashboardRecycler: React.FC = () => {
                                 <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {point.materials.map((material: string, idx: number) => (
-                                    <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                    <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{material}</span>
                                   ))}
                                 </div>
                               </div>
@@ -2138,7 +2106,7 @@ const DashboardRecycler: React.FC = () => {
                                 </span>
                               </div>
                             )}
-                            {/* Información adicional del residente */}
+                            {/* Información adicional del Dirigente */}
                             {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
                               <div className="mt-2 text-sm text-gray-600">
                                 <strong>Información adicional:</strong> {point.additional_info}
@@ -2148,7 +2116,7 @@ const DashboardRecycler: React.FC = () => {
                             <div className="mt-4 flex gap-2">
                               <button
                                 onClick={() => handleOpenPickupModal(point)}
-                                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow"
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow"
                               >
                                 Reclamar
                               </button>
@@ -2162,7 +2130,7 @@ const DashboardRecycler: React.FC = () => {
                                       window.open(url, '_blank', 'noopener,noreferrer');
                                     }}
                                     title="Abrir ruta de navegación en Google Maps"
-                                    className="ml-2 flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-600 rounded hover:bg-green-100 transition-colors shadow-sm text-green-800 font-bold text-xs"
+                                    className="ml-2 flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-600 rounded hover:bg-blue-100 transition-colors shadow-sm text-blue-800 font-bold text-xs"
                                   >
                                     <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-7 w-7 animate-bounce-map" />
                                     <span>Ruta Google Maps</span>
@@ -2177,12 +2145,12 @@ const DashboardRecycler: React.FC = () => {
                       ))
                     )}
                   </div>
-                  <hr className="my-10 border-green-300" />
+                  <hr className="my-10 border-blue-300" />
                 </div>
               )}
               {view === 'reclamados' && (
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Reclamados</h2>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Centros de Movilizaciòn Reclamados</h2>
                   <div className="grid gap-6 md:grid-cols-2">
                     {claimedPoints.filter(p => p.claim_status === 'claimed').length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos reclamados.</div>
@@ -2192,8 +2160,8 @@ const DashboardRecycler: React.FC = () => {
                         const address = point.address || 'Sin dirección';
                         const district = point.district || 'Sin distrito';
                         const materials = Array.isArray(point.materials) ? point.materials : [];
-                        const creator_avatar = point.creator_avatar || 'https://ui-avatars.com/api/?name=Residente&background=E0F2FE&color=2563EB&size=64';
-                        const creator_name = typeof point.creator_name === 'string' ? point.creator_name : 'Residente';
+                        const creator_avatar = point.creator_avatar || 'https://ui-avatars.com/api/?name=Dirigente&background=E0F2FE&color=2563EB&size=64';
+                        const creator_name = typeof point.creator_name === 'string' ? point.creator_name : 'Dirigente';
                         const creator_email = point.creator_email || '';
                         const creator_dni = point.creator_dni || point.profiles?.dni || 'No informado';
                         const pickup_time = point.pickup_time ? new Date(point.pickup_time) : null;
@@ -2244,18 +2212,18 @@ const DashboardRecycler: React.FC = () => {
                                     <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                       {materials.map((material, idx) => (
-                                        <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                        <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{material}</span>
                                       ))}
                                     </div>
                                   </div>
                                   <div className="ml-4 flex-shrink-0">
-                                    <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                                    <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-blue-300 hover:shadow-lg rounded-lg">
                                       <img
                                         src={point.photo_url || (point.type === 'colective_point'
                                           ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
                                           : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
                                         alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
-                                        className="w-28 h-28 object-cover rounded-lg shadow-md border border-green-200"
+                                        className="w-28 h-28 object-cover rounded-lg shadow-md border border-blue-200"
                                         style={{ background: '#f0fdf4' }}
                                         onError={(e) => {
                                           const target = e.target as HTMLImageElement;
@@ -2280,7 +2248,7 @@ const DashboardRecycler: React.FC = () => {
                                   {!pickup_time && <div className="text-yellow-600 text-xs mt-2">⚠️ Fecha/hora de retiro no configurada o inválida. Por favor, selecciona una fecha válida al reclamar el punto.</div>}
                                 </div>
                                 <div className="mt-6 pt-6 border-t border-gray-200">
-                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Dirigente:</h4>
                                   <div className="space-y-2">
                                     <div className="flex items-center text-sm text-gray-500">
                                       <img src={creator_avatar} alt={creator_name} className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm" />
@@ -2288,12 +2256,12 @@ const DashboardRecycler: React.FC = () => {
                                     </div>
                                     <div className="flex items-center text-sm text-gray-500">
                                       <Mail className="h-4 w-4 mr-2" />
-                                      <a href={`mailto:${creator_email}`} className="text-green-600 hover:text-green-700">{creator_email}</a>
+                                      <a href={`mailto:${creator_email}`} className="text-blue-600 hover:text-blue-700">{creator_email}</a>
                                     </div>
                                     {point.profiles?.phone && (
                                       <div className="flex items-center text-sm text-gray-500">
                                         <Phone className="h-4 w-4 mr-1" />
-                                        <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                        <a href={`tel:${point.profiles.phone}`} className="text-blue-600 hover:text-blue-700">{point.profiles.phone}</a>
                                       </div>
                                     )}
                                     <div className="flex items-center text-sm text-gray-500">
@@ -2303,10 +2271,10 @@ const DashboardRecycler: React.FC = () => {
                                 </div>
                                 <div className="mt-4 flex flex-wrap gap-2">
                                   <button onClick={() => { const isValidUuid = (id: string | null | undefined) => !!id && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id); if (isValidUuid(point.claim_id) && isValidUuid(point.id)) { setSelectedClaim({ id: point.claim_id ?? '', pointId: point.id ?? '' }); setShowCancelClaimModal(true); } else { setError('Error: No se puede cancelar, IDs inválidos.'); } }} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-semibold shadow">Cancelar reclamo</button>
-                                  <button onClick={() => { setPointToComplete(point); setShowCompleteModal(true); }} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow">Marcar como retirado!</button>
-                                  <button onClick={() => { const residentUserId = point.user_id || point.profiles?.user_id; if (residentUserId) { navigate(`/chat/${residentUserId}`); } else { setError('No se encontró el usuario residente para chatear.'); } }} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow">Mensaje al Residente</button>
+                                  <button onClick={() => { setPointToComplete(point); setShowCompleteModal(true); }} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow">Marcar como retirado!</button>
+                                  <button onClick={() => { const residentUserId = point.user_id || point.profiles?.user_id; if (residentUserId) { navigate(`/chat/${residentUserId}`); } else { setError('No se encontró el usuario Dirigente para chatear.'); } }} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold shadow">Mensaje al Dirigente</button>
                                   {typeof point.lng === 'number' && typeof point.lat === 'number' ? (
-                                    <button onClick={e => { e.stopPropagation(); const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`; window.open(url, '_blank', 'noopener,noreferrer'); }} title="Abrir ruta de navegación en Google Maps" className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-600 rounded hover:bg-green-100 transition-colors shadow-sm text-green-800 font-bold text-xs">
+                                    <button onClick={e => { e.stopPropagation(); const url = `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=driving`; window.open(url, '_blank', 'noopener,noreferrer'); }} title="Abrir ruta de navegación en Google Maps" className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-600 rounded hover:bg-blue-100 transition-colors shadow-sm text-blue-800 font-bold text-xs">
                                       <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1748481430/google-maps-icon_bur7my.png" alt="Google Maps" className="h-7 w-7 animate-bounce-map" />
                                       <span>Ruta Google Maps</span>
                                     </button>
@@ -2350,7 +2318,7 @@ const DashboardRecycler: React.FC = () => {
                       Vaciar Puntos Cancelados
                     </button>
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Puntos de Recolección Cancelados</h2>
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Centros de Movilizaciòn Cancelados</h2>
                   <div className="grid gap-6 md:grid-cols-2">
                     {claimedPoints.filter(p => p.claim_status === 'cancelled').length === 0 ? (
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos cancelados.</div>
@@ -2380,7 +2348,7 @@ const DashboardRecycler: React.FC = () => {
                                 <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {point.materials.map((material: string, idx: number) => (
-                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{material}</span>
                                   ))}
                                 </div>
                               </div>
@@ -2405,26 +2373,26 @@ const DashboardRecycler: React.FC = () => {
                               <div className="mt-2 text-xs text-red-600 font-semibold">Motivo: {point.cancellation_reason}</div>
                             )}
 
-                            {/* Info residente */}
+                            {/* Info Dirigente */}
                             <div className="mt-6 pt-6 border-t border-gray-200">
-                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Dirigente:</h4>
                               <div className="space-y-2">
                                 <div className="flex items-center text-sm text-gray-500">
                                   <img
-                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Residente')) + '&background=E0F2FE&color=2563EB&size=64'}
-                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Residente'}
+                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Dirigente')) + '&background=E0F2FE&color=2563EB&size=64'}
+                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Dirigente'}
                                     className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
                                   />
                                   <span>{point.creator_name}</span>
                                 </div>
                                 <div className="flex items-center text-sm text-gray-500">
                                   <Mail className="h-4 w-4 mr-2" />
-                                  <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
+                                  <a href={`mailto:${point.creator_email}`} className="text-blue-600 hover:text-blue-700">{point.creator_email}</a>
                                 </div>
                                 {point.profiles?.phone && (
                                   <div className="flex items-center text-sm text-gray-500">
                                     <Phone className="h-4 w-4 mr-1" />
-                                    <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                    <a href={`tel:${point.profiles.phone}`} className="text-blue-600 hover:text-blue-700">{point.profiles.phone}</a>
                                   </div>
                                 )}
                                 <div className="flex items-center text-sm text-gray-500">
@@ -2468,7 +2436,7 @@ const DashboardRecycler: React.FC = () => {
                       <div className="col-span-2 text-center text-gray-500">No tienes puntos retirados.</div>
                     ) : (
                       claimedPoints.filter(p => p.claim_status === 'completed').map(point => (
-                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-green-400">
+                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-blue-400">
                           <div className="p-6">
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3">
@@ -2480,21 +2448,21 @@ const DashboardRecycler: React.FC = () => {
                                   className="w-7 h-7 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.5"
                                 />
                                 <div>
-                                  <h3 className="text-lg font-bold text-green-800">{point.address}</h3>
+                                  <h3 className="text-lg font-bold text-blue-800">{point.address}</h3>
                                   <p className="mt-1 text-sm text-gray-500">{point.district}</p>
                                 </div>
                               </div>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Retirado</span>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Retirado</span>
                             </div>
                             <div className="flex flex-row items-start mt-4">
                               <div className="mr-6 flex-shrink-0">
-                                <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-green-300 hover:shadow-lg rounded-lg">
+                                <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-blue-300 hover:shadow-lg rounded-lg">
                                   <img
                                     src={point.photo_url || (point.type === 'colective_point'
                                       ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750893817/contenedor_u6jjye.png'
                                       : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
                                     alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
-                                    className="w-36 h-36 object-cover rounded-lg shadow-md border border-green-200"
+                                    className="w-36 h-36 object-cover rounded-lg shadow-md border border-blue-200"
                                     style={{ background: '#f0fdf4', filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
                                     onError={(e) => {
                                       // Si la imagen del material falla, usar la imagen por defecto
@@ -2509,7 +2477,7 @@ const DashboardRecycler: React.FC = () => {
                                   {/* Indicador de foto del material */}
                                   {point.photo_url && (
                                     <div className="absolute top-2 right-2">
-                                      <div className="bg-green-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
+                                      <div className="bg-blue-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
                                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                           <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                                         </svg>
@@ -2522,7 +2490,7 @@ const DashboardRecycler: React.FC = () => {
                                 <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
                                 <div className="mt-2 flex flex-wrap gap-2">
                                   {point.materials && Array.isArray(point.materials) && point.materials.map((material: string, idx: number) => (
-                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{material}</span>
+                                    <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{material}</span>
                                   ))}
                                 </div>
                               </div>
@@ -2531,32 +2499,32 @@ const DashboardRecycler: React.FC = () => {
                               <Calendar className="h-4 w-4 mr-2" />
                               <span>{point.pickup_time ? new Date(point.pickup_time).toLocaleString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}</span>
                             </div>
-                            {/* Información adicional del residente */}
+                            {/* Información adicional del Dirigente */}
                             {typeof point.additional_info === 'string' && point.additional_info.trim() !== '' && (
                               <div className="mt-2 text-sm text-gray-600">
                                 <strong>Información adicional:</strong> {point.additional_info}
                               </div>
                             )}
-                            {/* Info residente */}
+                            {/* Info Dirigente */}
                             <div className="mt-6 pt-6 border-t border-gray-200">
-                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Residente:</h4>
+                              <h4 className="text-sm font-medium text-gray-700 mb-3">Información del Dirigente:</h4>
                               <div className="space-y-2">
                                 <div className="flex items-center text-sm text-gray-500">
                                   <img
-                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Residente')) + '&background=E0F2FE&color=2563EB&size=64'}
-                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Residente'}
+                                    src={point.creator_avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(String(point.creator_name || 'Dirigente')) + '&background=E0F2FE&color=2563EB&size=64'}
+                                    alt={typeof point.creator_name === 'string' ? point.creator_name : 'Dirigente'}
                                     className="h-7 w-7 rounded-full object-cover mr-2 border border-blue-200 shadow-sm"
                                   />
                                   <span>{point.creator_name}</span>
                                 </div>
                                 <div className="flex items-center text-sm text-gray-500">
                                   <Mail className="h-4 w-4 mr-2" />
-                                  <a href={`mailto:${point.creator_email}`} className="text-green-600 hover:text-green-700">{point.creator_email}</a>
+                                  <a href={`mailto:${point.creator_email}`} className="text-blue-600 hover:text-blue-700">{point.creator_email}</a>
                                 </div>
                                 {point.profiles?.phone && (
                                   <div className="flex items-center text-sm text-gray-500">
                                     <Phone className="h-4 w-4 mr-1" />
-                                    <a href={`tel:${point.profiles.phone}`} className="text-green-600 hover:text-green-700">{point.profiles.phone}</a>
+                                    <a href={`tel:${point.profiles.phone}`} className="text-blue-600 hover:text-blue-700">{point.profiles.phone}</a>
                                   </div>
                                 )}
                                 <div className="flex items-center text-sm text-gray-500">
@@ -2657,7 +2625,7 @@ const DashboardRecycler: React.FC = () => {
                       <X className="h-6 w-6" />
                     </button>
                   </div>
-                  <p className="text-sm text-gray-600 mb-4">Has marcado el punto como retirado. El residente será notificado automáticamente.</p>
+                  <p className="text-sm text-gray-600 mb-4">Has marcado el punto como retirado. El Dirigente será notificado automáticamente.</p>
                   <div className="flex justify-end">
                     <button
                       onClick={handleCompleteCollection}
@@ -2703,7 +2671,7 @@ const DashboardRecycler: React.FC = () => {
                         id="pickupDateTime"
                         value={pickupDateTimeInput}
                         onChange={(e) => setPickupDateTimeInput(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md shadow-sm p-2 pl-10 focus:ring-green-500 focus:border-green-500"
+                        className="w-full border border-gray-300 rounded-md shadow-sm p-2 pl-10 focus:ring-blue-500 focus:border-blue-500"
                         min={new Date().toISOString().slice(0, 16)} // Evitar fechas pasadas
                         required
                       />
@@ -2730,7 +2698,7 @@ const DashboardRecycler: React.FC = () => {
                     <button
                       onClick={handleConfirmClaim}
                       disabled={loading || !pickupDateTimeInput}
-                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center"
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
                     >
                       <Clock className="h-4 w-4 mr-2" />
                       {loading ? 'Procesando...' : 'Confirmar Reclamo'}
@@ -2758,23 +2726,15 @@ const DashboardRecycler: React.FC = () => {
                 </div>
               </div>
             )}
-            {showPointsStatsModal && profileId && (
-              <MyRecyclerRatingsModal
-                open={showPointsStatsModal}
-                onClose={() => setShowPointsStatsModal(false)}
-                recyclerId={profileId}
-                recyclerName={user.name}
-                avatarUrl={user.avatar_url}
-              />
-            )}
+            {/* ratings modal removed */}
             {showChatModal && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">Mensajes con Residentes</h3>
+                    <h3 className="text-lg font-medium text-gray-900">Mensajes con Dirigentes</h3>
                     <button onClick={() => setShowChatModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button>
                   </div>
-                  {/* Lista de residentes con los que el reciclador tiene puntos reclamados o historial de mensajes */}
+                  {/* Lista de Dirigentes con los que el reciclador tiene puntos reclamados o historial de mensajes */}
                   {loadingChats ? (
                     <div className="p-4 text-center text-gray-500">Cargando chats...</div>
                   ) : (
@@ -2823,7 +2783,7 @@ const DashboardRecycler: React.FC = () => {
                   </button>
                   <h2 className="text-2xl font-bold text-cyan-700 mb-4">Mis Rutas</h2>
                   {routeError && <div className="text-red-600 mb-2">{routeError}</div>}
-                  {routeSuccess && <div className="text-green-600 mb-2">{routeSuccess}</div>}
+                  {routeSuccess && <div className="text-blue-600 mb-2">{routeSuccess}</div>}
                   {/* --- FORMULARIO DE EDICIÓN DE RUTA --- */}
                   {editingRoute ? (
                     <div>
@@ -2838,19 +2798,19 @@ const DashboardRecycler: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
                         {claimedPoints.length === 0 && <div className="col-span-2 text-gray-400">No tienes puntos reclamados.</div>}
                         {claimedPoints.map(point => (
-                          <label key={point.id} className={`flex items-center gap-2 border rounded px-2 py-1 cursor-pointer ${editSelectedPoints.includes(point.id) ? 'bg-green-100 border-green-400' : 'bg-white'}`}>
+                          <label key={point.id} className={`flex items-center gap-2 border rounded px-2 py-1 cursor-pointer ${editSelectedPoints.includes(point.id) ? 'bg-blue-100 border-blue-400' : 'bg-white'}`}>
                             <input
                               type="checkbox"
                               checked={editSelectedPoints.includes(point.id)}
                               onChange={() => toggleEditSelectPoint(point.id)}
-                              className="accent-green-600"
+                              className="accent-blue-600"
                             />
                             <span>{String(point.creator_name || 'Punto')} ({point.lat?.toFixed(4)}, {point.lng?.toFixed(4)})</span>
                           </label>
                         ))}
                       </div>
                       {editRouteError && <div className="text-red-600 mb-2">{editRouteError}</div>}
-                      {editRouteSuccess && <div className="text-green-600 mb-2">{editRouteSuccess}</div>}
+                      {editRouteSuccess && <div className="text-blue-600 mb-2">{editRouteSuccess}</div>}
                       <div className="flex gap-2">
                         <button
                           className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
@@ -2877,12 +2837,12 @@ const DashboardRecycler: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
                         {claimedPoints.length === 0 && <div className="col-span-2 text-gray-400">No tienes puntos reclamados.</div>}
                         {claimedPoints.map(point => (
-                          <label key={point.id} className={`flex items-center gap-2 border rounded px-2 py-1 cursor-pointer ${selectedRoutePoints.includes(point.id) ? 'bg-green-100 border-green-400' : 'bg-white'}`}>
+                          <label key={point.id} className={`flex items-center gap-2 border rounded px-2 py-1 cursor-pointer ${selectedRoutePoints.includes(point.id) ? 'bg-blue-100 border-blue-400' : 'bg-white'}`}>
                             <input
                               type="checkbox"
                               checked={selectedRoutePoints.includes(point.id)}
                               onChange={() => toggleSelectPoint(point.id)}
-                              className="accent-green-600"
+                              className="accent-blue-600"
                             />
                             <span>{String(point.creator_name || 'Punto')} ({point.lat?.toFixed(4)}, {point.lng?.toFixed(4)})</span>
                           </label>

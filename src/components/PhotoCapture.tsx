@@ -515,7 +515,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
                 <button
                   type="button"
                   onClick={handleConfirmImage}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 flex items-center"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 flex items-center"
                   disabled={processing}
                 >
                   {processing ? (
@@ -601,7 +601,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
           <button
             type="button"
             onClick={capture}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
             disabled={!!cameraError}
           >
             Capturar

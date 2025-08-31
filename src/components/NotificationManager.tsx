@@ -111,7 +111,7 @@ const NotificationManager = () => {
       <div className="mb-4">
         <p className="mb-2">
           Estado del token: 
-          <span className={`ml-2 ${deviceToken ? 'text-green-500' : 'text-red-500'}`}>
+          <span className={`ml-2 ${deviceToken ? 'text-blue-500' : 'text-red-500'}`}>
             {deviceToken ? 'Disponible' : 'No disponible'}
           </span>
         </p>
@@ -165,7 +165,7 @@ const NotificationManager = () => {
           className={`px-4 py-2 rounded-md ${
             isLoading
               ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600 text-white'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
           }`}
         >
           {isLoading ? 'Enviando...' : 'Enviar a todos los usuarios'}
@@ -175,7 +175,7 @@ const NotificationManager = () => {
       {notificationStatus && (
         <div className={`mt-4 p-2 rounded-md ${
           notificationStatus.includes('éxito')
-            ? 'bg-green-100 text-green-800'
+            ? 'bg-blue-100 text-blue-800'
             : 'bg-red-100 text-red-800'
         }`}>
           {notificationStatus}

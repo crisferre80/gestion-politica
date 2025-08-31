@@ -53,7 +53,7 @@ const NotificationBell: React.FC = () => {
             <div className="flex gap-2">
               <button 
                 onClick={toggleSound}
-                className={`text-xs p-1 rounded ${enableSound ? 'text-green-600' : 'text-gray-400'}`}
+                className={`text-xs p-1 rounded ${enableSound ? 'text-blue-600' : 'text-gray-400'}`}
                 title={enableSound ? "Sonido activado" : "Sonido desactivado"}
               >
                 {enableSound ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -61,7 +61,7 @@ const NotificationBell: React.FC = () => {
               {unreadCount > 0 && (
                 <button 
                   onClick={() => markAllAsRead()}
-                  className="text-xs bg-green-500 text-white px-2 py-1 rounded flex items-center gap-1"
+                  className="text-xs bg-blue-500 text-white px-2 py-1 rounded flex items-center gap-1"
                   title="Marcar todas como leídas"
                 >
                   <Check className="w-3 h-3" />
@@ -81,11 +81,11 @@ const NotificationBell: React.FC = () => {
                 onClick={() => handleNotificationClick(n.id)}
               >
                 <div className="flex-1">
-                  <div className={`font-bold text-sm mb-0.5 ${!n.read ? 'text-green-700' : ''}`}>{n.title}</div>
+                  <div className={`font-bold text-sm mb-0.5 ${!n.read ? 'text-blue-700' : ''}`}>{n.title}</div>
                   <div className="text-xs text-gray-600 mb-1">{n.content}</div>
                   <div className="text-xs text-gray-400">{new Date(n.created_at).toLocaleString()}</div>
                 </div>
-                {!n.read && <span className="ml-2 mt-1 w-2 h-2 rounded-full bg-green-500" />}
+                {!n.read && <span className="ml-2 mt-1 w-2 h-2 rounded-full bg-blue-500" />}
               </li>
             ))}
           </ul>

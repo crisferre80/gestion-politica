@@ -29,6 +29,7 @@ export interface MapboxPolygonProps {
     role?: string;
     online?: boolean;
     iconUrl?: string;
+    type?: string; // <-- Agregado para evitar el error de tipo
   }>;
   showUserLocation?: boolean;
   zones?: Zone[];
@@ -546,8 +547,8 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                   width: '100%',
                   height: '100%',
                   backgroundImage: `url(${marker.iconUrl ||
-                    (marker.role === 'resident_institutional'
-                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png'
+                    (marker.type === 'colective_point'
+                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822942/Pcolectivo_fges4s.png'
                       : marker.role === 'collection_point'
                       ? '/assets/recycling-marker.svg' // Icono para punto colectivo genérico
                       : marker.role === 'available'

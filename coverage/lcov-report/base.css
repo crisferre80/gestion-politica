@@ -165,11 +165,11 @@ table.coverage td span.cline-any {
 .cstat-no, .fstat-no, .cbranch-no, .cbranch-no { background:#F6C6CE }
 /* light red */
 .low, .cline-no { background:#FCE1E5 }
-/* light green */
+/* light blue */
 .high, .cline-yes { background:rgb(230,245,208) }
-/* medium green */
+/* medium blue */
 .cstat-yes { background:rgb(161,215,106) }
-/* dark green */
+/* dark blue */
 .status-line.high, .high .cover-fill { background:rgb(77,146,33) }
 .high .chart { border:1px solid rgb(77,146,33) }
 /* dark yellow (gold) */

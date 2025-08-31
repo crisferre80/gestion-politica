@@ -161,7 +161,7 @@ const AdminAds: React.FC = () => {
                   id="title"
                   value={newAd.title}
                   onChange={(e) => setNewAd({ ...newAd, title: e.target.value })}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   required
                 />
               </div>
@@ -175,7 +175,7 @@ const AdminAds: React.FC = () => {
                   id="link"
                   value={newAd.link}
                   onChange={(e) => setNewAd({ ...newAd, link: e.target.value })}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="https://"
                 />
               </div>
@@ -190,7 +190,7 @@ const AdminAds: React.FC = () => {
                     <div className="flex text-sm text-gray-600">
                       <label
                         htmlFor="file-upload"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-green-600 hover:text-green-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-green-500"
+                        className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
                       >
                         <span>Subir imagen</span>
                         <input
@@ -215,7 +215,7 @@ const AdminAds: React.FC = () => {
               <button
                 type="submit"
                 disabled={uploading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 {uploading ? 'Subiendo...' : 'Subir Publicidad'}
               </button>
@@ -243,7 +243,7 @@ const AdminAds: React.FC = () => {
                           href={ad.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-green-600 hover:text-green-500 flex items-center mt-1"
+                          className="text-sm text-blue-600 hover:text-blue-500 flex items-center mt-1"
                         >
                           <LinkIcon className="h-4 w-4 mr-1" />
                           Ver enlace

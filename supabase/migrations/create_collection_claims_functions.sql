@@ -45,12 +45,12 @@ DECLARE
 BEGIN
     -- Solo actuar si el estado cambió a 'completed'
     IF OLD.status != 'completed' AND NEW.status = 'completed' THEN
-        -- Obtener el ID del residente asociado al punto de recolección
+        -- Obtener el ID del Dirigente asociado al punto de recolección
         SELECT user_id INTO resident_id
         FROM collection_points
         WHERE id = NEW.collection_point_id;
         
-        -- Sumar 10 EcoCreditos al residente
+        -- Sumar 10 EcoCreditos al Dirigente
         UPDATE profiles
         SET eco_creditos = COALESCE(eco_creditos, 0) + 10
         WHERE user_id = resident_id;
@@ -61,7 +61,7 @@ BEGIN
         SET eco_creditos = COALESCE(eco_creditos, 0) + 5
         WHERE user_id = recycler_id;
         
-        -- Crear notificación para el residente
+        -- Crear notificación para el Dirigente
         INSERT INTO notifications (
             user_id, 
             title, 

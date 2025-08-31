@@ -3,26 +3,26 @@ import React from 'react';
 const QuienesSomosPage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
-      <div className="bg-white rounded-xl shadow-lg p-8 border border-green-200">
-        <h1 className="text-4xl font-extrabold text-green-800 mb-6 text-center tracking-tight">¿Quiénes Somos?</h1>
+      <div className="bg-white rounded-xl shadow-lg p-8 border border-blue-200">
+        <h1 className="text-4xl font-extrabold text-blue-800 mb-6 text-center tracking-tight">¿Quiénes Somos?</h1>
         {/* Carrusel de imágenes */}
         <div className="mb-8">
           <CarouselSindicato />
         </div>
-        <div className="prose prose-green max-w-none">
+        <div className="prose prose-blue max-w-none">
           <p>
-            ASURA es la Asociación Sindical Única de Recicladores Argentinos, una organización que lucha por la dignificación del trabajo reciclador y el desarrollo de herramientas tecnológicas que promuevan la inclusión social y el cuidado ambiental.
+            ASURA es la Asociación Sindical Única de Dirigentes Argentinos, una organización que lucha por la dignificación del trabajo reciclador y el desarrollo de herramientas tecnológicas que promuevan la inclusión social y el cuidado ambiental.
           </p>
           <p>
-            Nuestra misión es conectar a ciudadanos, recicladores y empresas para gestionar residuos reciclables de forma eficiente, segura y trazable, promoviendo la economía circular y el desarrollo sostenible.
+            Nuestra misión es conectar a ciudadanos, Dirigentes y empresas para gestionar residuos reciclables de forma eficiente, segura y trazable, promoviendo la economía circular y el desarrollo sostenible.
           </p>
           <p>
-            Trabajamos para brindar oportunidades, visibilidad y mejores condiciones a los recicladores, integrando tecnología y compromiso social en cada acción.
+            Trabajamos para brindar oportunidades, visibilidad y mejores condiciones a los Dirigentes, integrando tecnología y compromiso social en cada acción.
           </p>
           <h2 className="text-2xl font-semibold mt-6 mb-2">Contacto</h2>
-          <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg text-gray-800">
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg text-gray-800">
             <p className="font-semibold">Cristian Raúl Ferreyra</p>
-            <p>Líder de Proyecto Asura EcoNecta2</p>
+            <p>Líder de Proyecto Gestion Dirigencial y Politica</p>
             <p className="mb-1">asurasantiago@gmail.com</p>
             <p>Ciudad Capital de Santiago del Estero</p>
           </div>
@@ -36,13 +36,13 @@ const QuienesSomosPage: React.FC = () => {
 const images = [
   {
     src: "/assets/490907928_1120762550065261_4214991636731734683_n.jpg",
-    alt: "Recicladores en acción",
-    caption: "Recicladores urbanos trabajando en la ciudad"
+    alt: "Dirigentes en acción",
+    caption: "Dirigentes urbanos trabajando en la ciudad"
   },
   {
     src: "/assets/497886864_17856255534429774_1346804607382853053_n.jpg",
     alt: "Jornada de capacitación",
-    caption: "Capacitación y formación para recicladores"
+    caption: "Capacitación y formación para Dirigentes"
   },
   {
     src: "/assets/498632049_1148638820610967_8627901475166359115_n.jpg",
@@ -108,7 +108,7 @@ const CarouselSindicato: React.FC = () => {
         {images.map((_, idx) => (
           <button
             key={idx}
-            className={`w-3 h-3 rounded-full ${idx === current ? 'bg-green-500' : 'bg-white bg-opacity-60'} border border-green-700`}
+            className={`w-3 h-3 rounded-full ${idx === current ? 'bg-blue-500' : 'bg-white bg-opacity-60'} border border-blue-700`}
             onClick={() => setCurrent(idx)}
             aria-label={`Ver imagen ${idx + 1}`}
           />

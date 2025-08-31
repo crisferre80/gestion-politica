@@ -10,6 +10,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Logs de diagnóstico (seguros: solo mostramos prefijos, nunca claves completas)
+try {
+  console.log('Supabase URL (masked):', supabaseUrl ? supabaseUrl.replace(/(https?:\/\/)([^.]+)(.*)/, '$1$2...') : 'MISSING');
+  if (supabaseAnonKey) {
+    console.log('Supabase anon key prefix:', supabaseAnonKey.substring(0, 10) + '...');
+  } else {
+    console.warn('Supabase anon key missing');
+  }
+} catch {
+  // No bloquear la ejecución por logs
+}
+
 // Función para verificar la configuración de Supabase e inicializar recursos necesarios
 export async function initializeSupabase(): Promise<boolean> {
   try {
@@ -67,7 +79,7 @@ export async function initializeSupabase(): Promise<boolean> {
     
     // Intentamos usar las tablas principales, pero no bloqueamos la inicialización
     // Esto nos ayuda a diagnosticar el problema
-    const tables = ['profiles', 'collection_points', 'collection_claims'];
+  const tables = ['profiles', 'concentration_points', 'collection_claims'];
     for (const table of tables) {
       try {
         console.log(`Intentando acceder a la tabla ${table}...`);
@@ -155,7 +167,7 @@ export interface User {
   email: string;
   phone?: string;
   address?: string;
-  type: 'resident' | 'recycler' | 'resident_institutional';
+  type: 'resident' | 'recycler';
   avatar_url?: string;
   online?: boolean;
   materials?: string[];
@@ -229,7 +241,8 @@ export interface CollectionClaim {
 
 export async function signUpUser(email: string, password: string, userData: Partial<User> & { dni?: string }) {
   try {
-    // Intenta crear el usuario en Auth
+  // Intenta crear el usuario en Auth
+  console.log('[signUpUser] inicio', { email, role: userData.type, hasDni: !!userData.dni });
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -244,6 +257,16 @@ export async function signUpUser(email: string, password: string, userData: Part
     if (signUpError) throw signUpError;
     if (!authData.user) throw new Error('Failed to create user');
 
+    console.log('[signUpUser] auth created, user id:', authData.user.id);
+
+    // Si no hay sesión (por ejemplo cuando se requiere confirmación por email),
+    // authData.session puede ser null. En ese caso no intentamos operaciones que
+    // requieran privilegios adicionales y devolvemos info útil al llamador.
+    if (!authData.session) {
+      console.log('[signUpUser] No session returned (email confirmation may be required). Returning early.');
+      return { data: { ...authData, profile: null }, error: null };
+    }
+
     // Verifica si ya existe un perfil por user_id
     const { data: profileById } = await supabase
       .from('profiles')
@@ -251,6 +274,7 @@ export async function signUpUser(email: string, password: string, userData: Part
       .eq('user_id', authData.user.id)
       .maybeSingle();
     if (profileById) {
+  console.log('[signUpUser] perfil ya existe por user_id, retornando');
       return { data: { ...authData, profile: profileById }, error: null };
     }
 
@@ -263,12 +287,14 @@ export async function signUpUser(email: string, password: string, userData: Part
     if (profileByEmail) {
       // Si existe, actualiza el user_id si es necesario
       if (!profileByEmail.user_id) {
+        console.log('[signUpUser] perfil encontrado por email, actualizando user_id');
         await supabase.from('profiles').update({ user_id: authData.user.id }).eq('email', email);
       }
       return { data: { ...authData, profile: { ...profileByEmail, user_id: authData.user.id } }, error: null };
     }
 
     // Si no existe, crea el perfil
+    console.log('[signUpUser] Intentando crear perfil en table profiles');
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .insert([{
@@ -282,8 +308,12 @@ export async function signUpUser(email: string, password: string, userData: Part
       .single();
 
     if (profileError || !profile) {
-      // Si falla la creación del perfil, elimina el usuario Auth
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      // Si hay un error RLS, devolvemos un mensaje más claro
+      if (profileError && profileError.code === '42501') {
+        console.error('[signUpUser] RLS denied insert into profiles:', profileError);
+        return { data: null, error: new Error('Row-level security prevented profile creation. Ensure RLS policies allow inserts for authenticated users or run profile creation from a privileged backend.') };
+      }
+      console.error('[signUpUser] Error al crear perfil:', profileError);
       throw profileError || new Error('Failed to create profile');
     }
 
@@ -297,7 +327,8 @@ export async function signUpUser(email: string, password: string, userData: Part
 
 export async function signInUser(email: string, password: string) {
   try {
-    // Sign in user
+  // Sign in user
+  console.log('[signInUser] intento de inicio de sesión', { email });
     const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -311,6 +342,8 @@ export async function signInUser(email: string, password: string) {
     }
 
     if (!authData.user) throw new Error('Failed to sign in');
+
+  console.log('[signInUser] sign in exitoso, user id:', authData.user.id);
 
     // Get profile by user_id
     const { data: profile, error: profileError } = await supabase
@@ -419,8 +452,8 @@ export async function claimCollectionPoint(
     }
 
     // Verificar si las tablas necesarias existen
-    const claimsTableExists = await checkTableExists('collection_claims');
-    const pointsTableExists = await checkTableExists('collection_points');
+  const claimsTableExists = await checkTableExists('collection_claims');
+  const pointsTableExists = await checkTableExists('concentration_points');
     
     if (!claimsTableExists) {
       console.error('ERROR CRÍTICO: La tabla collection_claims no existe');
@@ -428,8 +461,8 @@ export async function claimCollectionPoint(
     }
     
     if (!pointsTableExists) {
-      console.error('ERROR CRÍTICO: La tabla collection_points no existe');
-      throw new Error('La tabla collection_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
+      console.error('ERROR CRÍTICO: La tabla concentration_points no existe');
+      throw new Error('La tabla concentration_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
     }
 
     // NUEVO: Verificar si existe un claim activo para este punto
@@ -475,10 +508,10 @@ export async function claimCollectionPoint(
       }
     }
 
-    // Verificar que el punto esté disponible en collection_points
-    console.log('Verificando estado del punto en collection_points');
+  // Verificar que el punto esté disponible en concentration_points
+    console.log('Verificando estado del punto en concentration_points');
     const { data: pointData, error: pointCheckError } = await supabase
-      .from('collection_points')
+      .from('concentration_points')
       .select('id, status, user_id')
       .eq('id', pointId)
       .single();
@@ -565,9 +598,9 @@ export async function claimCollectionPoint(
     console.log('Registro insertado correctamente en collection_claims:', claim);
 
     // Actualizar el punto de recolección
-    console.log('Actualizando collection_points');
+    console.log('Actualizando concentration_points');
     const { error: updateError } = await supabase
-      .from('collection_points')
+      .from('concentration_points')
       .update({
         status: 'claimed',
         claim_id: claim.id,
@@ -579,11 +612,11 @@ export async function claimCollectionPoint(
     if (updateError) {
       // Manejar específicamente el error cuando la tabla no existe
       if (updateError.code === '42P01') {
-        console.error('La tabla collection_points no existe en la base de datos');
-        throw new Error('La tabla collection_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
+  console.error('La tabla concentration_points no existe en la base de datos');
+  throw new Error('La tabla concentration_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
       }
       
-      console.error('Error al actualizar collection_points:', updateError);
+  console.error('Error al actualizar concentration_points:', updateError);
       throw updateError;
     }
     
@@ -599,8 +632,8 @@ export async function cancelClaim(
   claimId: string, pointId: string, reason: string): Promise<void> {
   try {
     // Verificar si las tablas necesarias existen
-    const claimsTableExists = await checkTableExists('collection_claims');
-    const pointsTableExists = await checkTableExists('collection_points');
+  const claimsTableExists = await checkTableExists('collection_claims');
+  const pointsTableExists = await checkTableExists('concentration_points');
     
     if (!claimsTableExists) {
       console.error('ERROR CRÍTICO: La tabla collection_claims no existe');
@@ -608,8 +641,8 @@ export async function cancelClaim(
     }
     
     if (!pointsTableExists) {
-      console.error('ERROR CRÍTICO: La tabla collection_points no existe');
-      throw new Error('La tabla collection_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
+      console.error('ERROR CRÍTICO: La tabla concentration_points no existe');
+      throw new Error('La tabla concentration_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
     }
     
     // Update claim status
@@ -626,7 +659,7 @@ export async function cancelClaim(
 
     // Update collection point status
     const { error: pointError } = await supabase
-      .from('collection_points')
+      .from('concentration_points')
       .update({
         status: 'available',
         claim_id: null,
@@ -649,15 +682,15 @@ export async function completeCollection(
 ): Promise<void> {
   try {
     // Verificar si las tablas necesarias existen
-    const claimsTableExists = await checkTableExists('collection_claims');
-    const pointsTableExists = await checkTableExists('collection_points');
-    const profilesTableExists = await checkTableExists('profiles');
+  const claimsTableExists = await checkTableExists('collection_claims');
+  const pointsTableExists = await checkTableExists('concentration_points');
+  const profilesTableExists = await checkTableExists('profiles');
     const notificationsTableExists = await checkTableExists('notifications');
     
     if (!claimsTableExists || !pointsTableExists || !profilesTableExists) {
       const missingTables = [];
       if (!claimsTableExists) missingTables.push('collection_claims');
-      if (!pointsTableExists) missingTables.push('collection_points');
+      if (!pointsTableExists) missingTables.push('concentration_points');
       if (!profilesTableExists) missingTables.push('profiles');
       
       console.error(`ERROR CRÍTICO: Las siguientes tablas no existen: ${missingTables.join(', ')}`);
@@ -677,7 +710,7 @@ export async function completeCollection(
 
     // Update collection point status
     const { error: pointError } = await supabase
-      .from('collection_points')
+      .from('concentration_points')
       .update({
         status: 'completed'
       })
@@ -687,17 +720,17 @@ export async function completeCollection(
 
     // Get resident ID
     const { data: point, error: pointFetchError } = await supabase
-      .from('collection_points')
+      .from('concentration_points')
       .select('user_id')
       .eq('id', pointId)
       .single();
 
     if (pointFetchError) throw pointFetchError;
 
-    // DEBUG: Mostrar el user_id del residente
-    console.log('[DEBUG completeCollection] user_id del residente:', point.user_id);
+    // DEBUG: Mostrar el user_id del Dirigente
+    console.log('[DEBUG completeCollection] user_id del Dirigente:', point.user_id);
 
-    // Sumar 10 EcoCreditos al residente
+    // Sumar 10 EcoCreditos al Dirigente
     const { data: currentProfile, error: profileError } = await supabase
       .from('profiles')
       .select('eco_creditos, user_id')
@@ -713,7 +746,7 @@ export async function completeCollection(
     if (updateError) throw updateError;
     console.log('[DEBUG completeCollection] eco_creditos nuevos:', nuevosCreditos);
 
-    // Crear notificación para el residente si la tabla existe
+    // Crear notificación para el Dirigente si la tabla existe
     if (notificationsTableExists) {
       const { error: notificationError } = await supabase
         .from('notifications')
@@ -744,7 +777,7 @@ export async function completeCollection(
 export async function deleteCollectionPoint(pointId: string, userId: string): Promise<void> {
   try {
     const { error } = await supabase
-      .from('collection_points')
+      .from('concentration_points')
       .delete()
       .eq('id', pointId)
       .eq('user_id', userId);
@@ -763,12 +796,14 @@ export async function ensureUserProfile({ id, email, name }: { id: string; email
     // Verifica si el perfil ya existe
     const { data, error } = await supabase
       .from('profiles')
-      .select('id')
+      // La tabla usa user_id como PK; devolvemos user_id como id para mantener compatibilidad
+      .select('user_id as id')
       .eq('user_id', id)
       .maybeSingle();
 
     if (!data && !error) {
       // Si no existe, lo crea
+      // Insertamos siempre con user_id explícito (evita que el DEFAULT gen_random_uuid() cree un valor distinto)
       await supabase.from('profiles').insert({
         user_id: id,
         email,

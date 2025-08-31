@@ -9,7 +9,7 @@
 ## Índice
 1. Introducción
 2. Acceso y registro
-3. Panel de residente
+3. Panel de Dirigente
 4. Panel de reciclador
 5. Panel de administrador
 6. Funcionalidades principales
@@ -19,20 +19,20 @@
 ---
 
 ## 1. Introducción
-EcoNecta es una plataforma para conectar residentes, recicladores y administradores, facilitando la gestión de puntos de recolección y la comunicación en tiempo real.
+EcoNecta es una plataforma para conectar Dirigentes, Dirigentes y administradores, facilitando la gestión de Centros de Movilizaciòn y la comunicación en tiempo real.
 
 ---
 
 ## 2. Acceso y registro
 - Descarga la app o accede vía web.
-- Regístrate como residente, reciclador o administrador.
+- Regístrate como Dirigente, reciclador o administrador.
 - Completa tu perfil con datos básicos y, si eres reciclador, tu ubicación y materiales que recolectas.
 
 ---
 
-## 3. Panel de residente
-- **Ver puntos de recolección:** Consulta, agrega o elimina tus puntos.
-- **Ver recicladores en línea:** Visualiza en tiempo real los recicladores disponibles en el mapa y contacta por chat.
+## 3. Panel de Dirigente
+- **Ver Centros de Movilizaciòn:** Consulta, agrega o elimina tus puntos.
+- **Ver Dirigentes en línea:** Visualiza en tiempo real los Dirigentes disponibles en el mapa y contacta por chat.
 - **Historial:** Consulta el estado de tus puntos (disponibles, reclamados, demorados, retirados).
 - **Mi EcoCuenta:** Visualiza tus EcoCreditos y recompensas.
 - **Perfil:** Edita tus datos y foto de perfil.
@@ -42,21 +42,21 @@ EcoNecta es una plataforma para conectar residentes, recicladores y administrado
 ## 4. Panel de reciclador
 - **Ver puntos disponibles:** Consulta puntos cercanos y reclámalos para recoger materiales.
 - **Mapa:** Visualiza puntos y tu ubicación.
-- **Chat:** Comunícate con residentes.
+- **Chat:** Comunícate con Dirigentes.
 - **Historial:** Revisa tus recolecciones y calificaciones.
 - **Perfil:** Edita tus datos y materiales que recolectas.
 
 ---
 
 ## 5. Panel de administrador
-- **Gestión de usuarios:** Visualiza y administra residentes y recicladores.
+- **Gestión de usuarios:** Visualiza y administra Dirigentes y Dirigentes.
 - **Zonas y estadísticas:** Consulta zonas de cobertura y estadísticas de recolección.
 - **Notificaciones:** Envía avisos a usuarios.
 
 ---
 
 ## 6. Funcionalidades principales
-- **Actualización en tiempo real:** Cambios de estado de recicladores y puntos se reflejan al instante.
+- **Actualización en tiempo real:** Cambios de estado de Dirigentes y puntos se reflejan al instante.
 - **Chat seguro:** Comunicación directa entre usuarios.
 - **EcoCreditos y recompensas:** Acumula puntos y canjea premios.
 - **Mapa interactivo:** Visualiza ubicaciones y rutas.
@@ -65,10 +65,10 @@ EcoNecta es una plataforma para conectar residentes, recicladores y administrado
 
 ## 7. Preguntas frecuentes
 - ¿Cómo agrego un punto de recolección?
-  - Desde el panel de residente, haz clic en "Agregar Punto" y completa los datos.
+  - Desde el panel de Dirigente, haz clic en "Agregar centro" y completa los datos.
 - ¿Cómo contacto a un reciclador?
   - Haz clic en el reciclador en línea y usa el botón "Enviar mensaje".
-- ¿Qué hago si no veo recicladores en línea?
+- ¿Qué hago si no veo Dirigentes en línea?
   - Espera unos minutos o revisa más tarde; la lista se actualiza automáticamente.
 
 ---

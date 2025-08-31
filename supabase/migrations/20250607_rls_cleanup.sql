@@ -21,14 +21,14 @@ CREATE POLICY "Usuarios actualizan su perfil o admin"
   );
 
 -- 2. RECYCLER_RATINGS
-DROP POLICY IF EXISTS "Usuarios pueden ver ratings de recicladores" ON recycler_ratings;
-CREATE POLICY "Usuarios pueden ver ratings de recicladores"
+DROP POLICY IF EXISTS "Usuarios pueden ver ratings de Dirigentes" ON recycler_ratings;
+CREATE POLICY "Usuarios pueden ver ratings de Dirigentes"
   ON recycler_ratings
   FOR SELECT
   USING (true);
 
-DROP POLICY IF EXISTS "Usuarios pueden calificar recicladores" ON recycler_ratings;
-CREATE POLICY "Usuarios pueden calificar recicladores"
+DROP POLICY IF EXISTS "Usuarios pueden calificar Dirigentes" ON recycler_ratings;
+CREATE POLICY "Usuarios pueden calificar Dirigentes"
   ON recycler_ratings
   FOR INSERT
   WITH CHECK (rater_id = (select auth.uid()));
@@ -77,8 +77,8 @@ CREATE POLICY "Usuarios crean puntos propios"
   WITH CHECK (user_id = (select auth.uid()));
 
 -- 6. COLLECTION_CLAIMS
-DROP POLICY IF EXISTS "Recicladores pueden reclamar puntos" ON collection_claims;
-CREATE POLICY "Recicladores pueden reclamar puntos"
+DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON collection_claims;
+CREATE POLICY "Dirigentes pueden reclamar puntos"
   ON collection_claims
   FOR INSERT
   WITH CHECK (recycler_id = (select auth.uid()));

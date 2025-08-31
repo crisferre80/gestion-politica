@@ -97,7 +97,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
                 <div
                   className={`rounded-lg px-4 py-2 max-w-xs ${
                     message.sender_id === currentUserId
-                      ? 'bg-green-600 text-white'
+                      ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-900'
                   }`}
                 >
@@ -119,12 +119,12 @@ const MessageBox: React.FC<MessageBoxProps> = ({
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Escribe un mensaje..."
-              className="flex-1 border border-gray-300 rounded-md shadow-sm px-4 py-2 text-sm focus:ring-green-500 focus:border-green-500"
+              className="flex-1 border border-gray-300 rounded-md shadow-sm px-4 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
             />
             <button
               type="submit"
               disabled={loading || !newMessage.trim()}
-              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
             >
               <Send className="h-4 w-4" />
               <span className="sr-only">Enviar</span>

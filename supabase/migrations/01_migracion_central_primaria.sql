@@ -33,7 +33,7 @@ CREATE TABLE profiles (
   total_ratings integer DEFAULT 0
 );
 
--- Tabla de ratings de recicladores
+-- Tabla de ratings de Dirigentes
 CREATE TABLE recycler_ratings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   recycler_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
@@ -68,7 +68,7 @@ CREATE TABLE user_statistics (
   updated_at timestamptz DEFAULT now()
 );
 
--- Tabla de puntos de recolección
+-- Tabla de Centros de Movilizaciòn
 CREATE TABLE collection_points (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
@@ -81,7 +81,7 @@ CREATE TABLE collection_points (
   updated_at timestamptz DEFAULT now()
 );
 
--- Tabla de reclamos de puntos de recolección
+-- Tabla de reclamos de Centros de Movilizaciòn
 CREATE TABLE collection_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   collection_point_id uuid REFERENCES collection_points(id) ON DELETE CASCADE,
@@ -233,14 +233,14 @@ CREATE POLICY "Usuarios actualizan su perfil o admin"
   );
 
 -- RLS para recycler_ratings
-DROP POLICY IF EXISTS "Usuarios pueden ver ratings de recicladores" ON recycler_ratings;
-CREATE POLICY "Usuarios pueden ver ratings de recicladores"
+DROP POLICY IF EXISTS "Usuarios pueden ver ratings de Dirigentes" ON recycler_ratings;
+CREATE POLICY "Usuarios pueden ver ratings de Dirigentes"
   ON recycler_ratings
   FOR SELECT
   USING (true);
 
-DROP POLICY IF EXISTS "Usuarios pueden calificar recicladores" ON recycler_ratings;
-CREATE POLICY "Usuarios pueden calificar recicladores"
+DROP POLICY IF EXISTS "Usuarios pueden calificar Dirigentes" ON recycler_ratings;
+CREATE POLICY "Usuarios pueden calificar Dirigentes"
   ON recycler_ratings
   FOR INSERT
   WITH CHECK (rater_id = auth.uid());
@@ -295,8 +295,8 @@ CREATE POLICY "Usuarios ven claims propios o admin"
     recycler_id = auth.uid() OR user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
-DROP POLICY IF EXISTS "Recicladores pueden reclamar puntos" ON collection_claims;
-CREATE POLICY "Recicladores pueden reclamar puntos"
+DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON collection_claims;
+CREATE POLICY "Dirigentes pueden reclamar puntos"
   ON collection_claims
   FOR INSERT
   WITH CHECK (recycler_id = auth.uid());

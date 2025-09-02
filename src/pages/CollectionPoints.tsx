@@ -135,7 +135,7 @@ function PuntosRecoleccion() {
     lng: Number(point.lng),
     title: point.address,
     isRecycler: false,
-    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png', // icono personalizado
+  iconUrl: '/assets/logo%20cm%20pj.png', // icono personalizado (local)
   }));
 
   

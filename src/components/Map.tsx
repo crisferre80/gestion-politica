@@ -65,6 +65,8 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   const [optimizedRoute, setOptimizedRoute] = useState<Array<{ lat: number; lng: number }>>([]);
   const [hoveredMarker, setHoveredMarker] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const mapRef = React.useRef<MapRef | null>(null);
+  // Default marker icon (use public asset). Filename contains spaces so encode URI.
+  const DEFAULT_MARKER_ICON = encodeURI('/assets/logo cm pj.png');
 
   // Cargar zonas desde supabase
   const fetchAdminZones = useCallback(async () => {
@@ -553,7 +555,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                       ? '/assets/recycling-marker.svg' // Icono para punto colectivo genérico
                       : marker.role === 'available'
                       ? '/assets/Punto_de_Recoleccion_Verde.png'
-                      : '/assets/Punto_de_Recoleccion_Amarillo.png')})`,
+                      : DEFAULT_MARKER_ICON)})`,
                   backgroundSize: 'contain',
                   backgroundRepeat: 'no-repeat',
                   backgroundPosition: 'center',

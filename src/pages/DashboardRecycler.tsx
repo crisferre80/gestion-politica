@@ -2011,7 +2011,7 @@ const DashboardRecycler: React.FC = () => {
                                 <img
                                   src={point.type === 'colective_point'
                                     ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                                    : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png'}
+                                    : '/assets/logo%20cm%20pj.png'}
                                   alt="Punto de Recolección"
                                   className="w-12 h-12 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.2"
                                 />

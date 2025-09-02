@@ -5,10 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import Map from '../components/Map';
 import { supabase } from '../lib/supabase';
-import DatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+// date picker and formatting removed: no schedule handling
 import { createNotification } from '../lib/notifications';
 import { toast } from 'react-toastify';
 
@@ -33,22 +30,16 @@ const AddCollectionPoint: React.FC = () => {
   const [collectivePointInfo, setCollectivePointInfo] = useState<{ address: string; institutionalName: string } | null>(null);
   
   const [address, setAddress] = useState('');
-  const [district, setDistrict] = useState('');
-  const [materials, setMaterials] = useState<string[]>([]);
   const [bultos, setBultos] = useState<number>(1);
-  const [collectionDate, setCollectionDate] = useState<Date | null>(null);
-  const [collectionTimeStart, setCollectionTimeStart] = useState<Date | null>(null);
-  const [collectionTimeEnd, setCollectionTimeEnd] = useState<Date | null>(null);
+  // materials and schedule removed per request
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [addressSuggestions, setAddressSuggestions] = useState<Suggestion[]>([]);
-  const [districtSuggestions, setDistrictSuggestions] = useState<Suggestion[]>([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-  const [showDistrictSuggestions, setShowDistrictSuggestions] = useState(false);
 
-  const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos', 'Escombros'];
+  // allMaterials removed
   // Estado para la foto del material (ahora con File y URL)
   const [materialPhotoFile, setMaterialPhotoFile] = useState<File | null>(null);
   const [materialPhotoPreview, setMaterialPhotoPreview] = useState<string | null>(null);
@@ -134,35 +125,13 @@ const AddCollectionPoint: React.FC = () => {
     }
   };
 
-  const fetchDistrictSuggestions = async (query: string) => {
-    if (!query) {
-      setDistrictSuggestions([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=ar&types=neighborhood,locality&access_token=${MAPBOX_TOKEN}`
-      );
-      const data = await response.json();
-      setDistrictSuggestions(data.features || []);
-    } catch (err) {
-      console.error('Error fetching district suggestions:', err);
-    }
-  };
+  // district removed
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setAddress(value);
     setShowAddressSuggestions(true);
     fetchAddressSuggestions(value);
-  };
-
-  const handleDistrictChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setDistrict(value);
-    setShowDistrictSuggestions(true);
-    fetchDistrictSuggestions(value);
   };
 
   const handleAddressSuggestionClick = (suggestion: Suggestion) => {
@@ -172,27 +141,11 @@ const AddCollectionPoint: React.FC = () => {
     if (suggestion.center) {
       setSelectedLocation({ lng: suggestion.center[0], lat: suggestion.center[1] });
     }
-    
-    const districtContext = suggestion.context?.find(ctx => 
-      ctx.id.startsWith('neighborhood') || ctx.id.startsWith('locality')
-    );
-    if (districtContext) {
-      setDistrict(districtContext.text);
-    }
   };
 
-  const handleDistrictSuggestionClick = (suggestion: Suggestion) => {
-    setDistrict(suggestion.text);
-    setShowDistrictSuggestions(false);
-  };
+  // district suggestion handling removed
 
-  const toggleMaterial = (material: string) => {
-    if (materials.includes(material)) {
-      setMaterials(materials.filter(m => m !== material));
-    } else {
-      setMaterials([...materials, material]);
-    }
-  };
+  // toggleMaterial removed
 
   // Memoizar los markers para evitar renders innecesarios del mapa
   const mapMarkers = useMemo(() => {
@@ -212,7 +165,8 @@ const AddCollectionPoint: React.FC = () => {
         lat: selectedLocation.lat,
         lng: selectedLocation.lng,
         title: 'Nuevo Punto de Recolección',
-    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png',
+        // Usar icono local desde public/assets (espacios codificados)
+        iconUrl: '/assets/logo%20cm%20pj.png',
       });
     }
     return markers;
@@ -242,21 +196,13 @@ const AddCollectionPoint: React.FC = () => {
           if (data.features && data.features.length > 0) {
             const feature = data.features[0];
             if (feature.place_name !== address) setAddress(feature.place_name);
-
-            type ContextType = { id: string; text: string };
-            const districtContext = feature.context?.find((ctx: ContextType) => 
-              ctx.id.startsWith('neighborhood') || ctx.id.startsWith('locality')
-            );
-            if (districtContext && districtContext.text !== district) {
-              setDistrict(districtContext.text);
-            }
           }
         })
         .catch(err => {
           console.error('Error in reverse geocoding:', err);
         });
     }
-  }, [selectedLocation, address, district, isAssociatedToCollectivePoint]);
+  }, [selectedLocation, address, isAssociatedToCollectivePoint]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,20 +217,9 @@ const AddCollectionPoint: React.FC = () => {
       return;
     }
     
-    // Validación condicional del distrito: no es obligatorio si está asociado a punto colectivo
-    const districtRequired = !isAssociatedToCollectivePoint;
-    if (!address || (districtRequired && !district) || materials.length === 0 || bultos < 1 || !collectionDate || !collectionTimeStart || !collectionTimeEnd) {
-      if (!address) {
-        setError('Por favor ingresa una dirección');
-      } else if (districtRequired && !district) {
-        setError('Por favor ingresa el distrito/zona');
-      } else if (materials.length === 0) {
-        setError('Por favor selecciona al menos un material');
-      } else if (bultos < 1) {
-        setError('La cantidad de bultos debe ser al menos 1');
-      } else if (!collectionDate || !collectionTimeStart || !collectionTimeEnd) {
-        setError('Por favor completa todos los campos de horario');
-      }
+    // Validación mínima: solo dirección requerida (si no es punto colectivo)
+    if (!address) {
+      setError('Por favor ingresa una dirección');
       return;
     }
     
@@ -292,19 +227,12 @@ const AddCollectionPoint: React.FC = () => {
     setError('');
     setPhotoError('');
 
-    const formattedSchedule = `${format(collectionDate, 'EEEE')}s, ${format(collectionTimeStart, 'HH:mm')} - ${format(collectionTimeEnd, 'HH:mm')}`;
-
     // LOG DETALLADO PARA DEPURACIÓN
     console.log('DEBUG AddCollectionPoint: user:', user);
     console.log('DEBUG AddCollectionPoint: user.id (irá como user_id):', user?.id);
     console.log('DEBUG AddCollectionPoint: datos a insertar:', {
       user_id: user?.id,
       address,
-      district,
-      materials,
-      bultos,
-      schedule: formattedSchedule,
-      additional_info: additionalInfo,
       lat: selectedLocation.lat,
       lng: selectedLocation.lng
     });
@@ -330,11 +258,7 @@ const AddCollectionPoint: React.FC = () => {
           {
             user_id: user.id, // Usar el UID de Supabase
             address,
-            district,
-            materials,
-            bultos,
-            schedule: formattedSchedule,
-            additional_info: additionalInfo,
+            // 'bultos' removed because the DB table does not have this column
             lat: selectedLocation.lat,
             lng: selectedLocation.lng,
             // Si se necesita marcar como punto colectivo, solo permitir que el creador lo indique explícitamente.
@@ -395,7 +319,6 @@ const AddCollectionPoint: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = () => {
       setShowAddressSuggestions(false);
-      setShowDistrictSuggestions(false);
     };
 
     document.addEventListener('click', handleClickOutside);
@@ -453,39 +376,13 @@ const AddCollectionPoint: React.FC = () => {
             .then(response => response.json())
             .then(data => {
               if (data.features && data.features.length > 0) {
-                const feature = data.features[0];
-                type ContextType = { id: string; text: string };
                 
-                // Intentar extraer distrito de diferentes contextos (orden de prioridad)
-                const districtContext = feature.context?.find((ctx: ContextType) => 
-                  ctx.id.startsWith('neighborhood') || 
-                  ctx.id.startsWith('locality') ||
-                  ctx.id.startsWith('place') ||
-                  ctx.id.startsWith('district')
-                );
-                
-                if (districtContext) {
-                  setDistrict(districtContext.text);
-                } else {
-                  // Si no se encuentra en el contexto, usar parte de la dirección
-                  const addressParts = collectivePoint.address.split(',');
-                  if (addressParts.length > 1) {
-                    setDistrict(addressParts[addressParts.length - 2].trim());
-                  } else {
-                    setDistrict('Centro'); // Valor por defecto
-                  }
-                }
+                // Distrito extraction removed — no state to set. You may log or store elsewhere if needed.
               }
             })
-            .catch(err => {
+              .catch(err => {
               console.error('Error in reverse geocoding for collective point:', err);
-              // Fallback: extraer de la dirección
-              const addressParts = collectivePoint.address.split(',');
-              if (addressParts.length > 1) {
-                setDistrict(addressParts[addressParts.length - 2].trim());
-              } else {
-                setDistrict('Centro');
-              }
+              // Distrito extraction removed — no state to set.
             });
         }
       } else {
@@ -623,72 +520,9 @@ const AddCollectionPoint: React.FC = () => {
                 )}
               </div>
               
-              <div className="relative">
-                <label htmlFor="district" className="block text-sm font-medium text-gray-700">
-                  Distrito/Zona {!isAssociatedToCollectivePoint && <span className="text-red-500">*</span>}
-                  {isAssociatedToCollectivePoint && <span className="text-gray-500">(automático)</span>}
-                </label>
-                <input
-                  type="text"
-                  id="district"
-                  value={district}
-                  onChange={handleDistrictChange}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isAssociatedToCollectivePoint) {
-                      setShowDistrictSuggestions(true);
-                    }
-                  }}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  placeholder={isAssociatedToCollectivePoint ? "Se completará automáticamente" : "Ej: Centro"}
-                  disabled={isAssociatedToCollectivePoint} // Deshabilitar si está asociado a un punto colectivo
-                />
-                {showDistrictSuggestions && districtSuggestions.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white rounded-md shadow-lg">
-                    <ul className="max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
-                      {districtSuggestions.map((suggestion, index) => (
-                        <li
-                          key={index}
-                          className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDistrictSuggestionClick(suggestion);
-                          }}
-                        >
-                          {suggestion.text}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {isAssociatedToCollectivePoint && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    El distrito se extraerá automáticamente de la ubicación del punto colectivo.
-                  </p>
-                )}
-              </div>
+              {/* Distrito removed */}
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Materiales para reciclar <span className="text-red-500">*</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {allMaterials.map((material) => (
-                    <button
-                      key={material}
-                      type="button"
-                      onClick={() => toggleMaterial(material)}
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        materials.includes(material)
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                      }`}
-                    >
-                      {material}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Materiales removed per request */}
               
               <div>
                 <label htmlFor="bultos" className="block text-sm font-medium text-gray-700 mb-2">
@@ -756,96 +590,7 @@ const AddCollectionPoint: React.FC = () => {
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Horario de recolección <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Día</label>
-                    <DatePicker
-                      selected={collectionDate}
-                      onChange={(date) => setCollectionDate(date)}
-                      className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      placeholderText="Seleccionar día"
-                      dateFormat="EEEE"
-                      showPopperArrow={false}
-                      locale={es}
-                      calendarStartDay={1}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Hora inicio</label>
-                    <div className="flex gap-2">
-                      <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
-                        value={collectionTimeStart ? collectionTimeStart.getHours() : ''}
-                        onChange={e => {
-                          const hour = parseInt(e.target.value);
-                          const date = collectionTimeStart ? new Date(collectionTimeStart) : new Date();
-                          date.setHours(hour);
-                          setCollectionTimeStart(date);
-                        }}
-                      >
-                        <option value="">Hora</option>
-                        {[...Array(24)].map((_, h) => (
-                          <option key={h} value={h}>{h.toString().padStart(2, '0')}</option>
-                        ))}
-                      </select>
-                      <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
-                        value={collectionTimeStart ? collectionTimeStart.getMinutes() : ''}
-                        onChange={e => {
-                          const min = parseInt(e.target.value);
-                          const date = collectionTimeStart ? new Date(collectionTimeStart) : new Date();
-                          date.setMinutes(min);
-                          setCollectionTimeStart(date);
-                        }}
-                      >
-                        <option value="">Min</option>
-                        {[0, 10, 15, 20, 30, 40, 45, 50].map(m => (
-                          <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Hora fin</label>
-                    <div className="flex gap-2">
-                      <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
-                        value={collectionTimeEnd ? collectionTimeEnd.getHours() : ''}
-                        onChange={e => {
-                          const hour = parseInt(e.target.value);
-                          const date = collectionTimeEnd ? new Date(collectionTimeEnd) : new Date();
-                          date.setHours(hour);
-                          setCollectionTimeEnd(date);
-                        }}
-                      >
-                        <option value="">Hora</option>
-                        {[...Array(24)].map((_, h) => (
-                          <option key={h} value={h}>{h.toString().padStart(2, '0')}</option>
-                        ))}
-                      </select>
-                      <select
-                        className="border border-gray-300 rounded-md shadow-sm py-2 px-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm w-1/2"
-                        value={collectionTimeEnd ? collectionTimeEnd.getMinutes() : ''}
-                        onChange={e => {
-                          const min = parseInt(e.target.value);
-                          const date = collectionTimeEnd ? new Date(collectionTimeEnd) : new Date();
-                          date.setMinutes(min);
-                          setCollectionTimeEnd(date);
-                        }}
-                      >
-                        <option value="">Min</option>
-                        {[0, 10, 15, 20, 30, 40, 45, 50].map(m => (
-                          <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Schedule removed per request */}
               
               <div>
                 <label htmlFor="additionalInfo" className="block text-sm font-medium text-gray-700">

@@ -12,10 +12,11 @@ const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  // userType maps to backend role values. We keep existing backend roles:
-  // 'recycler' => Dirigente
-  // 'resident' => Referente
-  const [userType, setUserType] = useState<'recycler' | 'resident'>('resident');
+  // userType maps to backend role values. Actualizamos:
+  // 'recycler' => Referente
+  // 'resident' => Vecino
+  // 'fiscal' => Fiscal
+  const [userType, setUserType] = useState<'recycler' | 'resident' | 'fiscal'>('resident');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
@@ -192,7 +193,7 @@ const Register: React.FC = () => {
                     onClick={() => { setUserType('recycler'); }}
                     className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${userType === 'recycler' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                   >
-                    Dirigente
+                    Referente
                   </button>
                 </div>
                 <div>
@@ -201,7 +202,16 @@ const Register: React.FC = () => {
                     onClick={() => setUserType('resident')}
                     className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${userType === 'resident' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                   >
-                    Referente
+                    Vecino
+                  </button>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setUserType('fiscal')}
+                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${userType === 'fiscal' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    Fiscal
                   </button>
                 </div>
               </div>

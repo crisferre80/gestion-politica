@@ -43,7 +43,7 @@ const Navbar: React.FC = () => {
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center">
             <Link to="/" className="flex items-center">
-              <span className="h-7 w-7 md:h-8 md:w-8 mr-2" />
+              <img src="/assets/PJ logo.png" alt="Logo PJ" className="h-28 w-28 mr-3 object-contain" />
               <span className="font-bold text-lg md:text-xl">Gestion Dirigencial y Politica</span>
             </Link>
           </div>

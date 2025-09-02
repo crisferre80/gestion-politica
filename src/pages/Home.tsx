@@ -77,19 +77,19 @@ const Home: React.FC = () => {
     <>
       <section className="relative bg-blue-200 text-white">
         <div
-          className="relative min-h-[320px] sm:h-[600px] bg-cover bg-center flex items-center"
-          style={{
-            backgroundImage: "url('/assets/PJ logo.png')",
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'repeat',
-          }}
+          className="relative min-h-[520px] sm:h-[1200px] bg-cover bg-center flex items-end"
+            style={{
+              backgroundImage: "url('/assets/pichon neder.jpg')",
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'repeat',
+            }}
         >
-          <div className="absolute inset-0 bg-black opacity-30" />
-          <div className="max-w-7xl mx-auto px-6 sm:px-6 lg:px-8 py-20">
-            <div className="max-w-3xl">
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">Conectando dirigentes y referentes por barrio en Santiago del Estero</h1>
-              <p className="text-base sm:text-lg mb-6">Organizamos y conectamos dirigentes políticos, referentes comunitarios y vecinos para coordinar acciones, reuniones y campañas en los distintos barrios de Santiago del Estero.</p>
+          <div className="absolute inset-0 bg-black opacity-40" />
+          <div className="max-w-7xl mx-auto px-6 sm:px-6 lg:px-8 py-90">
+            <div className="max-w-3xl mb-8">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.9)]">Conectando dirigentes y referentes por barrio en Santiago del Estero</h1>
+              <p className="text-base sm:text-lg mb-6 text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)]">Organizamos y conectamos dirigentes políticos, referentes comunitarios y vecinos para coordinar acciones, reuniones y campañas en los distintos barrios de Santiago del Estero.</p>
               <div className="flex flex-wrap gap-4">
                 <Link to="/register" className="bg-white text-blue-600 px-5 py-2.5 rounded-md font-medium hover:bg-gray-100 transition">Registrarse</Link>
                 <Link to="/login" className="bg-blue-700 text-white px-5 py-2.5 rounded-md font-medium hover:bg-blue-800 transition relative animate-glow focus:outline-none focus:ring-4 focus:ring-blue-300">

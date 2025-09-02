@@ -27,7 +27,7 @@ type ProfileRealtimePayload = {
 };
 
 // Panel exclusivo para Dirigentes institucionales (empresas, edificios, instituciones)
-const DashboardInstitutional: React.FC = () => {
+const DashboardFiscal: React.FC = () => {
   const { user } = useUser();
   type CollectionPoint = {
     id: string;
@@ -868,4 +868,4 @@ const DashboardInstitutional: React.FC = () => {
   );
 };
 
-export default DashboardInstitutional;
+export default DashboardFiscal;

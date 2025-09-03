@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, ChartOptions } from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
 import { useUser } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
@@ -73,12 +75,38 @@ const DashboardFiscal: React.FC = () => {
   };
   const [recyclers, setRecyclers] = useState<Recycler[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [, setSchools] = useState<CollectionPoint[]>([]);
+  // Urnas (boca de urna) reporting
+  const [urnasMesas, setUrnasMesas] = useState<number>(0);
+  const [urnasCount, setUrnasCount] = useState<number>(0);
+  // Campos para votos por lista
+  const [votesFrenteCivico, setVotesFrenteCivico] = useState<number>(0);
+  const [votesFuerzaPatria, setVotesFuerzaPatria] = useState<number>(0);
+  const [votesHacemosPorSantiago, setVotesHacemosPorSantiago] = useState<number>(0);
+  const [votesDespiertaSantiago, setVotesDespiertaSantiago] = useState<number>(0);
+
+  type UrnaReport = {
+    id?: string;
+    fiscal_user_id?: string;
+    school_id?: string;
+    mesas?: number;
+    urnas?: number;
+    votes_frente_civico?: number;
+    votes_fuerza_patria?: number;
+    votes_hacemos_por_santiago?: number;
+    votes_despierta_santiago?: number;
+    created_at?: string;
+  };
+  const [urnasReports, setUrnasReports] = useState<UrnaReport[]>([]);
+  const [totalUrnasGlobal, setTotalUrnasGlobal] = useState<number>(0);
+
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
   // Estado para detalle de Dirigente seleccionado
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [residentPoints, setResidentPoints] = useState<CollectionPoint[]>([]);
   const [residentLoading, setResidentLoading] = useState(false);
-  const [totals, setTotals] = useState<{ materiales: Record<string, number>; bultos: number }>({ materiales: {}, bultos: 0 });
+  const [totals, setTotals] = useState<{ materiales: Record<string, number>; autos: number }>({ materiales: {}, autos: 0 });
 
   // Estado para el reclamo del punto colectivo
   const [collectivePointClaim, setCollectivePointClaim] = useState<{
@@ -101,10 +129,10 @@ const DashboardFiscal: React.FC = () => {
   }, [showContactMenu]);
 
   useEffect(() => {
-    // Permitimos el acceso aquí a Dirigentes ('recycler') y a Referentes que puedan gestionar un punto colectivo.
-    if (!user) return;
-    // Si no es recycler ni resident, salir
-    if (user.type !== 'recycler' && user.type !== 'resident') return;
+  // Permitimos el acceso aquí a Dirigentes ('recycler'), Referentes y usuarios institucionales (fiscal)
+  if (!user) return;
+  // Si no es recycler, resident o fiscal, salir
+  if (user.type !== 'recycler' && user.type !== 'resident' && user.type !== 'fiscal' && user.role !== 'fiscal') return;
     const fetchData = async () => {
       // Buscar el punto colectivo creado por este usuario
       const { data: points } = await supabase
@@ -161,6 +189,20 @@ const DashboardFiscal: React.FC = () => {
         }
       }
       setLoading(false);
+      // Adicional: cargar todas las escuelas/puntos colectivos para mostrarlas en el panel institucional
+      try {
+        const { data: allSchools, error: schoolsError } = await supabase
+          .from('concentration_points')
+          .select('*')
+          .eq('type', 'colective_point');
+        if (schoolsError) {
+          console.error('[INSTITUTIONAL] Error al cargar escuelas/puntos colectivos:', schoolsError);
+        } else {
+          setSchools(allSchools || []);
+        }
+      } catch (err) {
+        console.error('[INSTITUTIONAL] Error inesperado cargando escuelas:', err);
+      }
     };
     fetchData();
   }, [user]);
@@ -368,11 +410,52 @@ const DashboardFiscal: React.FC = () => {
     fetchRecyclers();
   }, []);
 
-  // Calcular totales de materiales y bultos de todos los Dirigentes asociados
+  // Fetch existing urnas reports and subscribe to realtime updates
+  useEffect(() => {
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+    const fetchUrnas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('school_urnas')
+          .select('*, profiles!school_urnas_fiscal_user_id_fkey(name, user_id)');
+        if (error) {
+          console.warn('[URNAS] No se pudo obtener reports (la tabla puede no existir):', error.message || error);
+          setUrnasReports([]);
+          setTotalUrnasGlobal(0);
+          return;
+        }
+        const reports = data || [];
+  setUrnasReports(reports as UrnaReport[]);
+  const total = reports.reduce((s: number, r: UrnaReport) => s + (Number(r.urnas) || 0), 0);
+        setTotalUrnasGlobal(total);
+      } catch (err) {
+        console.error('[URNAS] Error fetching reports:', err);
+      }
+    };
+
+    fetchUrnas();
+
+    try {
+      channel = supabase.channel('school-urnas-channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'school_urnas' }, () => {
+          // Refrescar lista localmente simplificando: volver a fetchear
+          fetchUrnas();
+        })
+        .subscribe();
+    } catch (err) {
+      console.warn('[URNAS] No se pudo subscribir a realtime (posible falta de tabla):', err);
+    }
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Calcular totales de materiales y autos de todos los Dirigentes asociados
   useEffect(() => {
     const fetchTotals = async () => {
       if (associatedResidents.length === 0) {
-        setTotals({ materiales: {}, bultos: 0 });
+        setTotals({ materiales: {}, autos: 0 });
         return;
       }
       // Buscar todos los Centros de Movilizaciòn de los Dirigentes asociados
@@ -383,20 +466,20 @@ const DashboardFiscal: React.FC = () => {
         .from('concentration_points')
         .select('*')
         .in('user_id', userIds);
-      // Sumar materiales y bultos
+      // Sumar materiales y autos
       const materiales: Record<string, number> = {};
-      let bultos = 0;
+      let autos = 0;
       (points || []).forEach((p: CollectionPoint) => {
         if (Array.isArray(p.materials)) {
           p.materials.forEach((mat: string) => {
             materiales[mat] = (materiales[mat] || 0) + 1;
           });
         }
-        if (typeof p.bultos === 'number') {
-          bultos += p.bultos;
+        if (typeof p.autos === 'number') {
+          autos += p.autos;
         }
       });
-      setTotals({ materiales, bultos });
+      setTotals({ materiales, autos });
     };
     fetchTotals();
   }, [associatedResidents]);
@@ -431,7 +514,8 @@ const DashboardFiscal: React.FC = () => {
     }
   };
 
-  if (!user || user.type !== 'resident_institutional') {
+  // Permitir acceso a usuarios institucionales por tipo o por rol 'fiscal'
+  if (!user || (user.type !== 'resident_institutional' && user.role !== 'fiscal')) {
     return <div className="p-8 text-center text-red-600">Acceso solo para usuarios institucionales.</div>;
   }
 
@@ -445,13 +529,13 @@ const DashboardFiscal: React.FC = () => {
         />
         <div>
           <h1 className="text-3xl font-bold text-gray-800">{user?.name}</h1>
-          <p className="text-lg text-gray-500">Panel Institucional</p>
+          <p className="text-lg text-gray-500">Panel del Fiscal General</p>
         </div>
       </div>
       {/* Botón Agregar centro Colectivo arriba y visible */}
       <div className="flex gap-4 mb-6">
         <Link to="/add-collection-point" className="px-4 py-2 bg-blue-600 text-white rounded flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Agregar centro Colectivo
+          <Plus className="w-4 h-4" /> Agregar Escuela
         </Link>
       </div>
       {loading ? (
@@ -459,7 +543,7 @@ const DashboardFiscal: React.FC = () => {
       ) : (
         <>
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Punto Colectivo</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Escuela</h2>
             {collectivePoint ? (
               <div>
                 <div className="space-y-4">
@@ -467,16 +551,16 @@ const DashboardFiscal: React.FC = () => {
                     <img
                       src={
                         collectivePoint.type === 'colective_point'
-                          ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                          : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png'
+                          ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
+                          : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
                       }
-                      alt="Icono de Punto Colectivo"
-                      className="w-12 h-12 mr-4"
+                      alt="Icono de Escuela"
+                      className="w-14 h-14 mr-4"
                     />
                     <p className="text-gray-600">{collectivePoint.address}</p>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-700 mb-2">Materiales clasificados:</h3>
+                    <h3 className="font-semibold text-gray-700 mb-2">Escuela a cargo del Fiscal General:</h3>
                     <div className="flex flex-wrap gap-2">
                       {collectivePoint.materials?.map((material) => (
                         <span key={material} className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
@@ -657,6 +741,7 @@ const DashboardFiscal: React.FC = () => {
               </div>
             )}
           </div>
+          
           <div className="bg-white rounded-lg shadow p-4 mb-6">
             <h2 className="text-xl font-semibold mb-2">Dirigentes Asociados</h2>
             {associatedResidents.length > 0 ? (
@@ -711,7 +796,7 @@ const DashboardFiscal: React.FC = () => {
                               <div className="mb-2"><b>Distrito:</b> {point.district}</div>
                             )}
                             <div className="mb-2"><b>Materiales:</b> {Array.isArray(point.materials) ? point.materials.join(', ') : 'N/A'}</div>
-                            <div className="mb-2"><b>Bultos:</b> {typeof point.bultos === 'number' ? point.bultos : 0}</div>
+                            <div className="mb-2"><b>autos:</b> {typeof point.autos === 'number' ? point.autos : 0}</div>
                           </div>
                           <div>
                             {point.schedule && (
@@ -754,10 +839,10 @@ const DashboardFiscal: React.FC = () => {
                 <button className="mt-2 px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm" onClick={() => setSelectedResident(null)}>Cerrar</button>
               </div>
             )}
-            {/* Totales de materiales y bultos de todos los Dirigentes */}
+            {/* Totales de materiales y autos de todos los Dirigentes */}
             <div className="mt-4 p-4 bg-blue-50 rounded shadow">
               <h3 className="font-bold text-lg mb-2">Totales del Punto Colectivo</h3>
-              <div className="mb-2"><b>Bultos totales:</b> {totals.bultos}</div>
+              <div className="mb-2"><b>autos totales:</b> {totals.autos}</div>
               <div><b>Materiales totales:</b> {Object.keys(totals.materiales).length === 0 ? 'N/A' : (
                 <ul className="list-disc ml-6">
                   {Object.entries(totals.materiales).map(([mat, count]) => (
@@ -790,11 +875,10 @@ const DashboardFiscal: React.FC = () => {
                         lat: Number(collectivePoint.lat),
                         lng: Number(collectivePoint.lng),
                         title: collectivePoint.address || 'Punto Colectivo',
-                        role: collectivePoint.type === 'colective_point' ? 'colective_point' : 'collection_point',
-                        iconUrl:
-                          collectivePoint.type === 'colective_point'
-                            ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                            : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822947/iconmepresa_qbqqmx.png',
+                        // Forzar role/type school para que el Map muestre el icono de escuela
+                        role: 'school',
+                        type: 'school',
+                        iconUrl: '/assets/iconescuela.png',
                       },
                     ]
                   : []),
@@ -826,7 +910,171 @@ const DashboardFiscal: React.FC = () => {
                     )}
                     {rec.bio && <p className="text-gray-600 text-xs mt-2 text-center">{rec.bio}</p>}
                   </div>
-                ))
+                )))
+              }
+            </div>
+          </div>
+          {/* Sección: Urnas (boca de urna) */}
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1756876112/urna_cd4fia.png" alt="Urna" className="w-12 h-12" />
+              <div>
+                <h3 className="text-lg font-bold">Reporte de Urnas (Boca de urna)</h3>
+                <p className="text-sm text-gray-500">Ingresa la cantidad de mesas y urnas observadas en esta escuela.</p>
+              </div>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!user) return;
+              // Si no hay collectivePoint, intentar usar null School id
+              const schoolId = collectivePoint?.id || null;
+              try {
+                const payload = {
+                  fiscal_user_id: user.id,
+                  school_id: schoolId,
+                  mesas: urnasMesas || 0,
+                  urnas: urnasCount || 0,
+                  votes_frente_civico: votesFrenteCivico || 0,
+                  votes_fuerza_patria: votesFuerzaPatria || 0,
+                  votes_hacemos_por_santiago: votesHacemosPorSantiago || 0,
+                  votes_despierta_santiago: votesDespiertaSantiago || 0,
+                };
+                const { error } = await supabase.from('school_urnas').insert([payload]);
+                if (error) {
+                  console.warn('[URNAS] Error al insertar report:', error);
+                  alert('No se pudo enviar el reporte de urnas. Revisa la consola.');
+                } else {
+                  // Limpiar formulario
+                  setUrnasMesas(0);
+                  setUrnasCount(0);
+                  setVotesFrenteCivico(0);
+                  setVotesFuerzaPatria(0);
+                  setVotesHacemosPorSantiago(0);
+                  setVotesDespiertaSantiago(0);
+                  // Refrescar lista localmente
+                  const { data } = await supabase.from('school_urnas').select('*');
+                  const reports = (data || []) as UrnaReport[];
+                  setUrnasReports(reports);
+                  const total = reports.reduce((s: number, r: UrnaReport) => s + (Number(r.urnas) || 0), 0);
+                  setTotalUrnasGlobal(total);
+                }
+              } catch (err) {
+                console.error('[URNAS] Exception al enviar report:', err);
+                alert('Error enviando reporte de urnas.');
+              }
+            }}>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Mesas observadas</label>
+                  <input type="number" value={urnasMesas} onChange={(e) => setUrnasMesas(Number(e.target.value))} min={0} className="mt-1 block w-full p-2 border rounded" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Urnas contadas</label>
+                  <input type="number" value={urnasCount} onChange={(e) => setUrnasCount(Number(e.target.value))} min={0} className="mt-1 block w-full p-2 border rounded" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Votos Frente Cívico</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1756915060/frente_civico_k5uax1.png" alt="Frente Cívico" className="w-10 h-10 rounded-full object-cover border" />
+                    <input type="number" value={votesFrenteCivico} onChange={(e) => setVotesFrenteCivico(Number(e.target.value))} min={0} className="block w-full p-2 border rounded" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Votos Fuerza Patria</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1756915061/Generated_Image_September_03_2025_-_12_57PM_u2erqr.jpg" alt="Fuerza Patria" className="w-10 h-10 rounded-full object-cover border" />
+                    <input type="number" value={votesFuerzaPatria} onChange={(e) => setVotesFuerzaPatria(Number(e.target.value))} min={0} className="block w-full p-2 border rounded" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Votos Hacemos por Santiago</label>
+                  <input type="number" value={votesHacemosPorSantiago} onChange={(e) => setVotesHacemosPorSantiago(Number(e.target.value))} min={0} className="mt-1 block w-full p-2 border rounded" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Votos Despierta Santiago</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1756915060/despierta_santiago_p08i9w.jpg" alt="Despierta Santiago" className="w-10 h-10 rounded-full object-cover border" />
+                    <input type="number" value={votesDespiertaSantiago} onChange={(e) => setVotesDespiertaSantiago(Number(e.target.value))} min={0} className="block w-full p-2 border rounded" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Enviar reporte</button>
+                <div className="text-sm text-gray-600">Total global de urnas reportadas: <strong>{totalUrnasGlobal}</strong></div>
+              </div>
+            </form>
+
+            {/* Gráficos resumen: barras (votos por lista) y dona (proporción) */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-4 rounded shadow">
+                <h4 className="font-semibold mb-2">Votos por lista (total)</h4>
+                {(() => {
+                  const votosFC = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_frente_civico || 0)), 0);
+                  const votosFP = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_fuerza_patria || 0)), 0);
+                  const votosHxS = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_hacemos_por_santiago || 0)), 0);
+                  const votosDS = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_despierta_santiago || 0)), 0);
+                  const labels = ['Frente Cívico', 'Fuerza Patria', 'Hacemos x Sgo', 'Despierta Sgo'];
+                  const data = {
+                    labels,
+                    datasets: [
+                      {
+                        label: 'Votos',
+                        data: [votosFC, votosFP, votosHxS, votosDS],
+                        backgroundColor: ['#3b82f6', '#ef4444', '#f59e0b', '#10b981'],
+                      },
+                    ],
+                  };
+                  const options: ChartOptions<'bar'> = { responsive: true, plugins: { legend: { display: false } } };
+                  return <Bar data={data} options={options} />;
+                })()}
+              </div>
+              <div className="bg-white p-4 rounded shadow flex flex-col items-center">
+                <h4 className="font-semibold mb-2">Proporción de votos</h4>
+                {(() => {
+                  const votosFC = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_frente_civico || 0)), 0);
+                  const votosFP = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_fuerza_patria || 0)), 0);
+                  const votosHxS = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_hacemos_por_santiago || 0)), 0);
+                  const votosDS = urnasReports.reduce((s, r: UrnaReport) => s + (Number(r.votes_despierta_santiago || 0)), 0);
+                  const donutData = {
+                    labels: ['FC', 'FP', 'HxS', 'DS'],
+                    datasets: [{ data: [votosFC, votosFP, votosHxS, votosDS], backgroundColor: ['#3b82f6', '#ef4444', '#f59e0b', '#10b981'] }],
+                  };
+                  const donutOptions: ChartOptions<'doughnut'> = { responsive: true, plugins: { legend: { position: 'bottom' } } };
+                  return (
+                    <>
+                      <Doughnut data={donutData} options={donutOptions} />
+                      <div className="mt-3 text-sm text-gray-600">
+                        <div>FC: {donutData.datasets[0].data[0]}</div>
+                        <div>FP: {donutData.datasets[0].data[1]}</div>
+                        <div>HxS: {donutData.datasets[0].data[2]}</div>
+                        <div>DS: {donutData.datasets[0].data[3]}</div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Lista corta de reportes recientes */}
+            <div className="mt-6">
+              <h4 className="font-semibold mb-2">Reportes recientes</h4>
+              {urnasReports.length === 0 ? (
+                <p className="text-gray-500">No hay reportes aún.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {urnasReports.slice(0, 8).map(r => (
+                    <li key={r.id || Math.random()} className="flex items-center justify-between p-2 border rounded">
+                      <div>
+                        <div className="text-sm font-medium">Escuela: {r.school_id || 'No asociada'}</div>
+                        <div className="text-xs text-gray-500">Urnas: {r.urnas || 0} • Mesas: {r.mesas || 0}</div>
+                        <div className="text-xs text-gray-500 mt-1">Votos — FC: {r.votes_frente_civico || 0} • FP: {r.votes_fuerza_patria || 0} • HxS: {r.votes_hacemos_por_santiago || 0} • DS: {r.votes_despierta_santiago || 0}</div>
+                      </div>
+                      <div className="text-xs text-gray-400">{r.created_at ? new Date(r.created_at).toLocaleString('es-ES') : ''}</div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>

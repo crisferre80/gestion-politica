@@ -797,11 +797,11 @@ export async function ensureUserProfile({ id, email, name }: { id: string; email
     const { data, error } = await supabase
       .from('profiles')
       // La tabla usa user_id como PK; devolvemos user_id como id para mantener compatibilidad
-      .select('user_id as id')
+  .select('user_id')
       .eq('user_id', id)
       .maybeSingle();
 
-    if (!data && !error) {
+  if (!data && !error) {
       // Si no existe, lo crea
       // Insertamos siempre con user_id explícito (evita que el DEFAULT gen_random_uuid() cree un valor distinto)
       await supabase.from('profiles').insert({

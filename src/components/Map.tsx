@@ -549,8 +549,10 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                   width: '100%',
                   height: '100%',
                   backgroundImage: `url(${marker.iconUrl ||
-                    (marker.type === 'colective_point'
-                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750822942/Pcolectivo_fges4s.png'
+                    (marker.type === 'school' || marker.role === 'school' || marker.id === 'collective-point'
+                      ? '/assets/iconescuela.png'
+                      : marker.type === 'colective_point'
+                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
                       : marker.role === 'collection_point'
                       ? '/assets/recycling-marker.svg' // Icono para punto colectivo genérico
                       : marker.role === 'available'
@@ -579,7 +581,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                 />
               )}
               {/* Mostrar bicicleta grande DETRÁS del avatar (sin sombra) para que parezca que el avatar está montado */}
-              {(marker.role === 'recycler' || marker.online) && (
+              {(marker.id !== 'collective-point') && (marker.role === 'recycler' || marker.online) && (
                 <img
                   src={'/assets/bicireciclador-Photoroom.png'}
                   alt="Bicicleta reciclador"

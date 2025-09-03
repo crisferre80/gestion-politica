@@ -15,7 +15,7 @@ type Stats = {
     cancelled: Record<string, number>;
     delayed: Record<string, number>;
   };
-  bultosByMonth: Record<string, number>;
+  autosByMonth: Record<string, number>;
   topResidents: TopResident[];
 };
 
@@ -68,8 +68,8 @@ const Estadisticas: React.FC = () => {
           if (c.status === 'cancelled') claimsByStatus.cancelled[m] = (claimsByStatus.cancelled[m] || 0) + 1;
           if (c.status === 'delayed') claimsByStatus.delayed[m] = (claimsByStatus.delayed[m] || 0) + 1;
         });
-        // Bultos por mes (igual a completed)
-        const bultosByMonth = { ...claimsByStatus.completed };
+        // autos por mes (igual a completed)
+        const autosByMonth = { ...claimsByStatus.completed };
         // Dirigentes más comprometidos
         const residentCount: Record<string, number> = {};
         (residentPoints || []).forEach(p => {
@@ -92,7 +92,7 @@ const Estadisticas: React.FC = () => {
           });
           topResidents = topResidentsRaw.map(([userId, count]) => ({ name: nameMap[userId] || userId, count }));
         }
-        setStats({ months, createdByMonth, claimsByStatus, bultosByMonth, topResidents });
+        setStats({ months, createdByMonth, claimsByStatus, autosByMonth, topResidents });
         setError(null);
       } catch {
         setError('Error al cargar estadísticas');
@@ -183,16 +183,16 @@ const Estadisticas: React.FC = () => {
                 height={300}
               />
             </div>
-            {/* Bultos por mes */}
+            {/* autos por mes */}
             <div className="bg-white rounded-xl p-6 shadow">
-              <h2 className="text-xl font-bold text-purple-700 mb-2 flex items-center gap-2"><Star className="w-5 h-5" /> Bultos Retirados por Mes</h2>
+              <h2 className="text-xl font-bold text-purple-700 mb-2 flex items-center gap-2"><Star className="w-5 h-5" /> autos Retirados por Mes</h2>
               <Bar
                 data={{
                   labels: stats.months,
                   datasets: [
                     {
-                      label: 'Bultos Retirados',
-                      data: stats.months.map((m: string) => stats.bultosByMonth[m] || 0),
+                      label: 'autos Retirados',
+                      data: stats.months.map((m: string) => stats.autosByMonth[m] || 0),
                       backgroundColor: '#a78bfa',
                     },
                   ],

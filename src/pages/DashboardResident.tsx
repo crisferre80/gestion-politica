@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FaMapMarkerAlt, FaUserCircle, FaRecycle, FaWallet, FaHistory, FaPlus, FaMapPin, FaCalendarAlt, FaStar, FaEnvelope, FaPhone, FaTimes } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaUserCircle, FaRecycle, FaWallet, FaHistory, FaPlus, FaStar, FaEnvelope, FaPhone, FaTimes } from 'react-icons/fa';
 import { supabase } from '../lib/supabase';
 import { prepareImageForUpload, transformImage } from '../services/ImageTransformService';
 import ChatList from '../components/ChatList';
@@ -475,7 +475,8 @@ useEffect(() => {
     }
   }, [activeTab, user, fetchDetailedPoints]);
     // Estado para sub-pestañas de puntos (todos, reclamados, demorados, retirados, disponibles)
-    const [activePointsTab, setActivePointsTab] = useState<'todos' | 'reclamados' | 'demorados' | 'retirados' | 'disponibles'>(() => 'todos');
+  // eslint-disable-next-line no-empty-pattern
+  const [] = useState<'todos'>(() => 'todos');
   // Normaliza claim: si es array, toma el primero; si es objeto, lo deja igual
 // Tipos para los claims y Dirigentes
 // RecyclerType eliminado (no usado en este componente)
@@ -498,46 +499,7 @@ const puntosDemorados = detailedPoints.filter(p => p.status === 'delayed');
   }
 
   // Función para volver a poner un punto como disponible
-  const handleMakeAvailableAgain = async (point: DetailedPoint) => {
-    try {
-      // 1. Crear un nuevo punto disponible (NO copiar campos de reclamo)
-      const { data: newPoint, error: createError } = await supabase
-        .from('concentration_points')
-        .insert({
-          address: point.address,
-          district: point.district,
-          schedule: point.schedule,
-          user_id: point.user_id,
-          notas: point.notas,
-          additional_info: point.additional_info,
-          status: 'available',
-          lat: point.lat ?? null,
-          lng: point.lng ?? null,
-          materials: point.materials ?? [],
-          // Nunca copiar claim_id, pickup_time, recycler_id ni campos de reclamo
-        })
-        .select()
-        .single();
-      if (createError || !newPoint) {
-        toast.error('Error al crear el nuevo punto disponible.');
-        return;
-      }
-      // 2. Eliminar el punto retirado de la base de datos
-      await supabase
-        .from('concentration_points')
-        .delete()
-        .eq('id', point.id);
-      // 3. Actualizar el estado local: quitar el retirado y agregar el nuevo disponible
-      setDetailedPoints(prev => [
-        ...prev.filter(p => p.id !== point.id),
-        { ...newPoint, claim: null, claim_id: null }
-      ]);
-      toast.success('El punto ha sido reactivado como disponible.');
-    } catch (err) {
-      toast.error('Error al volver a poner el punto como disponible.');
-      console.error(err);
-    }
-  };
+   
 
   // Función para eliminar un punto de recolección
   const handleDeletePoint = async (point: DetailedPoint) => {
@@ -565,7 +527,8 @@ const [showDonationModal, setShowDonationModal] = useState<{ recyclerId: string;
 const [donationAmount, setDonationAmount] = useState<number>(0);
 
 // Estado para el objetivo de calificación (modal de calificaciones)
-const [, setRatingTarget] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
+// eslint-disable-next-line no-empty-pattern
+const [] = useState<{ recyclerId: string; recyclerName: string; avatarUrl?: string } | null>(null);
 
 // --- Estado para el modal de edición de imagen de cabecera ---
 const [showHeaderImageModal, setShowHeaderImageModal] = useState(false);
@@ -1219,57 +1182,8 @@ useEffect(() => {
           </button>
         </div>
       {activeTab === 'puntos' && (
-        <div className="w-full max-w-4xl">
-          <div className="mb-4 flex flex-wrap gap-2 justify-center md:justify-start">
-            <button
-              onClick={() => setActivePointsTab('todos')}
-              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
-                ${activePointsTab==='todos' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
-            >
-              Disponibles
-              {puntosTodos.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-800 text-white rounded-full">
-                  {puntosTodos.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActivePointsTab('reclamados')}
-              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all relative
-                ${activePointsTab==='reclamados' ? 'bg-yellow-400 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}
-            >
-              Puntos reclamados
-              {puntosReclamados.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-yellow-600 text-white rounded-full animate-pulse">
-                  {puntosReclamados.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActivePointsTab('demorados')}
-              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
-                ${activePointsTab==='demorados' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
-            >
-              Puntos demorados
-              {puntosDemorados.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-600 text-white rounded-full animate-pulse">
-                  {puntosDemorados.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActivePointsTab('retirados')}
-              className={`px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold transition-all
-                ${activePointsTab==='retirados' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
-            >
-              Puntos retirados
-              {puntosRetirados.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-600 text-white rounded-full">
-                  {puntosRetirados.length}
-                </span>
-              )}
-            </button>
-          </div>
+    <div className="w-full max-w-4xl">
+      <span className="px-3 py-1 rounded mb-2 md:mb-0 min-w-[120px] text-sm font-semibold bg-blue-600 text-white">Disponibles</span>
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">Mis Centros de Movilizaciòn</h2>
@@ -1295,12 +1209,8 @@ useEffect(() => {
             </Link>
             <div className="mt-4">
                   {(() => {
-                    // Filtrar según activePointsTab
-                    let list = detailedPoints;
-                    if (activePointsTab === 'disponibles') list = puntosTodos;
-                    else if (activePointsTab === 'reclamados') list = puntosReclamados;
-                    else if (activePointsTab === 'demorados') list = puntosDemorados;
-                    else if (activePointsTab === 'retirados') list = puntosRetirados;
+                    // Mostrar únicamente puntos disponibles
+                    const list = puntosTodos;
 
                     if (!list || list.length === 0) {
                       return <p className="text-sm text-gray-600">No tienes centros registrados aún.</p>;
@@ -1357,227 +1267,6 @@ useEffect(() => {
                     );
                   })()}
             </div>
-                  {(() => {
-                    let pointsToShow = puntosTodos;
-                    if (activePointsTab === 'reclamados') pointsToShow = puntosReclamados;
-                    if (activePointsTab === 'demorados') pointsToShow = puntosDemorados;
-                    if (activePointsTab === 'retirados') pointsToShow = puntosRetirados;
-                    if (pointsToShow.length === 0) return <p className="text-gray-500">No hay puntos en esta categoría.</p>;
-                    return (
-                      <ul className="space-y-4">
-                        {pointsToShow.map((point) => {
-                          // Determinar si el punto debe verse apagado
-                          let isInactive = false;
-                          if (activePointsTab === 'todos') {
-                            isInactive = point.status === 'completed';
-                          } else if (activePointsTab === 'reclamados' || activePointsTab === 'demorados') {
-                            isInactive = false;
-                          }
-
-                    return (
-                      <li
-                        key={point.id}
-                        className={`border rounded-lg p-4 flex flex-col md:flex-row md:items-center relative bg-white shadow-md transition-all duration-300 ease-in-out hover:scale-[1.025] hover:shadow-2xl group animate-fade-in ${isInactive ? 'opacity-80 grayscale-[0.2] pointer-events-none' : ''}`}
-                        style={{ animation: 'fadeInUp 0.7s' }}
-                      >
-                        <div className="flex-1 mb-2 md:mb-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <img src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1746839122/Punto_de_Recoleccion_Marcador_z3nnyy.png" alt="Punto de Recolección" className={`w-12 h-12 ${isInactive ? 'grayscale' : ''}`} />
-                            <h3 className="text-lg font-semibold whitespace-normal break-words">{point.address}</h3>
-                            {/* Etiqueta de estado */}
-                            {activePointsTab === 'todos' && (!point.status || point.status === 'available') && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-300">Disponible</span>
-                            )}
-                            {point.status === 'completed' && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-300">Retirado</span>
-                            )}
-                            {activePointsTab === 'retirados' && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-semibold border border-purple-300">
-                               Rating 
-                              </span>
-                            )}
-                            {activePointsTab==='demorados' && (
-                              <span className="ml-2 px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-300">Demorado</span>
-                            )}
-                          </div>
-                          <p className="text-gray-500"><FaMapPin className="inline-block w-4 h-4 mr-1" />{point.district}</p>
-                          <p className="text-gray-500"><FaCalendarAlt className="inline-block w-4 h-4 mr-1" />
-                            {(() => {
-                              if (typeof point.schedule === 'string') {
-                                const dias = [
-                                  { en: 'Monday', es: 'Lunes' },
-                                  { en: 'Tuesday', es: 'Martes' },
-                                  { en: 'Wednesday', es: 'Miércoles' },
-                                  { en: 'Thursday', es: 'Jueves' },
-                                  { en: 'Friday', es: 'Viernes' },
-                                  { en: 'Saturday', es: 'Sábado' },
-                                  { en: 'Sunday', es: 'Domingo' },
-                                  { en: 'Mondays', es: 'Lunes' },
-                                  { en: 'Tuesdays', es: 'Martes' },
-                                  { en: 'Wednesdays', es: 'Miércoles' },
-                                  { en: 'Thursdays', es: 'Jueves' },
-                                  { en: 'Fridays', es: 'Viernes' },
-                                  { en: 'Saturdays', es: 'Sábado' },
-                                  { en: 'Sundays', es: 'Domingo' },
-                                ];
-                                let texto = point.schedule;
-                                dias.forEach(d => {
-                                  texto = texto.replace(new RegExp(`\\b${d.en}\\b`, 'g'), d.es);
-                                });
-                                return texto;
-                              }
-                              return point.schedule;
-                            })()}
-                          </p>
-                          {/* Mostrar notas adicionales si existen */}
-                          {point.notas && (<p className="text-gray-600 mt-2 text-sm"><b>Notas adicionales:</b> {point.notas}</p>)}
-                          {point.additional_info && (<p className="text-gray-600 mt-2 text-sm"><b>Información adicional:</b> {point.additional_info}</p>)}
-                        </div>
-                        {/* Imagen del material o imagen por defecto */}
-                        <div className="flex-shrink-0 flex margin rigth items-center md:ml-6 mt-4 md:mt-0">
-                          <div className={`relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-blue-300 hover:shadow-lg rounded-lg ${isInactive ? 'grayscale' : ''}`}> 
-                            <img
-                              src={point.photo_url || "https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png"}
-                              alt={point.photo_url ? "Foto del material" : "Punto de Recolección"}
-                              className={`w-40 h-28 object-cover rounded-lg shadow-md border border-blue-200 ${isInactive ? 'grayscale' : ''}`}
-                              style={{ background: '#f0fdf4' }}
-                              onError={(e) => {
-                                // Si la imagen del material falla, usar la imagen por defecto
-                                const target = e.target as HTMLImageElement;
-                                target.src = "https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png";
-                                target.className = target.className.replace('object-cover', 'object-contain');
-                              }}
-                            />
-                            {/* Lower third con etiquetas de materiales */}
-                            {point.materials && point.materials.length > 0 && (
-                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent rounded-b-lg p-2">
-                                <div className="flex flex-wrap gap-1 justify-center">
-                                  {point.materials.slice(0, 2).map((material, idx) => (
-                                    <span
-                                      key={idx}
-                                      className="inline-block px-2 py-0.2 bg-blue-500/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm border border-white/40"
-                                      style={{ fontSize: '9px' }}
-                                    >
-                                      {material}
-                                    </span>
-                                  ))}
-                                  {point.materials.length > 2 && (
-                                    <span
-                                      className="inline-block px-2 py-1 bg-blue-600/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm border border-white/20"
-                                      style={{ fontSize: '10px' }}
-                                      title={`+${point.materials.length - 2} materiales más: ${point.materials.slice(2).join(', ')}`}
-                                    >
-                                      +{point.materials.length - 2}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            {/* Indicador de foto del material */}
-                            {point.photo_url && (
-                              <div className="absolute top-2 right-2">
-                                <div className="bg-blue-500/80 text-white p-1 rounded-full shadow-lg backdrop-blur-sm border border-white/20" title="Foto del material">
-                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {/* Contenedor de botones de acción - Responsive y organizado */}
-                        <div className="w-full md:w-auto mt-4 md:mt-0 md:ml-4">
-                          <div className="flex flex-col gap-2">
-                            {/* Botón para volver a disponible solo en tab demorados */}
-                            {activePointsTab === 'demorados' && (
-                              <button
-                                onClick={() => handleMakeAvailableAgain(point)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md animate-bounce w-full md:w-auto text-sm font-semibold"
-                              >
-                                ✅ Disponible
-                              </button>
-                            )}
-                            
-                            {/* Botones para puntos retirados: Volver a disponible, Calificar y Donar */}
-                            {activePointsTab === 'retirados' && (
-                              <>
-                                <button
-                                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md w-full text-sm font-semibold flex items-center justify-center gap-2"
-                                  onClick={() => handleMakeAvailableAgain(point)}
-                                  type="button"
-                                >
-                                  🔄 Volver a disponible
-                                </button>
-                                
-                                {/* Siempre mostrar botones de calificar y donar en puntos retirados */}
-                                {(() => {
-                                  // Mostrar botones de calificar/donar solo si hay claim_id o recycler info en el punto
-                                  const pt = point as unknown as Record<string, unknown>;
-                                  const recyclerId = String(pt.claim_id || pt.recycler_id || '');
-                                  const recyclerName = String(pt.recycler_name || 'Reciclador');
-                                  const avatarUrl = pt.recycler_avatar ? String(pt.recycler_avatar) : undefined;
-
-                                  if (!recyclerId) return null;
-
-                                  return (
-                                    <>
-                                      <button
-                                        className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 shadow-md w-full text-sm font-semibold flex items-center justify-center gap-2"
-                                        onClick={() => {
-                                          if (recyclerId) {
-                                            setRatingTarget({ recyclerId: recyclerId as string, recyclerName: recyclerName as string, avatarUrl });
-                                          } else {
-                                            toast.error('No se pudo encontrar información del reciclador para calificar');
-                                          }
-                                        }}
-                                        type="button"
-                                      >
-                                        <FaStar className="w-4 h-4" />
-                                        Calificar reciclador
-                                      </button>
-                                      <button
-                                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-md w-full text-sm font-semibold flex items-center justify-center gap-2"
-                                        onClick={() => {
-                                          if (recyclerId) {
-                                            setShowDonationModal({
-                                              recyclerId: recyclerId as string,
-                                              recyclerName: recyclerName as string,
-                                              avatarUrl,
-                                              alias: ''
-                                            });
-                                          } else {
-                                            toast.error('No se pudo encontrar información del reciclador para donar');
-                                          }
-                                        }}
-                                        type="button"
-                                      >
-                                        💝 Donar
-                                      </button>
-                                    </>
-                                  );
-                                })()}
-                              </>
-                            )}
-                            
-                            {/* Botón eliminar SOLO se muestra si el punto está disponible (no reclamado ni retirado) */}
-                            {( !point.claim_id && point.status !== 'completed') && (
-                              <button
-                                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 shadow-md w-full md:w-auto text-sm font-semibold flex items-center justify-center gap-2"
-                                onClick={() => handleDeletePoint(point)}
-                                type="button"
-                              >
-                                <FaTimes className="w-4 h-4" />
-                                Eliminar
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    );
-      })}
-    </ul>
-  );
-})()}
           </div>
         </div>
       )}

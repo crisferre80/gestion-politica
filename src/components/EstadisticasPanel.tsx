@@ -17,7 +17,7 @@ type Stats = {
     cancelled: Record<string, number>;
     delayed: Record<string, number>;
   };
-  bultosByMonth: Record<string, number>;
+  autosByMonth: Record<string, number>;
 };
 
 const EstadisticasPanel: React.FC<EstadisticasPanelProps> = ({ userId }) => {
@@ -66,9 +66,9 @@ const EstadisticasPanel: React.FC<EstadisticasPanelProps> = ({ userId }) => {
           if (c.status === 'cancelled') claimsByStatus.cancelled[m] = (claimsByStatus.cancelled[m] || 0) + 1;
           if (c.status === 'delayed') claimsByStatus.delayed[m] = (claimsByStatus.delayed[m] || 0) + 1;
         });
-        // Bultos por mes (igual a completed)
-        const bultosByMonth = { ...claimsByStatus.completed };
-        setStats({ months, createdByMonth, claimsByStatus, bultosByMonth });
+        // autos por mes (igual a completed)
+        const autosByMonth = { ...claimsByStatus.completed };
+        setStats({ months, createdByMonth, claimsByStatus, autosByMonth });
         setError(null);
       } catch {
         setError('Error al cargar estadísticas');
@@ -149,14 +149,14 @@ const EstadisticasPanel: React.FC<EstadisticasPanelProps> = ({ userId }) => {
         />
       </div>
       <div className="bg-white rounded-xl p-6 shadow">
-        <h2 className="text-xl font-bold text-purple-700 mb-2 flex items-center gap-2"><Star className="w-5 h-5" /> Bultos Retirados por Mes</h2>
+        <h2 className="text-xl font-bold text-purple-700 mb-2 flex items-center gap-2"><Star className="w-5 h-5" /> autos Retirados por Mes</h2>
         <Bar
           data={{
             labels: stats.months,
             datasets: [
               {
-                label: 'Bultos Retirados',
-                data: stats.months.map((m: string) => stats.bultosByMonth[m] || 0),
+                label: 'autos Retirados',
+                data: stats.months.map((m: string) => stats.autosByMonth[m] || 0),
                 backgroundColor: '#a78bfa',
               },
             ],

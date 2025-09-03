@@ -77,7 +77,7 @@ const Home: React.FC = () => {
     <>
       <section className="relative bg-blue-200 text-white">
         <div
-          className="relative min-h-[520px] sm:h-[1200px] bg-cover bg-center flex items-end"
+          className="relative min-h-[320px] sm:h-[640px] bg-cover bg-center flex items-end"
             style={{
               backgroundImage: "url('/assets/pichon neder.jpg')",
               backgroundSize: 'cover',
@@ -86,7 +86,7 @@ const Home: React.FC = () => {
             }}
         >
           <div className="absolute inset-0 bg-black opacity-40" />
-          <div className="max-w-7xl mx-auto px-6 sm:px-6 lg:px-8 py-90">
+          <div className="max-w-7xl mx-auto px-6 sm:px-6 lg:px-8 py-24">
             <div className="max-w-3xl mb-8">
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.9)]">Conectando dirigentes y referentes por barrio en Santiago del Estero</h1>
               <p className="text-base sm:text-lg mb-6 text-white drop-shadow-[0_2px_8px_rgba(255,255,255,0.8)]">Organizamos y conectamos dirigentes políticos, referentes comunitarios y vecinos para coordinar acciones, reuniones y campañas en los distintos barrios de Santiago del Estero.</p>
@@ -105,13 +105,13 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">¿Cómo funciona?</h2>
-            <p className="text-base text-gray-600 max-w-3xl mx-auto">Nuestra plataforma pone en contacto a dirigentes, referentes vecinales y ciudadanos para mapear necesidades por barrio, coordinar reuniones y gestionar actividades comunitarias y campañas locales.</p>
+            <p className="text-base text-gray-600 max-w-3xl mx-auto">Nuestra plataforma pone en contacto a dirigentes, referentes politicos, fiscales y ciudadanos para mapear necesidades por barrio, coordinar reuniones y gestionar actividades comunitarias y campañas locales.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-gray-50 p-6 rounded-lg text-center">
               <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><Users className="h-6 w-6 text-blue-600" /></div>
               <h3 className="text-lg font-semibold mb-2">Regístrate</h3>
-              <p className="text-sm text-gray-600">Crea tu perfil como dirigente, referente vecinal o ciudadano interesado en participar y coordinar actividades en tu barrio.</p>
+              <p className="text-sm text-gray-600">Crea tu perfil como Referente Politico, Dirigente o Fiscal General de una escuela para participar y coordinar actividades en tu barrio.</p>
             </div>
             <div className="bg-gray-50 p-6 rounded-lg text-center">
               <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><MapPin className="h-6 w-6 text-blue-600" /></div>
@@ -120,9 +120,21 @@ const Home: React.FC = () => {
             </div>
             <div className="bg-gray-50 p-6 rounded-lg text-center">
               <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><Calendar className="h-6 w-6 text-blue-600" /></div>
-              <h3 className="text-lg font-semibold mb-2">Coordina</h3>
-              <p className="text-sm text-gray-600">Organiza eventos, agenda reuniones y lleva el seguimiento de actividades y acuerdos por barrio.</p>
+              <h3 className="text-lg font-semibold mb-2">Informate</h3>
+              <p className="text-sm text-gray-600">Informate al instante de la boca de urna actualizada en tiempo real por los fiscales registrados</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-8 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-6">
+            <img
+              src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1756914360/ELIAS_SUAREZ_GOBERNADOR_hytsl6.jpg"
+              alt="Elias Suarez Gobernador"
+              className="mx-auto rounded-lg shadow-md w-full max-w-4xl object-cover"
+            />
           </div>
         </div>
       </section>
@@ -131,7 +143,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Beneficios</h2>
-            <p className="text-base text-gray-600 max-w-3xl mx-auto">Beneficios para dirigentes, referentes y vecinos: mejor coordinación, representación territorial y mayor impacto local.</p>
+            <p className="text-base text-gray-600 max-w-3xl mx-auto">Beneficios para dirigentes, referentes y fiscales generales: mejor coordinación, representación territorial y mayor impacto local.</p>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -143,15 +155,7 @@ const Home: React.FC = () => {
                 <li className="flex items-start"><ArrowRight className="h-4 w-4 text-blue-500 mr-2 mt-1" />Herramientas para coordinar campañas y seguimiento</li>
               </ul>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h3 className="text-xl font-semibold text-blue-600 mb-4">Para Vecinos</h3>
-              <ul className="space-y-3 text-sm text-gray-700">
-                <li className="flex items-start"><ArrowRight className="h-4 w-4 text-blue-500 mr-2 mt-1" />Participación en decisiones y actividades de barrio</li>
-                <li className="flex items-start"><ArrowRight className="h-4 w-4 text-blue-500 mr-2 mt-1" />Acceso a información sobre reuniones y eventos locales</li>
-                <li className="flex items-start"><ArrowRight className="h-4 w-4 text-blue-500 mr-2 mt-1" />Canales directos para comunicar necesidades</li>
-                <li className="flex items-start"><ArrowRight className="h-4 w-4 text-blue-500 mr-2 mt-1" />Mayor presencia y respuesta de representantes locales</li>
-              </ul>
-            </div>
+           
           </div>
         </div>
       </section>

@@ -4,7 +4,7 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 import { Award, TrendingUp, Package, Star, Users } from 'lucide-react';
 import 'chart.js/auto';
 
-type TopResident = { name: string; count: number };
+type Topdirigente = { name: string; count: number };
 
 type Stats = {
   months: string[];
@@ -16,7 +16,7 @@ type Stats = {
     delayed: Record<string, number>;
   };
   autosByMonth: Record<string, number>;
-  topResidents: TopResident[];
+  topdirigentes: Topdirigente[];
 };
 
 const Estadisticas: React.FC = () => {
@@ -52,7 +52,7 @@ const Estadisticas: React.FC = () => {
           claims = [];
         }
         // Dirigentes más comprometidos
-        const { data: residentPoints } = await supabase
+        const { data: dirigentePoints } = await supabase
           .from('concentration_points')
           .select('user_id');
         // Procesamiento de datos
@@ -86,17 +86,17 @@ const Estadisticas: React.FC = () => {
         // autos por mes (igual a completed)
         const autosByMonth = { ...claimsByStatus.completed };
         // Dirigentes más comprometidos
-        const residentCount: Record<string, number> = {};
-        (residentPoints || []).forEach(p => {
+        const dirigenteCount: Record<string, number> = {};
+        (dirigentePoints || []).forEach(p => {
           if (!p.user_id) return;
-          residentCount[p.user_id] = (residentCount[p.user_id] || 0) + 1;
+          dirigenteCount[p.user_id] = (dirigenteCount[p.user_id] || 0) + 1;
         });
-        const topResidentsRaw = Object.entries(residentCount)
+        const topdirigentesRaw = Object.entries(dirigenteCount)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5);
-        let topResidents: { name: string; count: number }[] = [];
-        if (topResidentsRaw.length > 0) {
-          const topUserIds = topResidentsRaw.map(([userId]) => userId);
+        let topdirigentes: { name: string; count: number }[] = [];
+        if (topdirigentesRaw.length > 0) {
+          const topUserIds = topdirigentesRaw.map(([userId]) => userId);
           const { data: profilesData } = await supabase
             .from('profiles')
             .select('user_id, name')
@@ -105,9 +105,9 @@ const Estadisticas: React.FC = () => {
           (profilesData || []).forEach(p => {
             nameMap[p.user_id] = p.name || 'Usuario Anónimo';
           });
-          topResidents = topResidentsRaw.map(([userId, count]) => ({ name: nameMap[userId] || userId, count }));
+          topdirigentes = topdirigentesRaw.map(([userId, count]) => ({ name: nameMap[userId] || userId, count }));
         }
-        setStats({ months, createdByMonth, claimsByStatus, autosByMonth, topResidents });
+        setStats({ months, createdByMonth, claimsByStatus, autosByMonth, topdirigentes });
         setError(null);
       } catch {
         setError('Error al cargar estadísticas');
@@ -228,11 +228,11 @@ const Estadisticas: React.FC = () => {
               <h2 className="text-xl font-bold text-blue-700 mb-2 flex items-center gap-2"><Users className="w-5 h-5" /> Dirigentes más comprometidos</h2>
               <Bar
                 data={{
-                  labels: stats.topResidents.map((r: TopResident) => r.name),
+                  labels: stats.topdirigentes.map((r: Topdirigente) => r.name),
                   datasets: [
                     {
                       label: 'Puntos creados',
-                      data: stats.topResidents.map((r: TopResident) => r.count),
+                      data: stats.topdirigentes.map((r: Topdirigente) => r.count),
                       backgroundColor: '#34d399',
                     },
                   ],

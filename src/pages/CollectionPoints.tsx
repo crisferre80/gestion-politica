@@ -21,6 +21,7 @@ function PuntosRecoleccion() {
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [pickupExtra, setPickupExtra] = useState('');
   // Claims feature removed from client — keep a placeholder state for compatibility
+  // eslint-disable-next-line no-empty-pattern, @typescript-eslint/no-explicit-any
   const [] = useState<any[]>([]); // Placeholder state
 
   const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos', 'Escombros'];
@@ -61,6 +62,7 @@ function PuntosRecoleccion() {
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, setError]);
 
   useEffect(() => {
@@ -129,7 +131,7 @@ function PuntosRecoleccion() {
           <div className="w-full flex justify-end md:justify-end mb-4 md:mb-0">
           <button
             onClick={() => {
-              if (user?.type === 'recycler') {
+              if (user?.type === 'referente') {
                 navigate('/dashboard-recycler', { replace: true });
               } else {
                 navigate('/dashboard', { replace: true });
@@ -141,7 +143,7 @@ function PuntosRecoleccion() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            {user?.type === 'recycler' ? 'Panel Dirigente' : 'Panel Referente'}
+            {user?.type === 'referente' ? 'Panel Referente' : 'Panel Dirigente'}
           </button>
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
@@ -154,8 +156,8 @@ function PuntosRecoleccion() {
             </p>
           </div>
           <div className="mt-4 md:mt-0 flex gap-4">
-            {/* Solo Dirigentes (role 'recycler') pueden crear/registrar centros de movilización */}
-            {user && user.type === 'recycler' && (
+            {/* Solo Dirigentes institucionales pueden crear/registrar centros de movilización; UI adaptada */}
+            {user && user.type === 'dirigente' && (
               <Link
                 to="/add-concentration-point"
                 className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center hover:bg-blue-700 shadow-lg"
@@ -310,7 +312,7 @@ function PuntosRecoleccion() {
         ) : (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <p className="text-gray-500 mb-4">No se encontraron Centros de Movilizaciòn con los filtros seleccionados.</p>
-            {user && user.type === 'resident' && (
+            {user && user.type === 'dirigente' && (
               <Link
                 to="/add-concentration-point"
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"

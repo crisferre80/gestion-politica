@@ -243,7 +243,7 @@ export type Database = {
           original_id: string
           point_data: Json | null
           recycler_id: string
-          resident_id: string | null
+          dirigente_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -252,7 +252,7 @@ export type Database = {
           original_id: string
           point_data?: Json | null
           recycler_id: string
-          resident_id?: string | null
+          dirigente_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -261,7 +261,7 @@ export type Database = {
           original_id?: string
           point_data?: Json | null
           recycler_id?: string
-          resident_id?: string | null
+          dirigente_id?: string | null
         }
         Relationships: []
       }
@@ -456,7 +456,7 @@ export type Database = {
           rater_id: string
           rating: number
           recycler_id: string
-          resident_id: string | null
+          dirigente_id: string | null
         }
         Insert: {
           concentration_claim_id?: string | null
@@ -466,7 +466,7 @@ export type Database = {
           rater_id: string
           rating: number
           recycler_id: string
-          resident_id?: string | null
+          dirigente_id?: string | null
         }
         Update: {
           concentration_claim_id?: string | null
@@ -476,7 +476,7 @@ export type Database = {
           rater_id?: string
           rating?: number
           recycler_id?: string
-          resident_id?: string | null
+          dirigente_id?: string | null
         }
         Relationships: [
           {
@@ -501,8 +501,8 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "recycler_ratings_resident_id_fkey"
-            columns: ["resident_id"]
+            foreignKeyName: "recycler_ratings_dirigente_id_fkey"
+            columns: ["dirigente_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

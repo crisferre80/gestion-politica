@@ -10,7 +10,7 @@ import { prepareImageForUpload, transformImage } from '../services/ImageTransfor
 import PhotoCapture from '../components/PhotoCapture.js';
 import ChatList from '../components/ChatList.js';
 import { getChatPreviews } from '../lib/chatUtils.js';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 // Importar funciones de prueba para debugging
@@ -36,7 +36,7 @@ const DashboardReferente = () => {
   const [view, setViewState] = useState('puntos');
 
   const [barrioPoints, setBarrioPoints] = useState<concentrationPoint[]>([]);
-  const [dirigentePoints, setDirigentePoints] = useState<concentrationPoint[]>([]);
+  const [, setDirigentePoints] = useState<concentrationPoint[]>([]);
   const [, setConcentrationPoints] = useState<concentrationPoint[]>([]);
 
   // Location and distance filtering
@@ -94,95 +94,204 @@ const DashboardReferente = () => {
   // Antes se filtraba por el user_id del referente (mostraba solo puntos creados por él).
   // Ahora traemos los puntos con status = 'available' para la pestaña "Disponibles".
   const barrioPointsRaw = await safeSelect('concentration_points', (qb: any) => qb.eq('status', 'available'));
+  console.log('[DashboardReferente] fetched barrioPointsRaw count:', (barrioPointsRaw || []).length);
 
   // Obtener puntos de concentración (todos) para usos internos y para detectar puntos creados por dirigentes
   const concentrationPointsRaw = await safeSelect('concentration_points');
+  console.log('[DashboardReferente] fetched concentrationPointsRaw count:', (concentrationPointsRaw || []).length);
 
       // Obtener perfiles de usuarios para mostrar información completa
       // Tomamos los user_ids tanto de los puntos de barrio y concentración filtrados como de todos los puntos
-      const allPoints = [...(barrioPointsRaw || []), ...(concentrationPointsRaw || [])];
+  const allPoints = [...(barrioPointsRaw || []), ...(concentrationPointsRaw || [])];
       // Además obtener todos los concentration_points para luego filtrar los creados por dirigentes
-      const allConcentrationPoints = await safeSelect('concentration_points');
-      const allUserIds = [...new Set([...allPoints.map((p: any) => p.user_id), ...(allConcentrationPoints || []).map((p: any) => p.user_id)])];
+  const allConcentrationPoints = await safeSelect('concentration_points');
+  console.log('[DashboardReferente] fetched allConcentrationPoints count:', (allConcentrationPoints || []).length);
+  const allUserIds = [...new Set([...allPoints.map((p: any) => p.user_id), ...(allConcentrationPoints || []).map((p: any) => p.user_id)])];
+  console.log('[DashboardReferente] allUserIds:', allUserIds);
       let profilesById: Record<string, any> = {};
 
-      if (allUserIds.length > 0) {
-        try {
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('user_id, name, email, phone, avatar_url, dni, type')
-            .in('user_id', allUserIds);
+      // Normalizador de claves para evitar mismatches entre 'id' y 'user_id'.
+      const normalizeKey = (v?: any) => (v == null ? '' : String(v).toLowerCase());
 
-          if (profilesError) throw profilesError;
+      // Construye un índice seguro a partir del array de perfiles. Indexa por
+      // user_id, id y por email (fallback). Retorna un map { normalizedKey: profile }
+      const buildProfilesIndex = (profilesArray: any[] | null | undefined) => {
+        const map: Record<string, any> = {};
+        if (!Array.isArray(profilesArray) || profilesArray.length === 0) return map;
+        for (const p of profilesArray) {
+          const kUser = normalizeKey(p?.user_id);
+          const kId = normalizeKey(p?.id);
+          if (kUser) map[kUser] = p;
+          if (kId) map[kId] = p;
+          if (p?.email) map[normalizeKey(p.email)] = p;
+        }
+        return map;
+      };
 
-          profilesById = (profilesData || []).reduce((acc: any, profile: any) => {
-            acc[profile.user_id] = profile;
-            return acc;
-          }, {});
-        } catch (bulkErr) {
-          // Si la consulta en bulk falla (p. ej. 400 por filtro desconocido), hacemos fallback
-          // a obtener cada perfil individualmente con resolveProfileRow
-          console.warn('Bulk profiles fetch failed, falling back to per-user fetch:', bulkErr);
-          for (const uid of allUserIds) {
-            try {
-              const row = await resolveProfileRow(uid);
-              if (row && row.user_id) profilesById[row.user_id] = row;
-            } catch (e) {
-              // ignorar error por usuario para no romper el proceso completo
-              console.warn('Error fetching profile for user', uid, e);
-            }
+      // Helper que intenta resolver el perfil de un punto usando el índice local
+      // y si no lo encuentra hace una consulta puntual via resolveProfileRow.
+      const lookupProfileForPoint = async (pointUserId: any, allProfilesArray?: any[]) => {
+        const key = normalizeKey(pointUserId);
+        if (!key) return null;
+        // Intenta llave rápida en el índice
+        let found = profilesById[key];
+        // Si no está y tenemos el array completo, intentar un match por scanning
+        if (!found && Array.isArray(allProfilesArray)) {
+          found = allProfilesArray.find((pr: any) => {
+            const ku = normalizeKey(pr?.user_id);
+            const ki = normalizeKey(pr?.id);
+            return ku === key || ki === key || normalizeKey(pr?.email) === key;
+          }) || null;
+        }
+        // Si aún no hay resultado, caer a la query puntual
+        if (!found) {
+          try {
+            found = await resolveProfileRow(pointUserId);
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          } catch (e) {
+            found = null;
           }
         }
+        return found || null;
+      };
+
+      // si ya se cargaron los perfiles en la variable `profiles` (fetch anterior),
+      // construimos el índice. Si tu código usa otro nombre, este build no rompe nada.
+      // Hacemos 'possibleProfiles' accesible fuera del try para poder usarlo
+      // más abajo al resolver puntos individualmente.
+       
+      let possibleProfiles: any = undefined;
+      try {
+        // Intentar usar variable local 'profiles' si existe
+         
+        possibleProfiles = undefined;
+        if (Array.isArray(possibleProfiles)) {
+          profilesById = buildProfilesIndex(possibleProfiles);
+        }
+      } catch {
+        // noop
       }
 
-      // Procesar puntos de barrio
-      const processedBarrioPoints = (barrioPointsRaw || []).map((point: any) => {
-        const profile = profilesById[point.user_id] || {};
+      // Si el índice quedó vacío, intentar hacer una consulta puntual por los user_ids
+      // recolectados para poblar el índice y así evitar referencias a variables
+      // intermedias inexistentes en el scope.
+      try {
+        if ((!profilesById || Object.keys(profilesById).length === 0) && Array.isArray(allUserIds) && allUserIds.length > 0) {
+          // Intentar obtener perfiles en lote
+          let fetchedProfiles: any[] = [];
+          try {
+            // Diagnostic fetch: call PostgREST directly to capture raw response when .in() fails
+            try {
+              const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+              const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+              if (baseUrl && anonKey) {
+                const select = encodeURIComponent('id,user_id,name,avatar_url,lat,lng,role,bio,materials,rating_average,total_ratings');
+                const inList = allUserIds.join(',');
+                const diagUrl = `${baseUrl}/rest/v1/profiles?select=${select}&user_id=in.(${encodeURIComponent(inList)})`;
+                try {
+                  const diagRes = await fetch(diagUrl, {
+                    headers: {
+                      apikey: anonKey,
+                      Authorization: `Bearer ${anonKey}`,
+                    },
+                    credentials: 'omit'
+                  });
+                  let bodyText = '';
+                  try { bodyText = await diagRes.text(); } catch (e) { bodyText = String(e); }
+                  console.log('[DashboardReferente][diag] direct REST fetch to profiles status:', diagRes.status, 'body:', bodyText);
+                } catch (diagErr) {
+                  console.warn('[DashboardReferente][diag] direct REST fetch failed:', diagErr);
+                }
+              }
+            } catch (diagErr) {
+              console.warn('[DashboardReferente][diag] error building diag request:', diagErr);
+            }
+
+            fetchedProfiles = await safeSelect('profiles', (qb: any) => qb.in('user_id', allUserIds));
+            console.log('[DashboardReferente] fetchedProfiles count:', (fetchedProfiles || []).length);
+          } catch (err) {
+            console.warn('[DashboardReferente] safeSelect(in) fallo:', err);
+            fetchedProfiles = [];
+          }
+
+          // Si no encontramos perfiles con la consulta en lote, intentar consultas individuales
+          if (!Array.isArray(fetchedProfiles) || fetchedProfiles.length === 0) {
+            console.log('[DashboardReferente] fetchedProfiles vacío, intentando consultas individuales por user_id...');
+            const resolvedList = await Promise.all(allUserIds.map(async (uid) => {
+              try {
+                const r = await resolveProfileRow(uid);
+                if (!r) console.warn('[DashboardReferente] resolveProfileRow devolvió null para', uid);
+                return r;
+              } catch (e) {
+                console.warn('[DashboardReferente] resolveProfileRow error para', uid, e);
+                return null;
+              }
+            }));
+            const nonNull = (resolvedList || []).filter(Boolean);
+            if (nonNull.length > 0) {
+              fetchedProfiles = nonNull as any[];
+            }
+          }
+
+          if (Array.isArray(fetchedProfiles) && fetchedProfiles.length > 0) {
+            profilesById = buildProfilesIndex(fetchedProfiles);
+            possibleProfiles = fetchedProfiles;
+          }
+        }
+        console.log('[DashboardReferente] profilesById keys:', Object.keys(profilesById || {}));
+      } catch {
+        // noop
+      }
+
+      // Procesar puntos de barrio (usar lookup centralizada que normaliza y hace fallback)
+      const processedBarrioPoints = await Promise.all((barrioPointsRaw || []).map(async (point: any) => {
+        const resolved = await lookupProfileForPoint(point.user_id, possibleProfiles || Object.values(profilesById));
+        // eslint-disable-next-line no-empty
+        try { console.log('[DashboardReferente] barrio point resolution', { pointId: point.id, pointUserId: point.user_id, resolvedId: resolved?.id, resolvedUserId: resolved?.user_id, resolvedRole: resolved?.role }); } catch {}
         return {
           ...point,
-          creator_name: profile?.name || 'Usuario Anónimo',
-          creator_email: profile?.email,
-          creator_phone: profile?.phone,
-          creator_avatar: profile?.avatar_url,
-          creator_dni: profile?.dni,
-          profiles: profile,
+          creator_name: resolved?.name || 'Usuario Anónimo',
+          creator_email: resolved?.email,
+          creator_phone: resolved?.phone,
+          creator_avatar: resolved?.avatar_url,
+          creator_dni: resolved?.dni,
+          profiles: resolved,
           materials: Array.isArray(point.materials) ? point.materials : [point.materials].filter(Boolean),
         };
-      });
+      }));
 
-      // Procesar puntos de concentración
-      const processedConcentrationPoints = (concentrationPointsRaw || []).map((point: any) => {
-        const profile = profilesById[point.user_id] || {};
+      // Procesar puntos de concentración (usar lookup centralizada)
+      const processedConcentrationPoints = await Promise.all((concentrationPointsRaw || []).map(async (point: any) => {
+        const resolved = await lookupProfileForPoint(point.user_id, possibleProfiles || Object.values(profilesById));
+        // eslint-disable-next-line no-empty
+        try { console.log('[DashboardReferente] concentration point resolution', { pointId: point.id, pointUserId: point.user_id, resolvedId: resolved?.id, resolvedUserId: resolved?.user_id, resolvedRole: resolved?.role }); } catch {}
         return {
           ...point,
-          creator_name: profile?.name || 'Usuario Anónimo',
-          creator_email: profile?.email,
-          creator_phone: profile?.phone,
-          creator_avatar: profile?.avatar_url,
-          creator_dni: profile?.dni,
-          profiles: profile,
+          creator_name: resolved?.name || 'Usuario Anónimo',
+          creator_email: resolved?.email,
+          creator_phone: resolved?.phone,
+          creator_avatar: resolved?.avatar_url,
+          creator_dni: resolved?.dni,
+          profiles: resolved,
         };
-      });
+      }));
 
-      setBarrioPoints(processedBarrioPoints);
-      setConcentrationPoints(processedConcentrationPoints);
+  console.log('[DashboardReferente] processedBarrioPoints count:', (processedBarrioPoints || []).length);
+  console.log('[DashboardReferente] processedConcentrationPoints count:', (processedConcentrationPoints || []).length);
+  setBarrioPoints(processedBarrioPoints);
+  setConcentrationPoints(processedConcentrationPoints);
       // Procesar puntos creados por dirigentes
-      const processedDirigentePoints = (allConcentrationPoints || []).filter((p: any) => {
-        const profile = profilesById[p.user_id] || {};
-        return profile?.type === 'dirigente';
-      }).map((point: any) => {
-        const profile = profilesById[point.user_id] || {};
-        return {
-          ...point,
-          creator_name: profile?.name || 'Dirigente',
-          creator_email: profile?.email,
-          creator_phone: profile?.phone,
-          creator_avatar: profile?.avatar_url,
-          creator_dni: profile?.dni,
-          profiles: profile,
-        };
-      });
-      setDirigentePoints(processedDirigentePoints);
+      const processedDirigentePoints = await Promise.all((allConcentrationPoints || []).map(async (point: any) => {
+        // Intentar resolver el perfil del creador del punto usando índice y fallback.
+        const resolved = await lookupProfileForPoint(point.user_id, possibleProfiles);
+        try {
+          console.log('[DashboardReferente] point resolution', { pointId: point.id, pointUserId: point.user_id, resolvedId: resolved?.id, resolvedUserId: resolved?.user_id, resolvedRole: resolved?.role });
+    } catch { /* noop */ }
+        return { ...point, profiles: resolved };
+      }));
+      // Filtrar solo los creados por dirigentes
+  console.log('[DashboardReferente] processedDirigentePoints count before filter:', (processedDirigentePoints || []).length);
+  setDirigentePoints(processedDirigentePoints.filter(p => p.profiles?.type === 'dirigente'));
   setLoading(false);
     } catch (err) {
       console.error('Error en fetchData:', err);
@@ -647,14 +756,13 @@ const DashboardReferente = () => {
         if (fetchError) throw fetchError;
         
         if (updatedProfile) {
-          // Asegurar que se mantenga el tipo de usuario como 'referente'
-          const updatedUser = { 
-            ...globalUser, 
+          // No forzamos el `type`/`role` aquí: mantenemos los valores existentes
+          // y solo actualizamos con los campos devueltos por la BD.
+          const updatedUser = {
+            ...globalUser,
             ...updatedProfile,
-            type: 'referente', // Mantener el tipo como referente político
-            role: 'referente'  // Asegurar el rol correcto
           };
-          
+
           console.log('Actualizando contexto con:', updatedUser);
           updateUser(updatedUser);
           
@@ -792,6 +900,82 @@ const DashboardReferente = () => {
   // Rutas eliminadas: el panel de Referente no gestiona rutas ahora.
 
   const [showAllPointsMap, setShowAllPointsMap] = useState(false);
+  // --- Dirigentes (mover lógica desde DashboardDirigente) ---
+  type Recycler = {
+    role: string;
+    id: string;
+    user_id?: string;
+    profiles?: { avatar_url?: string; name?: string; email?: string; phone?: string; dni?: string };
+    rating_average?: number;
+    total_ratings?: number;
+    materials?: string[];
+    bio?: string;
+    lat?: number;
+    lng?: number;
+    online?: boolean;
+  };
+
+  const [recyclers, setRecyclers] = useState<Recycler[]>(() => {
+    const cached = sessionStorage.getItem('recyclers_online');
+    if (cached) {
+      try { return JSON.parse(cached); } catch { return []; }
+    }
+    return [];
+  });
+
+  const [mapFitBounds, setMapFitBounds] = useState<[[number, number],[number, number]] | null>(null);
+  const [mapCenterToUser] = useState<boolean>(false);
+
+  const fetchOnlineRecyclers = React.useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      // Use select('*') to avoid referencing a non-existent 'id' column in some DBs
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'referente')
+        .limit(500);
+      if (!error && data) {
+        const normalized: Recycler[] = (data as any[]).map(d => ({
+          id: String(d.id || d.user_id || ''),
+          user_id: d.user_id,
+          role: d.role || 'recycler',
+          profiles: { name: d.name, avatar_url: d.avatar_url, email: d.email, phone: d.phone, dni: d.dni },
+          lat: typeof d.lat === 'string' ? Number(d.lat) : (typeof d.lat === 'number' ? d.lat : undefined),
+          lng: typeof d.lng === 'string' ? Number(d.lng) : (typeof d.lng === 'number' ? d.lng : undefined),
+          bio: d.bio,
+          materials: Array.isArray(d.materials) ? d.materials : (d.materials ? String(d.materials).split(',').map((s: string) => s.trim()) : []),
+          rating_average: d.rating_average ?? undefined,
+          total_ratings: d.total_ratings ?? undefined,
+          online: !!d.online,
+        }));
+        setRecyclers(normalized);
+      }
+    } catch (err) {
+      console.warn('[fetchOnlineRecyclers] Error:', err);
+    }
+  }, [user]);
+
+  useEffect(() => { sessionStorage.setItem('recyclers_online', JSON.stringify(recyclers)); }, [recyclers]);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => { await fetchOnlineRecyclers(); })();
+    const createRecyclersSubscription = () => {
+      const channelName = `recyclers-profiles`;
+      const channel = supabase.channel(channelName, {
+        config: { broadcast: { self: false }, presence: { key: 'recyclers' } }
+      })
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: "role=eq.referente" }, () => {
+        if (!isMounted) return; fetchOnlineRecyclers();
+      })
+      .subscribe();
+      return channel;
+    };
+    const channel = createRecyclersSubscription();
+    const interval = setInterval(() => { if (isMounted) fetchOnlineRecyclers(); }, 5000);
+    return () => { isMounted = false; supabase.removeChannel(channel); clearInterval(interval); };
+  }, [fetchOnlineRecyclers]);
 
   // Si necesitas rutas en el futuro, descomenta y usa estas líneas.
 
@@ -900,76 +1084,8 @@ const DashboardReferente = () => {
           </div>
         )}
 
-        {/* --- MAPA DE Centros de Movilizaciòn --- */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-2xl font-bold text-blue-700 flex items-center gap-2">
-              <svg className="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 12.414a4 4 0 10-1.414 1.414l4.243 4.243a1 1 0 001.414-1.414z" /></svg>
-              Mapa de Centros de Movilizaciòn
-            </h2>
-            <button
-              className="px-3 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 font-semibold text-sm"
-              onClick={() => setShowAllPointsMap((v) => !v)}
-            >
-              {showAllPointsMap ? 'Ocultar mapa' : 'Ver mapa'}
-            </button>
-          </div>
-          {showAllPointsMap && (
-            <div className="w-full h-96 rounded-lg overflow-hidden border border-blue-300 shadow mb-2 animate-fade-in">
-              <Map
-                markers={availablePoints.map(p => ({
-                  id: p.id,
-                  lat: Number(p.lat),
-                  lng: Number(p.lng),
-                  title: p.address,
-                  avatar_url: p.creator_avatar || undefined,
-                  iconUrl: '/assets/logo%20cm%20pj.png',
-                  status: 'disponible',
-                  iconsize: [96, 96]
-                }))}
-                showUserLocation={true}
-                showAdminZonesButton={true}
-                hideDrawControls={true} // Oculta controles de dibujo
-              />
-            </div>
-          )}
-        </div>
-        {/* Lista de Puntos creados por Dirigentes */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-2xl font-bold text-green-700 flex items-center gap-2">
-              <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.866-3.582 7-8 7v-7h8zM12 11V4l4 4" /></svg>
-              Puntos creados por Dirigentes
-            </h2>
-          </div>
-          <div className="bg-white rounded-lg border border-green-100 p-4">
-            {dirigentePoints.length === 0 ? (
-              <div className="text-sm text-gray-600">No se encontraron puntos creados por dirigentes.</div>
-            ) : (
-              <ul className="space-y-3">
-                {dirigentePoints.map(p => (
-                  <li key={p.id || `${p.user_id}-${p.lat}-${p.lng}`} className="flex items-center justify-between p-3 border rounded">
-                    <div>
-                      <div className="font-semibold text-sm">{p.address || 'Sin dirección'}</div>
-                      <div className="text-xs text-gray-500">Creado por: {p.creator_name || 'Dirigente'}</div>
-                      {typeof p.lat === 'number' && typeof p.lng === 'number' && (
-                        <div className="text-xs text-gray-500">Coordenadas: {Number(p.lat).toFixed(4)}, {Number(p.lng).toFixed(4)}</div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => { setSelectedPoint(p); setShowMap(true); }}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                      >
-                        Ver en mapa
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
+  {/* El mapa se mostrará debajo del header cuando se active (ver botón 'Mapa') */}
+  {/* Sección 'Puntos creados por Dirigentes' eliminada */}
         {/* --- FIN MAPA --- */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <h1 className="text-3xl font-bold text-blue-800">Panel del Referente</h1>
@@ -1041,10 +1157,10 @@ const DashboardReferente = () => {
                   </button>
                   {/* calificaciones removed */}
                   <button
-                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2 relative"
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-yellow-600 font-semibold shadow flex items-center gap-2 relative"
                     onClick={() => setShowChatModal(true)}
-                    // disabled={!canChatWithResident}
-                    // title={canChatWithResident ? "Abrir chat con Dirigente" : "Solo disponible si el Dirigente habilita el chat"}
+                    // disabled={!canChatWithdirigente}
+                    // title={canChatWithdirigente ? "Abrir chat con Dirigente" : "Solo disponible si el Dirigente habilita el chat"}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.8l-4.28 1.07A1 1 0 013 19.13V17.6c0-.29.13-.56.35-.74A7.97 7.97 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                     Mensajes
@@ -1062,11 +1178,60 @@ const DashboardReferente = () => {
                       return null;
                     })()}
                   </button>
+                  <button
+                    onClick={() => setShowAllPointsMap(v => !v)}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-semibold shadow flex items-center gap-2 text-sm"
+                    title="Mostrar mapa"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A2 2 0 013 15.382V7.618a2 2 0 011.553-1.894L9 3m0 17l6-3m-6 3V3m6 3l5.447 2.724A2 2 0 0121 8.618v7.764a2 2 0 01-1.553 1.894L15 20z" /></svg>
+                    Mapa
+                  </button>
                   {/* Botón 'Mis Rutas' eliminado para referentes */}
                 </div>
               </div>
             </div>
           </div>
+
+          {showAllPointsMap && (
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-blue-700 flex items-center gap-2 mb-3">
+                <svg className="w-7 h-7 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 12.414a4 4 0 10-1.414 1.414l4.243 4.243a1 1 0 001.414-1.414z" /></svg>
+                Mapa de Centros de Movilizaciòn
+              </h2>
+              <div id="dirigente-points-map" className="w-full h-96 rounded-lg overflow-hidden border border-blue-300 shadow mb-2 animate-fade-in">
+                <Map
+                  markers={availablePoints.map(p => ({
+                    id: p.id,
+                    lat: Number(p.lat),
+                    lng: Number(p.lng),
+                    title: p.address,
+                    avatar_url: p.creator_avatar || undefined,
+                    iconUrl: 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756996529/logo_cm_pj_ijx3oh.png',
+                    status: 'disponible',
+                    iconsize: [40, 40]
+                  }))}
+                  showUserLocation={true}
+                  showAdminZonesButton={false}
+                  hideDrawControls={true}
+                  onMarkerClick={(id) => {
+                    // Abrir la pestaña de Centros si está cerrada y mostrar el mapa/lista
+                    setViewState('disponibles');
+                    setShowAllPointsMap(true);
+                    // Esperar un poco para que el DOM renderice la lista y luego scrollear
+                    setTimeout(() => {
+                      const el = document.getElementById(`point-card-${id}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.classList.add('ring-4', 'ring-blue-300');
+                        setTimeout(() => el.classList.remove('ring-4', 'ring-blue-300'), 2200);
+                      }
+                    }, 350);
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="p-6">
             {error && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
@@ -1088,7 +1253,7 @@ const DashboardReferente = () => {
               </div>
             )}
             {/* Botones para selección de vista */}
-            <div className="mb-6 flex flex-wrap gap-2 justify-center md:justify-end">
+      <div className="mb-6 flex flex-wrap gap-2 justify-start md:justify-start">
               <button
                 onClick={() => handleSetView('disponibles')}
                 className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 min-w-[140px] text-sm
@@ -1097,11 +1262,24 @@ const DashboardReferente = () => {
                     : 'bg-gray-100 text-gray-700 hover:bg-blue-100 hover:text-blue-700'}
                 `}
               >
-                Disponibles
+        Ver Centros de Movilizacion
                 {availablePoints.length > 0 && (
                   <span className="ml-2 px-2 py-0.5 text-xs bg-blue-800 text-white rounded-full">
                     {availablePoints.length}
                   </span>
+                )}
+              </button>
+              <button
+                onClick={() => handleSetView('dirigentes')}
+                className={`px-4 py-2 rounded-md font-semibold transition-all duration-200 min-w-[140px] text-sm
+                  ${view === 'dirigentes'
+                    ? 'bg-green-600 text-white shadow-lg scale-105'
+                    : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}
+                `}
+              >
+                Ver Dirigentes
+                {recyclers.filter(r => r.online).length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-green-800 text-white rounded-full">{recyclers.filter(r => r.online).length}</span>
                 )}
               </button>
             </div>
@@ -1229,21 +1407,45 @@ const DashboardReferente = () => {
                       </div>
                     ) : (
                       availablePoints.map(point => (
-                        <div key={point.id} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-blue-400">
+                        <div key={point.id} id={`point-card-${point.id}`} className="bg-white rounded-lg shadow-md overflow-hidden border-2 border-blue-400">
                           <div className="p-6">
                             {/* Info principal */}
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3">
                                 <img
                                   src={point.type === 'colective_point'
-                                    ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                                    ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
                                     : '/assets/logo%20cm%20pj.png'}
                                   alt="Punto de Recolección"
                                   className="w-12 h-12 object-contain drop-shadow-lg animate-bounce mr-1 mt-0.2"
                                 />
-                                <div>
-                                  <h3 className="text-lg font-bold text-blue-800">{point.address}</h3>
-                                  <p className="mt-1 text-sm text-gray-500">{point.district}</p>
+                                <div className="min-w-0">
+                                  <h3 className="text-lg font-bold text-blue-800 truncate">{point.address}</h3>
+                                  <p className="mt-1 text-sm text-gray-500 truncate">{point.district || point.barrio || point.neighbourhood || 'Sin barrio'}</p>
+
+                                  {/* Creator / Dirigente info */}
+                                  <div className="mt-3 flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-blue-100 bg-white flex-shrink-0">
+                                      <img
+                                        src={getAvatarUrl(point.creator_avatar, typeof point.creator_name === 'string' ? point.creator_name : String(point.creator_name))}
+                                        alt={typeof point.creator_name === 'string' ? point.creator_name : String(point.creator_name || 'Dirigente')}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { const t = e.target as HTMLImageElement; t.src = '/default-avatar.png'; }}
+                                      />
+                                    </div>
+                                    <div className="text-sm truncate">
+                                      <div className="font-medium text-gray-800 truncate">{point.creator_name || 'Dirigente'}</div>
+                                      <div className="text-xs text-gray-500 truncate">
+                                        {point.creator_name ? (
+                                          <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{point.creator_phone}</span>
+                                        ) : point.creator_email ? (
+                                          <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{point.creator_email}</span>
+                                        ) : (
+                                          <span className="italic">Sin contacto</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1254,8 +1456,8 @@ const DashboardReferente = () => {
                               <div className="mr-6 flex-shrink-0">
                                 <div className="relative transition-transform duration-300 hover:scale-110 hover:rotate-2 hover:shadow-blue-300 hover:shadow-lg rounded-lg">
                                   <img
-                                    src={point.photo_url || (point.type === 'colective_point'
-                                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                                    src={point.photo_url ? point.photo_url : (point.type === 'colective_point'
+                                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
                                       : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756952486/Generated_Image_September_03_2025_-_11_19PM_ty6l6i.jpg')}
                                     alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
                                     className="w-32 h-38 object-cover rounded-lg shadow-md border border-blue-200"
@@ -1263,7 +1465,7 @@ const DashboardReferente = () => {
                                     onError={(e) => {
                                       const target = e.target as HTMLImageElement;
                                       target.src = point.type === 'colective_point'
-                                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
+                                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
                                         : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756952486/Generated_Image_September_03_2025_-_11_19PM_ty6l6i.jpg';
                                       target.className = target.className.replace('object-cover', 'object-contain');
                                     }}
@@ -1339,6 +1541,85 @@ const DashboardReferente = () => {
                   <hr className="my-10 border-blue-300" />
                 </div>
               )}
+                  {view === 'dirigentes' && (
+                    <div>
+                      <h2 className="text-2xl font-bold text-green-700 mb-3">Dirigentes registrados</h2>
+                      <div id="dirigente-recyclers-map" className="mb-4 w-full h-80 rounded-lg overflow-hidden border border-green-300 shadow">
+                        <Map
+                          markers={recyclers.filter(r => r.online && typeof r.lat === 'number' && typeof r.lng === 'number').map(r => ({
+                            id: r.id,
+                            lat: Number(r.lat),
+                            lng: Number(r.lng),
+                            title: r.profiles?.name || 'Reciclador',
+                            avatar_url: r.profiles?.avatar_url,
+                            role: r.role,
+                            online: !!r.online,
+                            iconsize: [36,36]
+                          }))}
+                          fitBounds={mapFitBounds}
+                          centerToUser={mapCenterToUser}
+                          showUserLocation={true}
+                        />
+                      </div>
+                      {recyclers.filter(r => r.online).length === 0 ? (
+                        <p className="text-gray-500">No hay Dirigentes en línea.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {recyclers.filter(r => r.online).map(rec => (
+                            <div key={rec.id} className="border rounded-lg p-4 bg-white shadow-sm flex items-start gap-4">
+                              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-green-200">
+                                <img src={getAvatarUrl(rec.profiles?.avatar_url, rec.profiles?.name)} alt={rec.profiles?.name || 'Reciclador'} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-start justify-between">
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-green-700 truncate">{rec.profiles?.name || 'Dirigente'}</div>
+                                    <div className="text-sm text-gray-500 flex flex-col mt-1">
+                                      {rec.profiles?.email && (
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                          <Mail className="w-4 h-4 text-blue-500" />
+                                          <span className="truncate">{rec.profiles.email}</span>
+                                        </div>
+                                      )}
+                                      {rec.profiles?.phone && (
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                          <Phone className="w-4 h-4 text-blue-500" />
+                                          <span className="truncate">{rec.profiles.phone}</span>
+                                        </div>
+                                      )}
+                                      {rec.profiles?.dni && (
+                                        <div className="text-xs text-gray-500 mt-1">DNI: {rec.profiles.dni}</div>
+                                      )}
+                                      {!rec.profiles?.email && !rec.profiles?.phone && !rec.profiles?.dni && (
+                                        <div className="text-sm text-gray-500">Sin contacto</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-sm text-gray-500 ml-4">{typeof rec.rating_average === 'number' ? rec.rating_average.toFixed(1) : 'N/A'}</div>
+                                </div>
+                                {rec.bio && <div className="text-sm text-gray-600 mt-2">{rec.bio}</div>}
+                                <div className="mt-3 flex gap-2">
+                                  <button onClick={() => {
+                                    if (rec.lat && rec.lng) {
+                                      const sw: [number, number] = [Number(rec.lng), Number(rec.lat)];
+                                      const ne: [number, number] = [Number(rec.lng), Number(rec.lat)];
+                                      setMapFitBounds([sw, ne]);
+                                      setTimeout(() => setMapFitBounds(null), 1500);
+                                    }
+                                  }} className="px-3 py-1 bg-green-600 text-white rounded">Ver en mapa</button>
+                                  {rec.user_id && (/^[0-9a-fA-F-]{36}$/.test(rec.user_id)) ? (
+                                    <Link to={`/chat/${rec.user_id}`} className="px-3 py-1 bg-blue-600 text-white rounded">Enviar mensaje</Link>
+                                  ) : (
+                                    <button className="px-3 py-1 bg-gray-200 text-gray-500 rounded" disabled>Chat no disponible</button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
               {/* Views 'reclamados', 'cancelados' and 'retirados' removed: claim logic is not used by Referentes */}
               {/* 'cancelados' view removed */}
               {/* 'retirados' view removed */}
@@ -1363,7 +1644,7 @@ const DashboardReferente = () => {
                           lng: Number(selectedPoint.lng),
                           title: selectedPoint.address,
                           avatar_url: selectedPoint.creator_avatar,
-                          // iconSize: [50, 50] // Ajuste del tamaño del ícono (eliminado porque no es una propiedad válida)
+                          iconUrl: '/assets/logo%20cm%20pj.png'
                         }
                       ]}
                       showUserLocation={true}

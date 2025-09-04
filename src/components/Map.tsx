@@ -30,11 +30,13 @@ export interface MapboxPolygonProps {
     online?: boolean;
     iconUrl?: string;
     type?: string; // <-- Agregado para evitar el error de tipo
+  iconsize?: [number, number];
   }>;
   showUserLocation?: boolean;
   zones?: Zone[];
   showAdminZonesButton?: boolean;
   onMapClick?: (event: { lng: number; lat: number }) => void;
+  onMarkerClick?: (id: string) => void;
   disableDraw?: boolean;
   hideDrawControls?: boolean;
   showRoute?: boolean;
@@ -51,6 +53,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
   zones = [],
   showAdminZonesButton = false,
   onMapClick,
+  onMarkerClick,
   disableDraw = false,
   route = [],
   fitBounds = null,
@@ -537,79 +540,94 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
           </Marker>
         )}
         {/* Marcadores personalizados */}
-        {markers.map(marker => (
-          <Marker key={marker.id} longitude={marker.lng} latitude={marker.lat}>
-            <div
-              onMouseEnter={() => setHoveredMarker(marker)}
-              onMouseLeave={() => setHoveredMarker(null)}
-              style={{ position: 'relative', width: 80, height: 80, cursor: 'pointer' }}
-            >
+        {markers.map(marker => {
+          // Allow per-marker iconsize override: [width, height]
+          // Fallback to 80px square when not provided
+          // Tamaño por defecto para marcadores (puedes ajustarlo aquí)
+          const size = marker.iconsize?.[0] ?? 120;
+          // Proporciones ajustadas para avatar y bicicleta
+          const avatarSize = Math.max(34, Math.round(size * 0.52));
+          const bikeSize = Math.max(44, Math.round(size * 0.85));
+          const avatarTop = Math.round(size * 0.09);
+          const avatarLeft = Math.round(size * 0.37);
+          const bikeTop = Math.round(size * 0.18);
+          const bikeLeft = Math.round(size * 0.08);
+
+          return (
+            <Marker key={marker.id} longitude={marker.lng} latitude={marker.lat}>
               <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundImage: `url(${marker.iconUrl ||
-                    (marker.type === 'school' || marker.role === 'school' || marker.id === 'collective-point'
-                      ? '/assets/iconescuela.png'
-                      : marker.type === 'colective_point'
-                      ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
-                      : marker.role === 'concentration_point'
-                      ? '/assets/recycling-marker.svg' // Icono para punto colectivo genérico
-                      : marker.role === 'available'
-                      ? '/assets/Punto_de_Recoleccion_Verde.png'
-                      : DEFAULT_MARKER_ICON)})`,
-                  backgroundSize: 'contain',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'center',
-                }}
-              />
-              {marker.avatar_url && (
-                <img
-                  src={marker.avatar_url}
-                  alt="Avatar del reciclador"
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    left: '30px',
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    border: '2px solid #fff',
-                    zIndex: 2,
-                    objectFit: 'cover',
-                  }}
-                />
-              )}
-              {/* Mostrar bicicleta grande DETRÁS del avatar (sin sombra) para que parezca que el avatar está montado */}
-              {(marker.id !== 'collective-point') && (marker.role === 'recycler' || marker.online) && (
-                <img
-                  src={'/assets/bicireciclador-Photoroom.png'}
-                  alt="Bicicleta reciclador"
-                  style={{
-                    position: 'absolute',
-                    top: '16px',
-                    left: '6px',
-                    width: '56px',
-                    height: '56px',
-                    zIndex: 1,
-                    objectFit: 'contain',
-                  }}
-                />
-              )}
-            </div>
-            {hoveredMarker?.id === marker.id && (
-              <Popup
-                longitude={marker.lng}
-                latitude={marker.lat}
-                closeButton={false}
-                closeOnClick={false}
-                anchor="top"
+                onClick={() => onMarkerClick?.(marker.id)}
+                onMouseEnter={() => setHoveredMarker(marker)}
+                onMouseLeave={() => setHoveredMarker(null)}
+                style={{ position: 'relative', width: size, height: size, cursor: 'pointer' }}
               >
-                <div style={{ whiteSpace: 'pre-wrap' }}>{marker.title}</div>
-              </Popup>
-            )}
-          </Marker>
-        ))}
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundImage: `url(${marker.iconUrl ||
+                      (marker.type === 'school' || marker.role === 'school' || marker.id === 'collective-point'
+                        ? '/assets/iconescuela.png'
+                        : marker.type === 'colective_point'
+                        ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
+                        : marker.role === 'concentration_point'
+                        ? '/assets/recycling-marker.svg' // Icono para punto colectivo genérico
+                        : marker.role === 'available'
+                        ? '/assets/Punto_de_Recoleccion_Verde.png'
+                        : DEFAULT_MARKER_ICON)})`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                  }}
+                />
+                {marker.avatar_url && (
+                  <img
+                    src={marker.avatar_url}
+                    alt="Avatar del reciclador"
+                    style={{
+                      position: 'absolute',
+                      top: `${avatarTop}px`,
+                      left: `${avatarLeft}px`,
+                      width: `${avatarSize}px`,
+                      height: `${avatarSize}px`,
+                      borderRadius: '50%',
+                      border: '2px solid #fff',
+                      zIndex: 2,
+                      objectFit: 'cover',
+                    }}
+                  />
+                )}
+                {/* Mostrar bicicleta grande DETRÁS del avatar (sin sombra) para que parezca que el avatar está montado */}
+                {(marker.id !== 'collective-point') && (marker.role === 'referente' || marker.online) && (
+                  <img
+                    src={'/assets/bicireciclador-Photoroom.png'}
+                    alt="Bicicleta reciclador"
+                    style={{
+                      position: 'absolute',
+                      top: `${bikeTop}px`,
+                      left: `${bikeLeft}px`,
+                      width: `${bikeSize}px`,
+                      height: `${bikeSize}px`,
+                      zIndex: 1,
+                      objectFit: 'contain',
+                    }}
+                  />
+                )}
+              </div>
+              {hoveredMarker?.id === marker.id && (
+                <Popup
+                  longitude={marker.lng}
+                  latitude={marker.lat}
+                  closeButton={false}
+                  closeOnClick={false}
+                  anchor="top"
+                >
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{marker.title}</div>
+                </Popup>
+              )}
+            </Marker>
+          );
+        })}
         {/* Zonas como polígonos */}
         {zonasParaMostrar.map((zone, index) => {
           console.log(`🔍 Renderizando zona ${index}:`, zone);

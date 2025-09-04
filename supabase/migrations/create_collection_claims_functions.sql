@@ -39,21 +39,21 @@ $$ LANGUAGE plpgsql;
 -- Function to add eco credits when claim is completed
 CREATE OR REPLACE FUNCTION sumar_eco_creditos_al_completar_claim() RETURNS TRIGGER AS $$
 DECLARE
-    resident_id uuid;
+    dirigente_id uuid;
     recycler_id uuid;
     creditos_actuales integer;
 BEGIN
     -- Solo actuar si el estado cambió a 'completed'
     IF OLD.status != 'completed' AND NEW.status = 'completed' THEN
         -- Obtener el ID del Dirigente asociado al punto de recolección
-        SELECT user_id INTO resident_id
+        SELECT user_id INTO dirigente_id
         FROM concentration_points
         WHERE id = NEW.concentration_point_id;
         
         -- Sumar 10 EcoCreditos al Dirigente
         UPDATE profiles
         SET eco_creditos = COALESCE(eco_creditos, 0) + 10
-        WHERE user_id = resident_id;
+        WHERE user_id = dirigente_id;
         
         -- También podría dar créditos al reciclador
         recycler_id := NEW.recycler_id;
@@ -69,7 +69,7 @@ BEGIN
             type,
             related_id
         ) VALUES (
-            resident_id,
+            dirigente_id,
             'Recolección Completada',
             'Tu punto de recolección ha sido completado exitosamente. Has ganado 10 EcoCreditos.',
             'concentration_completed',

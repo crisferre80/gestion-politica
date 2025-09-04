@@ -113,7 +113,7 @@ const Chat = () => {
             if (window.history.length > 2) {
               navigate(-1);
             } else {
-              navigate('/dashboard-resident');
+              navigate('/dashboard-dirigente');
             }
           }}
           type="button"

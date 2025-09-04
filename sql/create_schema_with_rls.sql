@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_url text,
   is_admin boolean DEFAULT false,
   online boolean DEFAULT false,
-  role text DEFAULT 'resident', -- role/tipo: resident | recycler | resident_institutional
+  role text DEFAULT 'dirigente', -- role/tipo: dirigente | recycler | dirigente_institutional
   dni text, -- documento de identidad opcional
   eco_creditos integer DEFAULT 0,
   created_at timestamptz DEFAULT now()
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- 3) Tabla concentration_points (puntos / centros / refererencias por barrio)
 CREATE TABLE IF NOT EXISTS concentration_points (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL, -- propietario / creador (residente o institución)
+  user_id uuid NOT NULL, -- propietario / creador (dirigentee o institución)
   address text,
   lat numeric,
   lng numeric,
@@ -341,7 +341,7 @@ DO $$
 BEGIN
   -- profiles: role, dni, eco_creditos
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='role') THEN
-    ALTER TABLE profiles ADD COLUMN role text DEFAULT 'resident';
+    ALTER TABLE profiles ADD COLUMN role text DEFAULT 'dirigente';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='dni') THEN
     ALTER TABLE profiles ADD COLUMN dni text;

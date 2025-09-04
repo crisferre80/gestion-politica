@@ -128,7 +128,7 @@ const JoinPoint: React.FC = () => {
             Sí, unirme
           </button>
           <button
-            onClick={() => navigate('/dashboard-resident')}
+            onClick={() => navigate('/dashboard-dirigente')}
             className="px-6 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition-colors"
           >
             Cancelar

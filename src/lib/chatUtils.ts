@@ -14,14 +14,14 @@ export interface ChatPreview {
 /**
  * Obtiene el último mensaje y el número de mensajes no leídos para cada Dirigente con el que el reciclador tiene conversación.
  * @param recyclerUserId string (user_id del reciclador)
- * @param residentUserIds string[] (user_id de los Dirigentes)
+ * @param dirigenteUserIds string[] (user_id de los Dirigentes)
  */
-export async function getChatPreviews(recyclerUserId: string, residentUserIds: string[]) {
+export async function getChatPreviews(recyclerUserId: string, dirigenteUserIds: string[]) {
   // Buscar los id internos de profiles
   const { data: profiles } = await supabase
     .from('profiles')
     .select('id, user_id, name, avatar_url')
-    .in('user_id', residentUserIds);
+    .in('user_id', dirigenteUserIds);
   if (!profiles) return [];
 
   // Map de user_id a profile
@@ -32,14 +32,14 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
 
   // Para cada Dirigente, obtener el último mensaje y los no leídos
   const previews: ChatPreview[] = [];
-  for (const residentUserId of residentUserIds) {
-    const residentProfile = profileMap[residentUserId];
-    if (!residentProfile) continue;
+  for (const dirigenteUserId of dirigenteUserIds) {
+    const dirigenteProfile = profileMap[dirigenteUserId];
+    if (!dirigenteProfile) continue;
     // Buscar mensajes entre reciclador y Dirigente (usando user_id, no id interno)
     const { data: messages } = await supabase
       .from('messages')
       .select('content, sent_at, sender_id, receiver_id, read')
-      .or(`and(sender_id.eq.${residentUserId},receiver_id.eq.${recyclerUserId}),and(sender_id.eq.${recyclerUserId},receiver_id.eq.${residentUserId})`)
+      .or(`and(sender_id.eq.${dirigenteUserId},receiver_id.eq.${recyclerUserId}),and(sender_id.eq.${recyclerUserId},receiver_id.eq.${dirigenteUserId})`)
       .order('sent_at', { ascending: false })
       .limit(20);
     let lastMessage = undefined;
@@ -51,13 +51,13 @@ export async function getChatPreviews(recyclerUserId: string, residentUserIds: s
       };
       // Mensajes no leídos enviados por el Dirigente al reciclador (usando user_id)
       unreadCount = messages.filter(
-        m => m.sender_id === residentUserId && m.receiver_id === recyclerUserId && m.read === false
+        m => m.sender_id === dirigenteUserId && m.receiver_id === recyclerUserId && m.read === false
       ).length;
     }
     previews.push({
-      userId: residentUserId,
-      name: residentProfile.name,
-      avatar_url: residentProfile.avatar_url,
+      userId: dirigenteUserId,
+      name: dirigenteProfile.name,
+      avatar_url: dirigenteProfile.avatar_url,
       lastMessage,
       unreadCount,
     });

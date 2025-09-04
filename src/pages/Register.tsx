@@ -12,10 +12,10 @@ const Register: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   // userType maps to backend role values. Actualizamos:
-  // 'recycler' => Referente
-  // 'resident' => Vecino
+  // 'referente' => Referente (antes 'recycler')
+  // 'dirigente' => Vecino/Dirigente (antes 'dirigente')
   // 'fiscal' => Fiscal
-  const [userType, setUserType] = useState<'recycler' | 'resident' | 'fiscal'>('resident');
+  const [userType, setUserType] = useState<'referente' | 'dirigente' | 'fiscal'>('dirigente');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
@@ -43,14 +43,14 @@ const Register: React.FC = () => {
       setError('Las contraseñas no coinciden');
       return;
     }
-    if (userType === 'recycler' && !dni.trim()) {
-      setError('El DNI es obligatorio para Dirigentes.');
+    if (userType === 'referente' && !dni.trim()) {
+      setError('El DNI es obligatorio para Referentes.');
       return;
     }
     setLoading(true);
     try {
-      // Si es institucional, el type será 'resident_institutional'
-      const typeToSend = userType; // 'recycler' o 'resident'
+  // Si es institucional, el type será 'dirigente_institutional' (compatibilidad con migraciones antiguas)
+  const typeToSend = userType; // 'referente' o 'dirigente'
       const { data, error } = await signUpUser(email, password, {
         name,
         type: typeToSend,
@@ -58,8 +58,8 @@ const Register: React.FC = () => {
         bio,
         address: undefined,
         materials: materials.split(',').map((m) => m.trim()).filter(Boolean),
-        experience_years: userType === 'recycler' ? experienceYears : undefined,
-        dni: userType === 'recycler' ? dni.trim() : undefined,
+        experience_years: userType === 'referente' ? experienceYears : undefined,
+        dni: userType === 'referente' ? dni.trim() : undefined,
       });
       if (error) {
         // Manejo robusto de errores de usuario ya registrado
@@ -92,7 +92,7 @@ const Register: React.FC = () => {
         }
       }
   // Si es dirigente (recycler) y hay alias, actualizar el perfil con alias
-  if (data?.user && userType === 'recycler' && alias.trim()) {
+  if (data?.user && userType === 'referente' && alias.trim()) {
         try {
           const { updateProfileByUserId } = await import('../lib/profileHelpers');
           await updateProfileByUserId(data.user.id, { alias: alias.trim() });
@@ -187,8 +187,8 @@ const Register: React.FC = () => {
                 <div>
                   <button
                     type="button"
-                    onClick={() => { setUserType('recycler'); }}
-                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${userType === 'recycler' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    onClick={() => { setUserType('referente'); }}
+                      className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${userType === 'referente' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                   >
                     Referente
                   </button>
@@ -196,10 +196,10 @@ const Register: React.FC = () => {
                 <div>
                   <button
                     type="button"
-                    onClick={() => setUserType('resident')}
-                    className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${userType === 'resident' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    onClick={() => setUserType('dirigente')}
+                      className={`w-full py-2 px-3 border rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${userType === 'dirigente' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
                   >
-                    Vecino
+                    Dirigente
                   </button>
                 </div>
                 <div>
@@ -347,7 +347,7 @@ const Register: React.FC = () => {
                 placeholder="Ej: Papel, Plástico, Vidrio"
               />
             </div>
-            {userType === 'recycler' && (
+            {userType === 'referente' && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">
@@ -392,7 +392,7 @@ const Register: React.FC = () => {
               </>
             )}
             {/* Institutional registration removed — only Dirigentes and Referentes supported */}
-            {userType === 'resident' && (
+            {userType === 'dirigente' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700">¿Vives en un edificio/institución? Escribe la dirección colectiva (opcional)</label>
                 <input

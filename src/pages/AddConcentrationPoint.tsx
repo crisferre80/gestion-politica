@@ -289,7 +289,7 @@ const AddconcentrationPoint: React.FC = () => {
       const { data: recyclers } = await supabase
         .from('profiles')
         .select('user_id')
-        .eq('role', 'recycler');
+  .eq('role', 'referente');
       if (recyclers && Array.isArray(recyclers)) {
         for (const recycler of recyclers) {
           try {

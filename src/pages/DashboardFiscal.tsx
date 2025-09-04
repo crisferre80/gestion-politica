@@ -49,14 +49,14 @@ const DashboardFiscal: React.FC = () => {
     [key: string]: unknown;
   };
     const [collectivePoint, setCollectivePoint] = useState<concentrationPoint | null>(null);
-  type Resident = {
+  type dirigente = {
     id: string;
     name?: string;
     email?: string;
     avatar_url?: string;
     user_id?: string;
   };
-  const [associatedResidents, setAssociatedResidents] = useState<Resident[]>([]);
+  const [associateddirigentes, setAssociateddirigentes] = useState<dirigente[]>([]);
   const [loading, setLoading] = useState(true);
   type Recycler = {
     id: string;
@@ -103,9 +103,9 @@ const DashboardFiscal: React.FC = () => {
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
   // Estado para detalle de Dirigente seleccionado
-  const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
-  const [residentPoints, setResidentPoints] = useState<concentrationPoint[]>([]);
-  const [residentLoading, setResidentLoading] = useState(false);
+  const [selecteddirigente, setSelecteddirigente] = useState<dirigente | null>(null);
+  const [dirigentePoints, setdirigentePoints] = useState<concentrationPoint[]>([]);
+  const [dirigenteLoading, setdirigenteLoading] = useState(false);
   const [totals, setTotals] = useState<{ materiales: Record<string, number>; autos: number }>({ materiales: {}, autos: 0 });
 
   // Estado para el reclamo del punto colectivo
@@ -131,8 +131,8 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
   useEffect(() => {
   // Permitimos el acceso aquí a Dirigentes ('recycler'), Referentes y usuarios institucionales (fiscal)
   if (!user) return;
-  // Si no es recycler, resident o fiscal, salir
-  if (user.type !== 'recycler' && user.type !== 'resident' && user.type !== 'fiscal' && user.role !== 'fiscal') return;
+  // Si no es recycler, dirigente o fiscal, salir
+  if (user.type !== 'recycler' && user.type !== 'dirigente' && user.type !== 'fiscal' && user.role !== 'fiscal') return;
     const fetchData = async () => {
       // Buscar el punto colectivo creado por este usuario
       const { data: points } = await supabase
@@ -150,17 +150,17 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
       // Buscar Dirigentes asociados a la misma dirección
       if (points && points.length > 0) {
         console.log('Punto colectivo encontrado:', points[0]);
-        const { data: residents, error: residentsError } = await supabase
+        const { data: dirigentes, error: dirigentesError } = await supabase
           .from('profiles')
           .select('id, name, email, avatar_url, user_id')
           .eq('address', points[0].address)
           .neq('user_id', user.id);
         
-        if (residentsError) {
-          console.error('Error al buscar Dirigentes asociados:', residentsError);
+        if (dirigentesError) {
+          console.error('Error al buscar Dirigentes asociados:', dirigentesError);
         } else {
-          console.log('Dirigentes asociados encontrados:', residents);
-          setAssociatedResidents(residents || []);
+          console.log('Dirigentes asociados encontrados:', dirigentes);
+          setAssociateddirigentes(dirigentes || []);
         }
       }
       setLoading(false);
@@ -190,7 +190,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
         alert('Error al eliminar el punto: ' + error.message);
       } else {
         setCollectivePoint(null);
-        setAssociatedResidents([]);
+        setAssociateddirigentes([]);
       }
     }
   };
@@ -204,7 +204,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
           event: '*',
           schema: 'public',
           table: 'profiles',
-          filter: 'role=eq.recycler',
+          filter: 'role=eq.referente',
         },
         (payload) => {
           const newRec = payload.new as ProfileRealtimePayload;
@@ -384,12 +384,12 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
   // Calcular totales de materiales y autos de todos los Dirigentes asociados
   useEffect(() => {
     const fetchTotals = async () => {
-      if (associatedResidents.length === 0) {
+      if (associateddirigentes.length === 0) {
         setTotals({ materiales: {}, autos: 0 });
         return;
       }
       // Buscar todos los Centros de Movilizaciòn de los Dirigentes asociados
-      const userIds = associatedResidents.map(r => r.user_id || r.id);
+      const userIds = associateddirigentes.map(r => r.user_id || r.id);
       console.log('Calculando totales para user_ids:', userIds);
       
       const { data: points } = await supabase
@@ -412,14 +412,14 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
       setTotals({ materiales, autos });
     };
     fetchTotals();
-  }, [associatedResidents]);
+  }, [associateddirigentes]);
 
   // Al seleccionar un Dirigente, buscar todos sus Centros de Movilizaciòn
-  const handleSelectResident = async (res: Resident) => {
+  const handleSelectdirigente = async (res: dirigente) => {
     console.log('Seleccionando Dirigente:', res);
-    setSelectedResident(res);
-    setResidentLoading(true);
-    setResidentPoints([]);
+    setSelecteddirigente(res);
+    setdirigenteLoading(true);
+    setdirigentePoints([]);
     
     try {
       // Buscar por user_id que es lo que se almacena en concentration_points
@@ -435,18 +435,18 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
         console.error('Error al buscar puntos del Dirigente:', error);
       } else {
         console.log('Puntos encontrados para el Dirigente:', points);
-        setResidentPoints(points || []);
+        setdirigentePoints(points || []);
       }
     } catch (err) {
       console.error('Error inesperado:', err);
     } finally {
-      setResidentLoading(false);
+      setdirigenteLoading(false);
     }
   };
 
   // Permitir acceso a usuarios institucionales por tipo o por rol 'fiscal'
-  if (!user || (user.type !== 'resident_institutional' && user.role !== 'fiscal')) {
-    return <div className="p-8 text-center text-red-600">Acceso solo para usuarios institucionales.</div>;
+  if (!user || (user.type !== 'fiscal' && user.role !== 'fiscal')) {
+    return <div className="p-8 text-center text-red-600">Acceso solo para usuarios institucionales (fiscal).</div>;
   }
 
   return (
@@ -574,11 +574,11 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
           
           <div className="bg-white rounded-lg shadow p-4 mb-6">
             <h2 className="text-xl font-semibold mb-2">Dirigentes Asociados</h2>
-            {associatedResidents.length > 0 ? (
+            {associateddirigentes.length > 0 ? (
               <ul className="divide-y">
-                {associatedResidents.map(res => (
+                {associateddirigentes.map(res => (
                   <li key={res.id} className="py-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded transition"
-                    onClick={() => handleSelectResident(res)}
+                    onClick={() => handleSelectdirigente(res)}
                   >
                     <img src={getAvatarUrl(res.avatar_url, res.name)} alt={res.name} className="w-8 h-8 rounded-full" />
                     <span>{res.name} ({res.email})</span>
@@ -595,7 +595,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
                           if (error) {
                             alert('Error al eliminar la asociación: ' + error.message);
                           } else {
-                            setAssociatedResidents(prev => prev.filter(r => r.id !== res.id));
+                            setAssociateddirigentes(prev => prev.filter(r => r.id !== res.id));
                           }
                         }
                       }}
@@ -609,14 +609,14 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
               <div>No hay Dirigentes asociados a este punto colectivo.</div>
             )}
             {/* Detalle del Dirigente seleccionado */}
-            {selectedResident && (
+            {selecteddirigente && (
               <div className="mt-4 p-4 bg-gray-50 rounded shadow">
-                <h3 className="font-bold text-lg mb-2">Centros de Movilizaciòn de {selectedResident.name}</h3>
-                {residentLoading ? (
+                <h3 className="font-bold text-lg mb-2">Centros de Movilizaciòn de {selecteddirigente.name}</h3>
+                {dirigenteLoading ? (
                   <div>Cargando Centros de Movilizaciòn...</div>
-                ) : residentPoints.length > 0 ? (
+                ) : dirigentePoints.length > 0 ? (
                   <div className="space-y-3">
-                    {residentPoints.map((point, index) => (
+                    {dirigentePoints.map((point, index) => (
                       <div key={point.id} className="p-4 bg-white rounded border shadow-sm">
                         <h4 className="font-semibold text-md mb-3 text-blue-600">Punto #{index + 1}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -660,13 +660,13 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
                       </div>
                     ))}
                     <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                      <b>Total de puntos:</b> {residentPoints.length}
+                      <b>Total de puntos:</b> {dirigentePoints.length}
                     </div>
                   </div>
                 ) : (
                   <div>Este Dirigente no tiene Centros de Movilizaciòn propios.</div>
                 )}
-                <button className="mt-2 px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm" onClick={() => setSelectedResident(null)}>Cerrar</button>
+                <button className="mt-2 px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 text-sm" onClick={() => setSelecteddirigente(null)}>Cerrar</button>
               </div>
             )}
             {/* Totales de materiales y autos de todos los Dirigentes */}

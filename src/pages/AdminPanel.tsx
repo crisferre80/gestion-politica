@@ -9,7 +9,7 @@ import { TerraDraw } from "terra-draw";
 import { TerraDrawMapboxGLAdapter } from "terra-draw-mapbox-gl-adapter";
 import mapboxgl from "mapbox-gl";
 import { TerraDrawPolygonMode, TerraDrawLineStringMode, TerraDrawPointMode, TerraDrawCircleMode, TerraDrawRectangleMode, TerraDrawSelectMode } from "terra-draw";
-import type { Feature, Featureconcentration, Polygon } from "geojson";
+import type { Feature, FeatureCollection, Polygon } from "geojson";
 
 interface UserRow {
   avatar_url: string | null;
@@ -36,7 +36,7 @@ interface concentrationPoint {
   id: string;
   location: string;
   user_id: string;
-  resident_id?: string; // Añadido para evitar error de propiedad inexistente
+  dirigente_id?: string; // Añadido para evitar error de propiedad inexistente
 }
 
 const AdminPanel: React.FC = () => {
@@ -60,7 +60,7 @@ const AdminPanel: React.FC = () => {
   const [showModal, setShowModal] = useState(false); // Estado para mostrar el modal
   const [selectedRecycler, setSelectedRecycler] = useState<UserRow | null>(null);
   const [showPointsModal, setShowPointsModal] = useState(false);
-  const [residentPoints, setResidentPoints] = useState<concentrationPoint[]>([]);
+  const [dirigentePoints, setdirigentePoints] = useState<concentrationPoint[]>([]);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const [terraDrawInstance, setTerraDrawInstance] = useState<TerraDraw | null>(null);
   const [selectedTool, setSelectedTool] = useState<string>("Polygon");
@@ -238,9 +238,9 @@ const AdminPanel: React.FC = () => {
 
       // Filtrar usuarios según el tipo de notificación seleccionado
       if (notifType === 'Dirigentes') {
-        filteredUsers = users.filter(user => user.role === 'recycler');
+  filteredUsers = users.filter(user => user.role === 'referente');
       } else if (notifType === 'Referentes') {
-        filteredUsers = users.filter(user => user.role === 'resident');
+  filteredUsers = users.filter(user => user.role === 'dirigente');
       } else if (notifType === 'Individual' && selectedUser) {
         filteredUsers = [selectedUser];
       }
@@ -312,7 +312,7 @@ const AdminPanel: React.FC = () => {
   // Cargar Dirigentes para asignación
   useEffect(() => {
     const fetchRecyclers = async () => {
-      const { data } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url').eq('role', 'recycler');
+  const { data } = await supabase.from('profiles').select('id, user_id, name, email, role, avatar_url').eq('role', 'referente');
       if (data) setRecyclers(data as UserRow[]);
     };
     fetchRecyclers();
@@ -361,7 +361,7 @@ const AdminPanel: React.FC = () => {
     await refreshData();
   };
 
-  const fetchResidentPoints = async (userId: string) => {
+  const fetchdirigentePoints = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('concentration_points')
@@ -372,16 +372,16 @@ const AdminPanel: React.FC = () => {
         throw new Error(`Error al obtener Centros de Movilizaciòn: ${error.message}`);
       }
 
-      setResidentPoints(data || []);
+      setdirigentePoints(data || []);
     } catch (error) {
-      console.error('Error fetching resident points:', error);
+      console.error('Error fetching dirigente points:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       alert(errorMessage);
     }
   };
 
   const handleShowPoints = async (userId: string) => {
-    await fetchResidentPoints(userId);
+    await fetchdirigentePoints(userId);
     setShowPointsModal(true);
   };
 
@@ -420,10 +420,10 @@ const AdminPanel: React.FC = () => {
     const geojsonData = typeof zone.coordinates === "string"
       ? JSON.parse(zone.coordinates)
       : zone.coordinates;
-    let polygonGeoJSON: Featureconcentration<Polygon> | null = null;
+    let polygonGeoJSON: FeatureCollection<Polygon> | null = null;
     if (
       geojsonData &&
-      geojsonData.type === "Featureconcentration" &&
+      geojsonData.type === "FeatureCollection" &&
       Array.isArray(geojsonData.features) &&
       geojsonData.features.length > 2 &&
       geojsonData.features.every((f: Feature) => f.geometry.type === "Point")
@@ -438,7 +438,7 @@ const AdminPanel: React.FC = () => {
         coords.push(coords[0]);
       }
       polygonGeoJSON = {
-        type: "Featureconcentration",
+        type: "FeatureCollection",
         features: [
           {
             type: "Feature",
@@ -453,12 +453,12 @@ const AdminPanel: React.FC = () => {
       };
     } else if (
       geojsonData &&
-      geojsonData.type === "Featureconcentration" &&
+      geojsonData.type === "FeatureCollection" &&
       Array.isArray(geojsonData.features) &&
       geojsonData.features.length > 0 &&
       geojsonData.features[0].geometry.type === "Polygon"
     ) {
-      polygonGeoJSON = geojsonData as Featureconcentration<Polygon>;
+      polygonGeoJSON = geojsonData as FeatureCollection<Polygon>;
     }
     if (polygonGeoJSON && polygonGeoJSON.features.length > 0) {
       // Limpiar fuente/capa si existe
@@ -553,11 +553,11 @@ const AdminPanel: React.FC = () => {
     }
   }, [terraDrawInstance]);
 
-  const handleSaveZones = useCallback(async (geojson: GeoJSON.Featureconcentration) => {
+  const handleSaveZones = useCallback(async (geojson: GeoJSON.FeatureCollection) => {
     try {
       // Convertir polígonos a puntos GeoJSON
-      const pointsGeoJSON: GeoJSON.Featureconcentration = {
-        type: "Featureconcentration",
+      const pointsGeoJSON: GeoJSON.FeatureCollection = {
+        type: "FeatureCollection",
         features: geojson.features.flatMap((feature) => {
           if (feature.geometry.type === "Polygon") {
             const coordinates = feature.geometry.coordinates[0]; // Obtener los vértices del polígono
@@ -573,14 +573,14 @@ const AdminPanel: React.FC = () => {
           return [feature]; // Mantener otros tipos de geometría sin cambios
         }).flat(),
       };
-
+  
       const { error } = await supabase.from("zones").insert({
         coordinates: pointsGeoJSON,
         name: zoneName || "Zona generada",
         color: zoneColor || "#FF0000",
         user_id: "a2a423a1-ac51-4a6b-8588-34918d8d81df", // ID de usuario por defecto
       }).select("coordinates, name, color");
-
+  
       if (error) {
         console.error("Error al guardar zonas como puntos GeoJSON:", error);
         alert("No se pudo guardar las zonas como puntos GeoJSON.");
@@ -845,9 +845,9 @@ const AdminPanel: React.FC = () => {
                 Dirigentes
               </button>
               <button
-                onClick={() => setUserFilter("resident")}
+                onClick={() => setUserFilter("dirigente")}
                 className={`px-3 py-1 text-sm rounded-lg font-semibold transition-all ${
-                  userFilter === "resident" 
+                  userFilter === "dirigente" 
                     ? "bg-orange-600 text-white" 
                     : "bg-gray-200 text-gray-800 hover:bg-gray-300"
                 }`}
@@ -868,10 +868,10 @@ const AdminPanel: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-lg font-semibold truncate">{user.name}</p>
                       <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                      <p className="text-sm font-medium" style={{ color: user.role === 'admin' ? 'blue' : user.role === 'recycler' ? 'blue' : user.role === 'resident_institutional' ? 'purple' : 'orange' }}>
-                        {user.role === 'admin' ? 'Administrador' : user.role === 'recycler' ? 'Reciclador' : user.role === 'resident_institutional' ? 'Dirigente Institucional' : 'Dirigente'}
+                      <p className="text-sm font-medium" style={{ color: user.role === 'admin' ? 'blue' : user.role === 'referente' ? 'blue' : user.role === 'fiscal' ? 'purple' : 'orange' }}>
+                        {user.role === 'admin' ? 'Administrador' : user.role === 'referente' ? 'Referente' : user.role === 'fiscal' ? 'Fiscal' : 'Dirigente'}
                       </p>
-                      {user.role === 'resident' && (
+                      {user.role === 'dirigente' && (
                         <div className="mt-2">
                           <h4 className="text-sm font-semibold">Centros de Movilizaciòn:</h4>
                           <ul className="list-disc pl-5">
@@ -881,7 +881,7 @@ const AdminPanel: React.FC = () => {
                           </ul>
                         </div>
                       )}
-                      {user.role === 'resident_institutional' && (
+                      {user.role === 'fiscal' && (
                         <div className="mt-2">
                           <h4 className="text-sm font-semibold">Punto Colectivo:</h4>
                           <ul className="list-disc pl-5">
@@ -899,7 +899,7 @@ const AdminPanel: React.FC = () => {
                       >
                         <span>Eliminar Usuario</span>
                       </button>
-                      {(user.role === 'resident' || user.role === 'resident_institutional') && (
+                      {(user.role === 'dirigente' || user.role === 'fiscal') && (
                         <button
                           onClick={() => handleShowPoints(user.user_id)}
                           className="relative px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
@@ -996,9 +996,9 @@ const AdminPanel: React.FC = () => {
                         // Filtrar usuarios según el tipo seleccionado
                         let filteredUsers = users;
                         if (notifType === 'Dirigentes') {
-                          filteredUsers = users.filter(user => user.role === 'recycler');
+                          filteredUsers = users.filter(user => user.role === 'referente');
                         } else if (notifType === 'Referentes') {
-                          filteredUsers = users.filter(user => user.role === 'resident');
+                          filteredUsers = users.filter(user => user.role === 'dirigente');
                         }
                         
                         // Extraer y copiar los emails al portapapeles
@@ -1201,7 +1201,7 @@ const AdminPanel: React.FC = () => {
               if (terraDrawInstance) {
                 const geojson = terraDrawInstance.getSnapshot();
                 handleSaveZones({
-                  type: "Featureconcentration",
+                  type: "FeatureCollection",
                   features: geojson,
                 });
               }
@@ -1257,11 +1257,11 @@ const AdminPanel: React.FC = () => {
         <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center">
           <div className="bg-white rounded-lg p-4 w-96 sm:w-[32rem]">
             <h3 className="text-lg font-semibold mb-4">Centros de Movilizaciòn</h3>
-            {residentPoints.length === 0 ? (
+            {dirigentePoints.length === 0 ? (
               <p className="text-sm text-gray-500">No hay Centros de Movilizaciòn creados por este Dirigente.</p>
             ) : (
               <ul className="space-y-2">
-                {residentPoints.map((point: concentrationPoint) => (
+                {dirigentePoints.map((point: concentrationPoint) => (
                   <li key={point.id} className="flex items-center justify-between p-1 border rounded-lg text-sm">
                     <span className="truncate w-4/5 h-6">{point.address}</span>
                     <select
@@ -1269,7 +1269,7 @@ const AdminPanel: React.FC = () => {
                       className="px-0.5 py-2 text-xs rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-600 w-1/5"
                     >
                       <option value="">--Reciclador--</option>
-                      {users.filter((user: UserRow) => user.role === 'recycler').map((recycler: UserRow) => (
+                      {users.filter((user: UserRow) => user.role === 'referente').map((recycler: UserRow) => (
                         <option key={recycler.id} value={recycler.id}>{recycler.name}</option>
                       ))}
                     </select>

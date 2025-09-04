@@ -188,10 +188,8 @@ export interface User {
   email: string;
   phone?: string;
   address?: string;
-  // Tipos de usuario: se incluyen variantes históricas y el tipo 'fiscal'
-  // 'resident' -> vecino/dirigente, 'recycler' -> referente/dirigente técnico
-  // 'resident_institutional' se mantuvo para compatibilidad con migraciones antiguas
-  type: 'resident' | 'recycler' | 'fiscal' | 'resident_institutional';
+  // Tipos de usuario actuales: 'dirigente' (antes 'dirigente'), 'referente' (antes 'recycler'), 'fiscal'
+  type: 'dirigente' | 'referente' | 'fiscal' | string;
   avatar_url?: string;
   online?: boolean;
   materials?: string[];
@@ -202,6 +200,9 @@ export interface User {
 }
 
 export type concentrationPoint = {
+  creator_phone: ReactNode;
+  neighbourhood: string;
+  barrio: string;
   creator_dni: string | undefined;
   additional_info: unknown;
   user_id: string;
@@ -415,7 +416,7 @@ export async function signInUser(email: string, password: string) {
           user_id: authData.user.id,
           email: authData.user.email!,
           name: authData.user.user_metadata.name || '',
-          role: authData.user.user_metadata.type || 'resident',
+          role: authData.user.user_metadata.type || 'dirigente',
         }
       ]);
 

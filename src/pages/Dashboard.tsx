@@ -27,11 +27,18 @@ const Dashboard: React.FC = () => {
   if (user.role === 'fiscal') {
     return <DashboardFiscal />;
   }
-  if (user.type === 'recycler') {
+  // Mostrar panel de Referente si el usuario tiene rol 'referente' o type 'recycler'
+  if (user.role === 'referente' || user.type === 'recycler') {
     return <DashboardReferente />;
   }
-  // Cualquier otro tipo (antes existía 'resident_institutional') se muestra como Referente (DashboardDirigente)
-  return <DashboardDirigente />;
+
+  // Mostrar panel de Dirigente si explícitamente es un dirigente
+  if (user.role === 'dirigente' || user.type === 'dirigente') {
+    return <DashboardDirigente />;
+  }
+
+  // Fallback: mostrar el panel del Referente por defecto para usuarios no administrativos
+  return <DashboardReferente />;
 };
 
 export default Dashboard;

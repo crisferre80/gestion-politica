@@ -1,7 +1,7 @@
--- Create collection_claims table
-create table public.collection_claims (
+-- Create concentration_claims table
+create table public.concentration_claims (
   id uuid not null default gen_random_uuid (),
-  collection_point_id uuid null,
+  concentration_point_id uuid null,
   recycler_id uuid null,
   user_id uuid null,
   status text null default 'claimed'::text,
@@ -11,11 +11,11 @@ create table public.collection_claims (
   cancellation_reason text null,
   cancelled_at text null,
   completed_at timestamp with time zone null,
-  constraint collection_claims_pkey primary key (id),
-  constraint unique_active_claim_per_point unique (collection_point_id) deferrable,
-  constraint collection_claims_collection_point_id_fkey foreign KEY (collection_point_id) references collection_points (id) on delete CASCADE,
-  constraint collection_claims_recycler_id_fkey foreign KEY (recycler_id) references profiles (user_id) on delete CASCADE,
-  constraint collection_claims_user_id_fkey foreign KEY (user_id) references profiles (user_id) on delete CASCADE,
+  constraint concentration_claims_pkey primary key (id),
+  constraint unique_active_claim_per_point unique (concentration_point_id) deferrable,
+  constraint concentration_claims_concentration_point_id_fkey foreign KEY (concentration_point_id) references concentration_points (id) on delete CASCADE,
+  constraint concentration_claims_recycler_id_fkey foreign KEY (recycler_id) references profiles (user_id) on delete CASCADE,
+  constraint concentration_claims_user_id_fkey foreign KEY (user_id) references profiles (user_id) on delete CASCADE,
   constraint trg_prevent_duplicate_active_claims TRIGGER deferrable
 ) TABLESPACE pg_default;
 
@@ -23,21 +23,21 @@ create table public.collection_claims (
 create constraint TRIGGER trg_prevent_duplicate_active_claims
 after INSERT
 or
-update on collection_claims deferrable initially IMMEDIATE for EACH row
+update on concentration_claims deferrable initially IMMEDIATE for EACH row
 execute FUNCTION prevent_duplicate_active_claims ();
 
 -- Create trigger to set point as claimed
 create trigger trg_set_point_claimed_on_claim
-after INSERT on collection_claims for EACH row
+after INSERT on concentration_claims for EACH row
 execute FUNCTION set_point_claimed_on_claim ();
 
 -- Create trigger to add eco credits when claim is completed
 create trigger trg_sumar_eco_creditos_al_completar_claim
 after
-update on collection_claims for EACH row
+update on concentration_claims for EACH row
 execute FUNCTION sumar_eco_creditos_al_completar_claim ();
 
 -- Create trigger to update the updated_at field
-create trigger trg_update_collection_claims_updated_at BEFORE
-update on collection_claims for EACH row
-execute FUNCTION update_collection_claims_updated_at ();
+create trigger trg_update_concentration_claims_updated_at BEFORE
+update on concentration_claims for EACH row
+execute FUNCTION update_concentration_claims_updated_at ();

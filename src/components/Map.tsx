@@ -153,12 +153,12 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
               coords = [];
             }
           }
-          // Caso 3: FeatureCollection de GeoJSON
-          else if (z.coordinates && typeof z.coordinates === 'object' && (z.coordinates as { type?: string }).type === 'FeatureCollection') {
+          // Caso 3: Featureconcentration de GeoJSON
+          else if (z.coordinates && typeof z.coordinates === 'object' && (z.coordinates as { type?: string }).type === 'Featureconcentration') {
             try {
-              console.log(`🗺️ Convirtiendo FeatureCollection para ${z.name}`);
-              const featureCollection = z.coordinates as { features?: unknown[] };
-              const features = featureCollection.features;
+              console.log(`🗺️ Convirtiendo Featureconcentration para ${z.name}`);
+              const featureconcentration = z.coordinates as { features?: unknown[] };
+              const features = featureconcentration.features;
               
               console.log(`📋 Features encontrados:`, features);
               console.log(`🔢 Número de features:`, features?.length || 0);
@@ -235,13 +235,13 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                 });
                 
                 coords = extractedCoords;
-                console.log(`✅ Coordenadas extraídas de FeatureCollection para ${z.name}:`, coords);
+                console.log(`✅ Coordenadas extraídas de Featureconcentration para ${z.name}:`, coords);
                 console.log(`🔢 Total de polígonos extraídos: ${coords.length}`);
               } else {
                 console.log(`❌ Features no es un array válido o está vacío:`, features);
               }
             } catch (geoError) {
-              console.warn(`❌ Error processing FeatureCollection for zone ${z.id}:`, geoError);
+              console.warn(`❌ Error processing Featureconcentration for zone ${z.id}:`, geoError);
               coords = [];
             }
           }
@@ -553,7 +553,7 @@ const MapboxPolygon: React.FC<MapboxPolygonProps> = ({
                       ? '/assets/iconescuela.png'
                       : marker.type === 'colective_point'
                       ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756873463/iconescuela_loziof.png'
-                      : marker.role === 'collection_point'
+                      : marker.role === 'concentration_point'
                       ? '/assets/recycling-marker.svg' // Icono para punto colectivo genérico
                       : marker.role === 'available'
                       ? '/assets/Punto_de_Recoleccion_Verde.png'

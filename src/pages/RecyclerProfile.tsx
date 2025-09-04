@@ -25,26 +25,48 @@ const RecyclerProfile: React.FC = () => {
   const fetchProfile = React.useCallback(async () => {
     setLoading(true);
     setError('');
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', id)
-      .single();
-    if (error || !data) {
+    try {
+      const { resolveProfileRow } = await import('../lib/profileHelpers');
+      const data = await resolveProfileRow(id || '');
+      if (!data) {
+        setError('No se pudo cargar el perfil');
+        setLoading(false);
+        return;
+      }
+      if (!data) {
+        setError('No se pudo cargar el perfil');
+        setLoading(false);
+        return;
+      }
+    
+    } catch (err) {
       setError('No se pudo cargar el perfil');
       setLoading(false);
       return;
     }
-    setEditName(data.name || '');
-    setEditEmail(data.email || '');
-    setEditPhone(data.phone || '');
-    setEditAddress(data.address || '');
-    setEditBio(data.bio || '');
-    setEditMaterials(Array.isArray(data.materials) ? data.materials.join(', ') : '');
-    setEditAlias(data.alias || '');
-    setEditDni(data.dni || '');
-    setAvatarUrl(data.avatar_url || '');
-    setLoading(false);
+    // ahora recargamos el perfil usando la misma lógica
+    try {
+      const { resolveProfileRow } = await import('../lib/profileHelpers');
+      const profile = await resolveProfileRow(id || '');
+      if (!profile) {
+        setError('No se pudo cargar el perfil');
+        setLoading(false);
+        return;
+      }
+      setEditName(profile.name || '');
+      setEditEmail(profile.email || '');
+      setEditPhone(profile.phone || '');
+      setEditAddress(profile.address || '');
+      setEditBio(profile.bio || '');
+      setEditMaterials(Array.isArray(profile.materials) ? profile.materials.join(', ') : '');
+      setEditAlias(profile.alias || '');
+      setEditDni(profile.dni || '');
+      setAvatarUrl(profile.avatar_url || '');
+      setLoading(false);
+    } catch (e) {
+      setError('No se pudo cargar el perfil');
+      setLoading(false);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -113,8 +135,13 @@ const RecyclerProfile: React.FC = () => {
                       const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
                       const publicUrl = data.publicUrl;
                       if (!publicUrl) throw new Error('No se pudo obtener la URL de la imagen');
-                      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('user_id', id);
-                      if (updateError) throw new Error('No se pudo actualizar el perfil con la foto');
+                      try {
+                        const { updateProfileByUserId } = await import('../lib/profileHelpers');
+                        const res = await updateProfileByUserId(id || '', { avatar_url: publicUrl });
+                        if (res.error) throw new Error('No se pudo actualizar el perfil con la foto');
+                      } catch (err) {
+                        throw new Error('No se pudo actualizar el perfil con la foto');
+                      }
                       setAvatarUrl(publicUrl);
                     } catch {
                       // Puedes mostrar un toast de error
@@ -134,7 +161,13 @@ const RecyclerProfile: React.FC = () => {
                     }
                     if (editAlias && editAlias.trim()) updateObj.alias = editAlias.trim();
                     if (editDni && editDni.trim()) updateObj.dni = editDni.trim();
-                    await supabase.from('profiles').update(updateObj).eq('user_id', id);
+                    try {
+                      const { updateProfileByUserId } = await import('../lib/profileHelpers');
+                      const res = await updateProfileByUserId(id || '', updateObj);
+                      if (res.error) console.warn('No se pudo actualizar el perfil:', res.error);
+                    } catch (err) {
+                      console.warn('No se pudo actualizar el perfil:', err);
+                    }
                     await fetchProfile(); // <-- Refresca el perfil tras actualizar
                   }}>
                     <div>

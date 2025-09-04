@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { TrendingUp, Package, Star } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, checkTableExists } from '../lib/supabase';
 import 'chart.js/auto';
 
 interface EstadisticasPanelProps {
@@ -34,11 +34,29 @@ const EstadisticasPanel: React.FC<EstadisticasPanelProps> = ({ userId }) => {
           .from('concentration_points')
           .select('id, created_at, user_id, status')
           .eq('user_id', userId);
-        // Reclamos por mes y estado SOLO del usuario
-        const { data: claims } = await supabase
-          .from('collection_claims')
-          .select('id, created_at, status, completed_at, cancelled_at')
-          .eq('user_id', userId);
+        // Reclamos por mes y estado SOLO del usuario. Antes de consultar,
+        // verificamos que la tabla exista para evitar errores 400/404 en
+        // instalaciones sin esa migración.
+        let claims: any[] = [];
+        const hasClaimsTable = await checkTableExists('concentration_claims');
+        if (hasClaimsTable) {
+          try {
+            const { data: maybeClaims, error: claimsError } = await supabase
+              .from('concentration_claims')
+              .select('id, created_at, status, completed_at, cancelled_at')
+              .eq('user_id', userId)
+              .limit(100);
+            if (!claimsError && maybeClaims) {
+              claims = maybeClaims;
+            }
+          } catch (err) {
+            // Si la consulta falla por cualquier motivo devolvemos array vacío.
+            claims = [];
+          }
+        } else {
+          // Tabla no disponible: dejamos claims vacío para mostrar 0s en gráficos.
+          claims = [];
+        }
         const now = new Date();
         const months = Array.from({ length: 12 }, (_, i) => {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);

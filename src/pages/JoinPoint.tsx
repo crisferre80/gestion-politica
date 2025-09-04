@@ -70,21 +70,25 @@ const JoinPoint: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Actualizar el perfil del Dirigente con la dirección del punto
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ address: pointInfo.address })
-      .eq('user_id', user.id);
+      // Actualizar el perfil del Dirigente con la dirección del punto
+      try {
+        const { updateProfileByUserId } = await import('../lib/profileHelpers');
+        const res = await updateProfileByUserId(user.id, { address: pointInfo.address });
+        if (res.error) {
+          setError('Hubo un error al unirte al punto. Intenta de nuevo.');
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        setError('Hubo un error al unirte al punto. Intenta de nuevo.');
+        setLoading(false);
+        return;
+      }
 
-    if (updateError) {
-      setError('Hubo un error al unirte al punto. Inténtalo de nuevo.');
-      setLoading(false);
-    } else {
       setSuccess(true);
       setTimeout(() => {
         navigate('/dashboard');
       }, 3000);
-    }
   };
 
   if (loading) {

@@ -7,11 +7,75 @@
 DROP TABLE IF EXISTS user_statistics CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS recycler_ratings CASCADE;
-DROP TABLE IF EXISTS collection_claims CASCADE;
-DROP TABLE IF EXISTS collection_points CASCADE;
+DROP TABLE IF EXISTS concentration_claims CASCADE;
+DROP TABLE IF EXISTS concentration_points CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS advertisements CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
+
+CREATE TABLE concentration_points (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  address text,
+  lat double precision,
+  lng double precision,
+  type text DEFAULT 'individual',
+  photo_url text NULL,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Add index for concentration_points
+CREATE INDEX IF NOT EXISTS idx_concentration_points_user_id ON concentration_points(user_id);
+CREATE INDEX IF NOT EXISTS idx_concentration_points_type ON concentration_points(type);
+
+-- RLS for concentration_points
+ALTER TABLE concentration_points ENABLE ROW LEVEL SECURITY;
+
+-- SELECT: propietario puede ver sus puntos; admins pueden ver todos
+DROP POLICY IF EXISTS "concentration_points_select_owner_or_admin" ON concentration_points;
+CREATE POLICY "concentration_points_select_owner_or_admin" ON concentration_points
+  FOR SELECT USING (
+    user_id = auth.uid()::uuid
+    OR (EXISTS (SELECT 1 FROM profiles p2 WHERE p2.user_id = auth.uid()::uuid AND p2.is_admin = true))
+  );
+
+-- INSERT: el user_id debe coincidir con auth.uid() o admin
+DROP POLICY IF EXISTS "concentration_points_insert_owner" ON concentration_points;
+CREATE POLICY "concentration_points_insert_owner" ON concentration_points
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid()::uuid
+    OR (EXISTS (SELECT 1 FROM profiles p2 WHERE p2.user_id = auth.uid()::uuid AND p2.is_admin = true))
+  );
+
+-- UPDATE: propietario o admin
+DROP POLICY IF EXISTS "concentration_points_update_owner_or_admin" ON concentration_points;
+CREATE POLICY "concentration_points_update_owner_or_admin" ON concentration_points
+  FOR UPDATE USING (
+    user_id = auth.uid()::uuid
+    OR (EXISTS (SELECT 1 FROM profiles p2 WHERE p2.user_id = auth.uid()::uuid AND p2.is_admin = true))
+  ) WITH CHECK (
+    user_id = auth.uid()::uuid
+    OR (EXISTS (SELECT 1 FROM profiles p2 WHERE p2.user_id = auth.uid()::uuid AND p2.is_admin = true))
+  );
+
+-- DELETE: propietario o admin
+DROP POLICY IF EXISTS "concentration_points_delete_owner_or_admin" ON concentration_points;
+CREATE POLICY "concentration_points_delete_owner_or_admin" ON concentration_points
+  FOR DELETE USING (
+    user_id = auth.uid()::uuid
+    OR (EXISTS (SELECT 1 FROM profiles p2 WHERE p2.user_id = auth.uid()::uuid AND p2.is_admin = true))
+  );
+
+-- Add trigger for concentration_points updated_at
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'concentration_points_updated_at_trg') THEN
+    CREATE TRIGGER concentration_points_updated_at_trg
+    BEFORE UPDATE ON concentration_points
+    FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+  END IF;
+END$$;
 
 -- =========================
 -- TABLAS PRINCIPALES
@@ -61,14 +125,14 @@ CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications(user_id);
 
 CREATE TABLE user_statistics (
   user_id uuid PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
-  collections_completed integer DEFAULT 0,
-  collections_cancelled integer DEFAULT 0,
+  concentrations_completed integer DEFAULT 0,
+  concentrations_cancelled integer DEFAULT 0,
   last_active_at timestamptz,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
 
-CREATE TABLE collection_points (
+CREATE TABLE concentration_points (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
   address text,
@@ -80,9 +144,9 @@ CREATE TABLE collection_points (
   updated_at timestamptz DEFAULT now()
 );
 
-CREATE TABLE collection_claims (
+CREATE TABLE concentration_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  collection_point_id uuid REFERENCES collection_points(id) ON DELETE CASCADE,
+  concentration_point_id uuid REFERENCES concentration_points(id) ON DELETE CASCADE,
   recycler_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
   status text DEFAULT 'claimed',
@@ -145,29 +209,29 @@ CREATE TRIGGER trg_update_user_statistics_updated_at
 BEFORE UPDATE ON user_statistics
 FOR EACH ROW EXECUTE FUNCTION update_user_statistics_updated_at();
 
-CREATE OR REPLACE FUNCTION update_collection_points_updated_at() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION update_concentration_points_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_collection_points_updated_at ON collection_points;
-CREATE TRIGGER trg_update_collection_points_updated_at
-BEFORE UPDATE ON collection_points
-FOR EACH ROW EXECUTE FUNCTION update_collection_points_updated_at();
+DROP TRIGGER IF EXISTS trg_update_concentration_points_updated_at ON concentration_points;
+CREATE TRIGGER trg_update_concentration_points_updated_at
+BEFORE UPDATE ON concentration_points
+FOR EACH ROW EXECUTE FUNCTION update_concentration_points_updated_at();
 
-CREATE OR REPLACE FUNCTION update_collection_claims_updated_at() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION update_concentration_claims_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_collection_claims_updated_at ON collection_claims;
-CREATE TRIGGER trg_update_collection_claims_updated_at
-BEFORE UPDATE ON collection_claims
-FOR EACH ROW EXECUTE FUNCTION update_collection_claims_updated_at();
+DROP TRIGGER IF EXISTS trg_update_concentration_claims_updated_at ON concentration_claims;
+CREATE TRIGGER trg_update_concentration_claims_updated_at
+BEFORE UPDATE ON concentration_claims
+FOR EACH ROW EXECUTE FUNCTION update_concentration_claims_updated_at();
 
 CREATE OR REPLACE FUNCTION update_advertisements_updated_at() RETURNS TRIGGER AS $$
 BEGIN
@@ -188,8 +252,8 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recycler_ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_statistics ENABLE ROW LEVEL SECURITY;
-ALTER TABLE collection_points ENABLE ROW LEVEL SECURITY;
-ALTER TABLE collection_claims ENABLE ROW LEVEL SECURITY;
+ALTER TABLE concentration_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE concentration_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE advertisements ENABLE ROW LEVEL SECURITY;
 
@@ -213,13 +277,13 @@ CREATE POLICY "Cualquier usuario ve perfiles de puntos disponibles"
   USING (
     id = auth.uid()
     OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
-    OR id IN (SELECT user_id FROM collection_points WHERE status = 'available')
+    OR id IN (SELECT user_id FROM concentration_points WHERE status = 'available')
   );
 
 -- 3. Cualquier usuario puede ver Centros de Movilizaciòn disponibles
-DROP POLICY IF EXISTS "Cualquier usuario ve puntos disponibles" ON collection_points;
+DROP POLICY IF EXISTS "Cualquier usuario ve puntos disponibles" ON concentration_points;
 CREATE POLICY "Cualquier usuario ve puntos disponibles"
-  ON collection_points
+  ON concentration_points
   FOR SELECT
   USING (
     status = 'available'
@@ -228,23 +292,23 @@ CREATE POLICY "Cualquier usuario ve puntos disponibles"
   );
 
 -- 4. Usuarios pueden crear puntos propios
-DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON collection_points;
+DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON concentration_points;
 CREATE POLICY "Usuarios crean puntos propios"
-  ON collection_points
+  ON concentration_points
   FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
 -- 5. Dirigentes pueden reclamar puntos
-DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON collection_claims;
+DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON concentration_claims;
 CREATE POLICY "Dirigentes pueden reclamar puntos"
-  ON collection_claims
+  ON concentration_claims
   FOR INSERT
   WITH CHECK (recycler_id = auth.uid());
 
 -- 6. Dirigentes y Dirigentes pueden ver sus claims y el admin todos
-DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON collection_claims;
+DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON concentration_claims;
 CREATE POLICY "Usuarios ven claims propios o admin"
-  ON collection_claims
+  ON concentration_claims
   FOR SELECT
   USING (
     recycler_id = auth.uid() OR user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'

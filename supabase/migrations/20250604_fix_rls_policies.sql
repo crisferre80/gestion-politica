@@ -59,10 +59,10 @@ CREATE POLICY "Usuarios ven sus estadísticas o admin"
     user_id = (select auth.uid()) OR (select auth.uid()) = 'a2a423a1-ac51-4a6b-8588-34918d8d81df'
   );
 
--- 5. COLLECTION_POINTS
-DROP POLICY IF EXISTS "Cualquier usuario ve puntos disponibles" ON collection_points;
+-- 5. concentration_POINTS
+DROP POLICY IF EXISTS "Cualquier usuario ve puntos disponibles" ON concentration_points;
 CREATE POLICY "Cualquier usuario ve puntos disponibles"
-  ON collection_points
+  ON concentration_points
   FOR SELECT
   USING (
     status = 'available'
@@ -70,22 +70,22 @@ CREATE POLICY "Cualquier usuario ve puntos disponibles"
     OR (select auth.uid()) = 'a2a423a1-ac51-4a6b-8588-34918d8d81df'
   );
 
-DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON collection_points;
+DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON concentration_points;
 CREATE POLICY "Usuarios crean puntos propios"
-  ON collection_points
+  ON concentration_points
   FOR INSERT
   WITH CHECK (user_id = (select auth.uid()));
 
--- 6. COLLECTION_CLAIMS
-DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON collection_claims;
+-- 6. concentration_CLAIMS
+DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON concentration_claims;
 CREATE POLICY "Dirigentes pueden reclamar puntos"
-  ON collection_claims
+  ON concentration_claims
   FOR INSERT
   WITH CHECK (recycler_id = (select auth.uid()));
 
-DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON collection_claims;
+DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON concentration_claims;
 CREATE POLICY "Usuarios ven claims propios o admin"
-  ON collection_claims
+  ON concentration_claims
   FOR SELECT
   USING (
     recycler_id = (select auth.uid()) OR user_id = (select auth.uid()) OR (select auth.uid()) = 'a2a423a1-ac51-4a6b-8588-34918d8d81df'

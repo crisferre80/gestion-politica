@@ -6,19 +6,19 @@ Se han realizado los siguientes cambios para que las fotos de los Centros de Mov
 
 ### 1. Cambios en el Código
 
-#### `src/pages/AddCollectionPoint.tsx`
-- **Líneas 321 y 325**: Cambiado el bucket de `'collection_photos'` a `'points'`
+#### `src/pages/AddconcentrationPoint.tsx`
+- **Líneas 321 y 325**: Cambiado el bucket de `'concentration_photos'` a `'points'`
 - Las fotos de materiales ahora se suben al bucket correcto
 
 #### `supabaseTypes.ts`
-- **Líneas 164, 186, 203**: Agregado el campo `photo_url: string | null` a la interfaz de `collection_points`
+- **Líneas 164, 186, 203**: Agregado el campo `photo_url: string | null` a la interfaz de `concentration_points`
 - Esto permite el tipado correcto en TypeScript
 
 ### 2. Migración de Base de Datos
 
-#### Archivo: `supabase/migrations/20250710_add_photo_url_to_collection_points.sql`
+#### Archivo: `supabase/migrations/20250710_add_photo_url_to_concentration_points.sql`
 ```sql
-ALTER TABLE collection_points 
+ALTER TABLE concentration_points 
 ADD COLUMN IF NOT EXISTS photo_url TEXT;
 ```
 
@@ -74,4 +74,4 @@ Si las fotos no se muestran:
 1. Verifica que el bucket "points" esté marcado como público
 2. Revisa las políticas de RLS en Storage
 3. Comprueba la consola del navegador para errores de CORS
-4. Verifica que el campo `photo_url` exista en la tabla `collection_points`
+4. Verifica que el campo `photo_url` exista en la tabla `concentration_points`

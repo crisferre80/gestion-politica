@@ -13,8 +13,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_sumar_eco_creditos_al_completar_claim ON collection_claims;
+DROP TRIGGER IF EXISTS trg_sumar_eco_creditos_al_completar_claim ON concentration_claims;
 CREATE TRIGGER trg_sumar_eco_creditos_al_completar_claim
-AFTER UPDATE ON collection_claims
+AFTER UPDATE ON concentration_claims
 FOR EACH ROW
 EXECUTE FUNCTION sumar_eco_creditos_al_completar_claim();

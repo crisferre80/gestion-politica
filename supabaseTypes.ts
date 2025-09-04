@@ -86,11 +86,11 @@ export type Database = {
         }
         Relationships: []
       }
-      collection_claims: {
+      concentration_claims: {
         Row: {
           cancellation_reason: string | null
           cancelled_at: string | null
-          collection_point_id: string | null
+          concentration_point_id: string | null
           completed_at: string | null
           created_at: string | null
           id: string
@@ -103,7 +103,7 @@ export type Database = {
         Insert: {
           cancellation_reason?: string | null
           cancelled_at?: string | null
-          collection_point_id?: string | null
+          concentration_point_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           id?: string
@@ -116,7 +116,7 @@ export type Database = {
         Update: {
           cancellation_reason?: string | null
           cancelled_at?: string | null
-          collection_point_id?: string | null
+          concentration_point_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           id?: string
@@ -128,21 +128,21 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "collection_claims_collection_point_id_fkey"
-            columns: ["collection_point_id"]
+            foreignKeyName: "concentration_claims_concentration_point_id_fkey"
+            columns: ["concentration_point_id"]
             isOneToOne: true
-            referencedRelation: "collection_points"
+            referencedRelation: "concentration_points"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "collection_claims_recycler_id_fkey"
+            foreignKeyName: "concentration_claims_recycler_id_fkey"
             columns: ["recycler_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
           {
-            foreignKeyName: "collection_claims_user_id_fkey"
+            foreignKeyName: "concentration_claims_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -230,12 +230,12 @@ export type Database = {
             foreignKeyName: "fk_concentration_points_claim_id"
             columns: ["claim_id"]
             isOneToOne: false
-            referencedRelation: "collection_claims"
+            referencedRelation: "concentration_claims"
             referencedColumns: ["id"]
           },
         ]
       }
-      collection_points_backup: {
+      concentration_points_backup: {
         Row: {
           created_at: string | null
           deleted_at: string | null
@@ -449,7 +449,7 @@ export type Database = {
       }
       recycler_ratings: {
         Row: {
-          collection_claim_id: string | null
+          concentration_claim_id: string | null
           comment: string | null
           created_at: string | null
           id: string
@@ -459,7 +459,7 @@ export type Database = {
           resident_id: string | null
         }
         Insert: {
-          collection_claim_id?: string | null
+          concentration_claim_id?: string | null
           comment?: string | null
           created_at?: string | null
           id?: string
@@ -469,7 +469,7 @@ export type Database = {
           resident_id?: string | null
         }
         Update: {
-          collection_claim_id?: string | null
+          concentration_claim_id?: string | null
           comment?: string | null
           created_at?: string | null
           id?: string
@@ -480,10 +480,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "recycler_ratings_collection_claim_id_fkey"
-            columns: ["collection_claim_id"]
+            foreignKeyName: "recycler_ratings_concentration_claim_id_fkey"
+            columns: ["concentration_claim_id"]
             isOneToOne: false
-            referencedRelation: "collection_claims"
+            referencedRelation: "concentration_claims"
             referencedColumns: ["id"]
           },
           {
@@ -546,24 +546,24 @@ export type Database = {
       }
       user_statistics: {
         Row: {
-          collections_cancelled: number | null
-          collections_completed: number | null
+          concentrations_cancelled: number | null
+          concentrations_completed: number | null
           created_at: string | null
           last_active_at: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
-          collections_cancelled?: number | null
-          collections_completed?: number | null
+          concentrations_cancelled?: number | null
+          concentrations_completed?: number | null
           created_at?: string | null
           last_active_at?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
-          collections_cancelled?: number | null
-          collections_completed?: number | null
+          concentrations_cancelled?: number | null
+          concentrations_completed?: number | null
           created_at?: string | null
           last_active_at?: string | null
           updated_at?: string | null

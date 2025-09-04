@@ -21,7 +21,7 @@ interface Suggestion {
   }>;
 }
 
-const AddCollectionPoint: React.FC = () => {
+const AddconcentrationPoint: React.FC = () => {
   const { user } = useUser();
   const navigate = useNavigate();
   
@@ -228,9 +228,9 @@ const AddCollectionPoint: React.FC = () => {
     setPhotoError('');
 
     // LOG DETALLADO PARA DEPURACIÓN
-    console.log('DEBUG AddCollectionPoint: user:', user);
-    console.log('DEBUG AddCollectionPoint: user.id (irá como user_id):', user?.id);
-    console.log('DEBUG AddCollectionPoint: datos a insertar:', {
+    console.log('DEBUG AddconcentrationPoint: user:', user);
+    console.log('DEBUG AddconcentrationPoint: user.id (irá como user_id):', user?.id);
+    console.log('DEBUG AddconcentrationPoint: datos a insertar:', {
       user_id: user?.id,
       address,
       lat: selectedLocation.lat,
@@ -277,7 +277,7 @@ const AddCollectionPoint: React.FC = () => {
           user_id: user.id, // Notificar al UID correcto
           title: 'Punto de recolección creado',
           content: `Has creado un nuevo punto de recolección en ${address}.`,
-          type: 'collection_point_created',
+          type: 'concentration_point_created',
           related_id: newPoint?.id,
           user_name: user?.name,
           user_email: user?.email
@@ -297,7 +297,7 @@ const AddCollectionPoint: React.FC = () => {
               user_id: recycler.user_id,
               title: 'Nuevo punto disponible',
               content: `Se ha creado un nuevo punto de recolección en ${address}.`,
-              type: 'new_collection_point',
+              type: 'new_concentration_point',
               related_id: newPoint?.id
               // No email/name for Dirigentes here
             });
@@ -629,4 +629,4 @@ const AddCollectionPoint: React.FC = () => {
   );
 };
 
-export default AddCollectionPoint;
+export default AddconcentrationPoint;

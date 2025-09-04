@@ -1,4 +1,4 @@
-# NOTA INTERNA: Sincronización de Dirigentes en línea en DashboardResident
+# NOTA INTERNA: Sincronización de Dirigentes en línea en DashboardDirigente
 
 Este proyecto utiliza una lógica robusta para asegurar que el listado de Dirigentes en línea en el panel del Dirigente se actualice en tiempo real, sin necesidad de recargar la página ni reiniciar sesión.
 

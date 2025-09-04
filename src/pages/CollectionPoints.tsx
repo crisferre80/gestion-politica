@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Filter, Search, Plus } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import Map from '../components/Map';
-import { supabase, type CollectionPoint } from '../lib/supabase';
+import { supabase, type concentrationPoint } from '../lib/supabase';
 import DatePicker from 'react-datepicker';
 import es from '../utils/datepickerEs';
 import "react-datepicker/dist/react-datepicker.css";
@@ -14,14 +14,14 @@ function PuntosRecoleccion() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
+  const [concentrationPoints, setconcentrationPoints] = useState<concentrationPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPickupTime, setSelectedPickupTime] = useState<Date | null>(null);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [pickupExtra, setPickupExtra] = useState('');
-  type ActiveClaim = { collection_point_id: string; status: string };
-  const [claims, setClaims] = useState<ActiveClaim[]>([]);
+  // Claims feature removed from client — keep a placeholder state for compatibility
+  const [] = useState<any[]>([]); // Placeholder state
 
   const allMaterials = ['Papel', 'Cartón', 'Plástico', 'Vidrio', 'Metal', 'Electrónicos', 'Escombros'];
 
@@ -40,15 +40,15 @@ function PuntosRecoleccion() {
         .order('created_at', { ascending: false }) // OK: solo columna raíz
         .eq('status', 'available');
 
-      if (user && user.type === 'recycler') {
-        query = query.or(`status.eq.available,status.eq.claimed.and(claimed_by.eq.${user.id})`);
-      } 
+  // Claims feature removed: only show available points
+  // (previously we optionally included claimed points for the current recycler)
+  query = query.or(`status.eq.available`);
 
   const { data, error: supabaseError } = await query;
 
       if (supabaseError) throw supabaseError;
 
-  setCollectionPoints(data.map(point => ({
+  setconcentrationPoints(data.map(point => ({
         ...point,
         creator_name: point.profiles?.name || 'Usuario Anónimo',
         creator_email: point.profiles?.email,
@@ -56,7 +56,7 @@ function PuntosRecoleccion() {
         status: point.status || 'available'
       })));
     } catch (err) {
-      console.error('Error fetching collection points:', err);
+      console.error('Error fetching concentration points:', err);
       setError('Error al cargar los Centros de Movilizaciòn');
     } finally {
       setLoading(false);
@@ -67,23 +67,11 @@ function PuntosRecoleccion() {
     fetchPoints();
   }, [fetchPoints]);
 
-  // Cargar claims activos para los puntos disponibles
+  // Claims feature removed: no background fetching of claims
   useEffect(() => {
-    const fetchClaims = async () => {
-      const pointIds = collectionPoints.map(p => p.id);
-      if (pointIds.length === 0) {
-        setClaims([]);
-        return;
-      }
-      const { data, error } = await supabase
-        .from('collection_claims')
-        .select('collection_point_id, status')
-        .in('collection_point_id', pointIds);
-      if (!error && data) setClaims(data);
-      else setClaims([]);
-    };
-    fetchClaims();
-  }, [collectionPoints]);
+    // No longer fetching claims
+  }, [concentrationPoints]);
+  
 
   // Función para eliminar un punto de recolección
   const handleDeletePoint = async (pointId: string) => {
@@ -95,7 +83,7 @@ function PuntosRecoleccion() {
       return;
     }
     try {
-      await import('../lib/supabase').then(mod => mod.deleteCollectionPoint(pointId, user.id));
+      await import('../lib/supabase').then(mod => mod.deleteconcentrationPoint(pointId, user.id));
       await fetchPoints();
       alert('Punto de recolección eliminado exitosamente');
     } catch (err) {
@@ -114,18 +102,13 @@ function PuntosRecoleccion() {
   };
 
   // Filtrar puntos que no tienen claim activo
-  const filteredPoints = collectionPoints.filter(point => {
-    const matchesSearch =
-      point.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredPoints = concentrationPoints.filter(point => {
+    const matchesSearch = searchTerm.length === 0 || 
+      point.address.toLowerCase().includes(searchTerm.toLowerCase()) || 
       point.district.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesMaterials =
-      selectedMaterials.length === 0 ||
+    const matchesMaterials = selectedMaterials.length === 0 || 
       selectedMaterials.some(material => point.materials.includes(material));
-
-    // Excluir puntos con claim activo (claimed o completed)
-    const claim = claims.find(c => c.collection_point_id === point.id && (c.status === 'claimed' || c.status === 'completed'));
-    return matchesSearch && matchesMaterials && !claim;
+    return matchesSearch && matchesMaterials;
   });
 
   // Para el mapa, todos los puntos filtrados
@@ -174,7 +157,7 @@ function PuntosRecoleccion() {
             {/* Solo Dirigentes (role 'recycler') pueden crear/registrar centros de movilización */}
             {user && user.type === 'recycler' && (
               <Link
-                to="/add-collection-point"
+                to="/add-concentration-point"
                 className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center hover:bg-blue-700 shadow-lg"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -329,7 +312,7 @@ function PuntosRecoleccion() {
             <p className="text-gray-500 mb-4">No se encontraron Centros de Movilizaciòn con los filtros seleccionados.</p>
             {user && user.type === 'resident' && (
               <Link
-                to="/add-collection-point"
+                to="/add-concentration-point"
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
               >
                 <Plus className="h-4 w-4 mr-2" />

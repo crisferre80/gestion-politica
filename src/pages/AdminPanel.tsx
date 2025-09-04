@@ -9,7 +9,7 @@ import { TerraDraw } from "terra-draw";
 import { TerraDrawMapboxGLAdapter } from "terra-draw-mapbox-gl-adapter";
 import mapboxgl from "mapbox-gl";
 import { TerraDrawPolygonMode, TerraDrawLineStringMode, TerraDrawPointMode, TerraDrawCircleMode, TerraDrawRectangleMode, TerraDrawSelectMode } from "terra-draw";
-import type { Feature, FeatureCollection, Polygon } from "geojson";
+import type { Feature, Featureconcentration, Polygon } from "geojson";
 
 interface UserRow {
   avatar_url: string | null;
@@ -30,7 +30,7 @@ interface FeedbackRow {
   created_at: string;
 }
 
-interface CollectionPoint {
+interface concentrationPoint {
   address: ReactNode;
   recycler_id: string | null;
   id: string;
@@ -52,7 +52,7 @@ const AdminPanel: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [, setRecyclers] = useState<UserRow[]>([]);
   const [feedbackData, setFeedbackData] = useState<FeedbackRow[]>([]);
-  const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>([]);
+  const [concentrationPoints, setconcentrationPoints] = useState<concentrationPoint[]>([]);
   // eslint-disable-next-line no-empty-pattern
   const [] = useState<string | null>(null);
   // Ref para drag-scroll en el carrusel de pestañas
@@ -60,7 +60,7 @@ const AdminPanel: React.FC = () => {
   const [showModal, setShowModal] = useState(false); // Estado para mostrar el modal
   const [selectedRecycler, setSelectedRecycler] = useState<UserRow | null>(null);
   const [showPointsModal, setShowPointsModal] = useState(false);
-  const [residentPoints, setResidentPoints] = useState<CollectionPoint[]>([]);
+  const [residentPoints, setResidentPoints] = useState<concentrationPoint[]>([]);
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
   const [terraDrawInstance, setTerraDrawInstance] = useState<TerraDraw | null>(null);
   const [selectedTool, setSelectedTool] = useState<string>("Polygon");
@@ -150,7 +150,7 @@ const AdminPanel: React.FC = () => {
     }
   }, [selectedUser]);
 
-  const fetchCollectionPoints = useCallback(async () => {
+  const fetchconcentrationPoints = useCallback(async () => {
     try {
     const { data, error } = await supabase.from('concentration_points').select('*');
       if (error) {
@@ -159,7 +159,7 @@ const AdminPanel: React.FC = () => {
         return;
       }
       if (data) {
-        setCollectionPoints(data);
+        setconcentrationPoints(data);
       }
     } catch (err) {
       console.error('Error inesperado al cargar Centros de Movilizaciòn:', err);
@@ -173,8 +173,8 @@ const AdminPanel: React.FC = () => {
   }, [selectedUser, fetchUsersAndPoints]);
 
   useEffect(() => {
-    fetchCollectionPoints();
-  }, [fetchCollectionPoints]);
+    fetchconcentrationPoints();
+  }, [fetchconcentrationPoints]);
   
   // Verificar disponibilidad del servicio de correo
   useEffect(() => {
@@ -198,14 +198,14 @@ const AdminPanel: React.FC = () => {
     .channel('concentration_points')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'concentration_points' }, (payload) => {
       console.log('Cambio detectado en concentration_points:', payload);
-      fetchCollectionPoints(); // Refrescar Centros de Movilizaci2n
+      fetchconcentrationPoints(); // Refrescar Centros de Movilizaci2n
     })
     .subscribe();
 
     return () => {
         supabase.removeChannel(subscription);
     };
-  }, [fetchCollectionPoints]);
+  }, [fetchconcentrationPoints]);
 
   // Refrescar usuarios después de enviar notificación global o eliminar usuario
   const refreshUsers = async () => {
@@ -222,7 +222,7 @@ const AdminPanel: React.FC = () => {
 
   const refreshData = async () => {
     await fetchUsersAndPoints();
-    await fetchCollectionPoints();
+    await fetchconcentrationPoints();
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -329,7 +329,7 @@ const AdminPanel: React.FC = () => {
   // Eliminar punto de recolección
 
   // Asignar punto a reciclador
-  const assignCollectionPointToRecycler = async (recyclerId: string, pointId: string) => {
+  const assignconcentrationPointToRecycler = async (recyclerId: string, pointId: string) => {
     try {
       const { error } = await supabase
         .from('concentration_points')
@@ -341,10 +341,10 @@ const AdminPanel: React.FC = () => {
         alert('No se pudo asignar el punto de recolección.');
       } else {
         alert('Punto de recolección asignado exitosamente.');
-        const updatedPoints = collectionPoints.map(point =>
+        const updatedPoints = concentrationPoints.map(point =>
           point.id === pointId ? { ...point, recycler_id: recyclerId } : point
         );
-        setCollectionPoints(updatedPoints);
+        setconcentrationPoints(updatedPoints);
       }
     } catch (err) {
       console.error('Error inesperado al asignar punto de recolección:', err);
@@ -357,7 +357,7 @@ const AdminPanel: React.FC = () => {
   };
 
   const handleAssignPoint = async (recyclerId: string, pointId: string) => {
-    await assignCollectionPointToRecycler(recyclerId, pointId);
+    await assignconcentrationPointToRecycler(recyclerId, pointId);
     await refreshData();
   };
 
@@ -420,10 +420,10 @@ const AdminPanel: React.FC = () => {
     const geojsonData = typeof zone.coordinates === "string"
       ? JSON.parse(zone.coordinates)
       : zone.coordinates;
-    let polygonGeoJSON: FeatureCollection<Polygon> | null = null;
+    let polygonGeoJSON: Featureconcentration<Polygon> | null = null;
     if (
       geojsonData &&
-      geojsonData.type === "FeatureCollection" &&
+      geojsonData.type === "Featureconcentration" &&
       Array.isArray(geojsonData.features) &&
       geojsonData.features.length > 2 &&
       geojsonData.features.every((f: Feature) => f.geometry.type === "Point")
@@ -438,7 +438,7 @@ const AdminPanel: React.FC = () => {
         coords.push(coords[0]);
       }
       polygonGeoJSON = {
-        type: "FeatureCollection",
+        type: "Featureconcentration",
         features: [
           {
             type: "Feature",
@@ -453,12 +453,12 @@ const AdminPanel: React.FC = () => {
       };
     } else if (
       geojsonData &&
-      geojsonData.type === "FeatureCollection" &&
+      geojsonData.type === "Featureconcentration" &&
       Array.isArray(geojsonData.features) &&
       geojsonData.features.length > 0 &&
       geojsonData.features[0].geometry.type === "Polygon"
     ) {
-      polygonGeoJSON = geojsonData as FeatureCollection<Polygon>;
+      polygonGeoJSON = geojsonData as Featureconcentration<Polygon>;
     }
     if (polygonGeoJSON && polygonGeoJSON.features.length > 0) {
       // Limpiar fuente/capa si existe
@@ -553,11 +553,11 @@ const AdminPanel: React.FC = () => {
     }
   }, [terraDrawInstance]);
 
-  const handleSaveZones = useCallback(async (geojson: GeoJSON.FeatureCollection) => {
+  const handleSaveZones = useCallback(async (geojson: GeoJSON.Featureconcentration) => {
     try {
       // Convertir polígonos a puntos GeoJSON
-      const pointsGeoJSON: GeoJSON.FeatureCollection = {
-        type: "FeatureCollection",
+      const pointsGeoJSON: GeoJSON.Featureconcentration = {
+        type: "Featureconcentration",
         features: geojson.features.flatMap((feature) => {
           if (feature.geometry.type === "Polygon") {
             const coordinates = feature.geometry.coordinates[0]; // Obtener los vértices del polígono
@@ -875,7 +875,7 @@ const AdminPanel: React.FC = () => {
                         <div className="mt-2">
                           <h4 className="text-sm font-semibold">Centros de Movilizaciòn:</h4>
                           <ul className="list-disc pl-5">
-                            {collectionPoints.filter(point => point.user_id === user.user_id).map(point => (
+                            {concentrationPoints.filter(point => point.user_id === user.user_id).map(point => (
                               <li key={point.id}>{point.location}</li>
                             ))}
                           </ul>
@@ -885,7 +885,7 @@ const AdminPanel: React.FC = () => {
                         <div className="mt-2">
                           <h4 className="text-sm font-semibold">Punto Colectivo:</h4>
                           <ul className="list-disc pl-5">
-                            {collectionPoints.filter(point => point.user_id === user.user_id).map(point => (
+                            {concentrationPoints.filter(point => point.user_id === user.user_id).map(point => (
                               <li key={point.id}>{point.address}</li>
                             ))}
                           </ul>
@@ -905,9 +905,9 @@ const AdminPanel: React.FC = () => {
                           className="relative px-3 py-1 text-sm rounded-lg bg-blue-600 text-white font-semibold transition-all flex items-center space-x-2"
                         >
                           <span>Puntos</span>
-                          {collectionPoints.filter(point => point.user_id === user.user_id).length > 0 && (
+                          {concentrationPoints.filter(point => point.user_id === user.user_id).length > 0 && (
                             <span className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-red-500 text-white text-xs rounded-full px-2 py-0.5 shadow-lg z-50">
-                              {collectionPoints.filter(point => point.user_id === user.user_id).length}
+                              {concentrationPoints.filter(point => point.user_id === user.user_id).length}
                             </span>
                           )}
                         </button>
@@ -1201,7 +1201,7 @@ const AdminPanel: React.FC = () => {
               if (terraDrawInstance) {
                 const geojson = terraDrawInstance.getSnapshot();
                 handleSaveZones({
-                  type: "FeatureCollection",
+                  type: "Featureconcentration",
                   features: geojson,
                 });
               }
@@ -1261,7 +1261,7 @@ const AdminPanel: React.FC = () => {
               <p className="text-sm text-gray-500">No hay Centros de Movilizaciòn creados por este Dirigente.</p>
             ) : (
               <ul className="space-y-2">
-                {residentPoints.map((point: CollectionPoint) => (
+                {residentPoints.map((point: concentrationPoint) => (
                   <li key={point.id} className="flex items-center justify-between p-1 border rounded-lg text-sm">
                     <span className="truncate w-4/5 h-6">{point.address}</span>
                     <select

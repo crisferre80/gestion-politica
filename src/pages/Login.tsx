@@ -19,10 +19,13 @@ const Login: React.FC = () => {
     try {
       const { data, profile } = await signInUser(email, password);
       if (data.user && profile) {
-        // Marcar online en el backend
-        await import('../lib/supabase').then(({ supabase }) =>
-          supabase.from('profiles').update({ online: true }).eq('user_id', data.user.id)
-        );
+        // Marcar online en el backend (usar select por user_id y luego update por id)
+        try {
+          const { updateProfileByUserId } = await import('../lib/profileHelpers');
+          await updateProfileByUserId(data.user.id, { online: true });
+        } catch (e) {
+          console.warn('No se pudo actualizar online en Login:', e);
+        }
         login({
           id: data.user.id,
           profileId: profile.id, // <-- ID interno de profiles

@@ -6,7 +6,7 @@ DO $$ BEGIN
   IF EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'unique_active_claim_per_point'
   ) THEN
-    ALTER TABLE collection_claims
+    ALTER TABLE concentration_claims
     DROP CONSTRAINT unique_active_claim_per_point;
   END IF;
 END $$;
@@ -18,8 +18,8 @@ BEGIN
   -- Solo prevenir si hay claims con status 'claimed' o 'completed' 
   -- (permitir nuevos claims si el último está 'cancelled')
   IF EXISTS (
-    SELECT 1 FROM collection_claims
-    WHERE collection_point_id = NEW.collection_point_id
+    SELECT 1 FROM concentration_claims
+    WHERE concentration_point_id = NEW.concentration_point_id
       AND status IN ('claimed', 'completed')
       AND id <> COALESCE(NEW.id, uuid_generate_v4()) -- Manejar caso de INSERT
   ) THEN
@@ -30,9 +30,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Recrear el trigger (ya existe pero actualizamos la función)
-DROP TRIGGER IF EXISTS trg_prevent_duplicate_active_claims ON collection_claims;
+DROP TRIGGER IF EXISTS trg_prevent_duplicate_active_claims ON concentration_claims;
 CREATE CONSTRAINT TRIGGER trg_prevent_duplicate_active_claims
-AFTER INSERT OR UPDATE ON collection_claims
+AFTER INSERT OR UPDATE ON concentration_claims
 DEFERRABLE INITIALLY IMMEDIATE
 FOR EACH ROW EXECUTE FUNCTION prevent_duplicate_active_claims();
 

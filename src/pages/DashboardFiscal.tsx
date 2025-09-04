@@ -9,7 +9,7 @@ import Map from '../components/Map';
 import QRCode from 'react-qr-code';
 import { getAvatarUrl } from '../utils/feedbackHelper';
 
-// Tipo para el payload de realtime de perfiles (igual que en DashboardResident.tsx)
+// Tipo para el payload de realtime de perfiles (igual que en DashboardDirigente.tsx)
 type ProfileRealtimePayload = {
   dni?: string;
   id: string;
@@ -31,7 +31,7 @@ type ProfileRealtimePayload = {
 // Panel exclusivo para Dirigentes institucionales (empresas, edificios, instituciones)
 const DashboardFiscal: React.FC = () => {
   const { user } = useUser();
-  type CollectionPoint = {
+  type concentrationPoint = {
     id: string;
     user_id: string;
     address: string;
@@ -48,7 +48,7 @@ const DashboardFiscal: React.FC = () => {
     updated_at?: string;
     [key: string]: unknown;
   };
-    const [collectivePoint, setCollectivePoint] = useState<CollectionPoint | null>(null);
+    const [collectivePoint, setCollectivePoint] = useState<concentrationPoint | null>(null);
   type Resident = {
     id: string;
     name?: string;
@@ -75,7 +75,7 @@ const DashboardFiscal: React.FC = () => {
   };
   const [recyclers, setRecyclers] = useState<Recycler[]>([]);
   const [showQrModal, setShowQrModal] = useState(false);
-  const [, setSchools] = useState<CollectionPoint[]>([]);
+  const [, setSchools] = useState<concentrationPoint[]>([]);
   // Urnas (boca de urna) reporting
   const [urnasMesas, setUrnasMesas] = useState<number>(0);
   const [urnasCount, setUrnasCount] = useState<number>(0);
@@ -104,12 +104,12 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 
   // Estado para detalle de Dirigente seleccionado
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
-  const [residentPoints, setResidentPoints] = useState<CollectionPoint[]>([]);
+  const [residentPoints, setResidentPoints] = useState<concentrationPoint[]>([]);
   const [residentLoading, setResidentLoading] = useState(false);
   const [totals, setTotals] = useState<{ materiales: Record<string, number>; autos: number }>({ materiales: {}, autos: 0 });
 
   // Estado para el reclamo del punto colectivo
-  const [collectivePointClaim, setCollectivePointClaim] = useState<{
+  const [, setCollectivePointClaim] = useState<{
     id: string;
     status: string;
     recycler_id: string;
@@ -142,35 +142,10 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
         .limit(1);
       setCollectivePoint(points && points.length > 0 ? points[0] : null);
       
-      // Buscar reclamo del punto colectivo si existe
+      // La lógica de reclamos (concentration_claims) fue eliminada del cliente.
+      // No intentamos consultar esa tabla para evitar errores 400/404 en instancias sin la migración.
       if (points && points.length > 0) {
-        const collectivePointId = points[0].id;
-        const { data: claimData, error: claimError } = await supabase
-          .from('collection_claims')
-          .select('*, profiles!collection_claims_recycler_id_fkey(name, avatar_url, phone)')
-          .eq('collection_point_id', collectivePointId)
-          .eq('status', 'claimed')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (claimError) {
-          console.error('Error al buscar reclamo del punto colectivo:', claimError);
-        } else if (claimData) {
-          console.log('Reclamo del punto colectivo encontrado:', claimData);
-          setCollectivePointClaim({
-            id: claimData.id,
-            status: claimData.status,
-            recycler_id: claimData.recycler_id,
-            pickup_time: claimData.pickup_time,
-            created_at: claimData.created_at,
-            recycler_name: claimData.profiles?.name,
-            recycler_avatar: claimData.profiles?.avatar_url,
-            recycler_phone: claimData.profiles?.phone,
-          });
-        } else {
-          setCollectivePointClaim(null);
-        }
+        setCollectivePointClaim(null);
       }
       // Buscar Dirigentes asociados a la misma dirección
       if (points && points.length > 0) {
@@ -300,55 +275,10 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
     };
   }, []);
 
-  // Suscripción en tiempo real a reclamos del punto colectivo
+  // Claims feature removed: no realtime subscription to concentration_claims
   useEffect(() => {
-    if (!collectivePoint) return;
-    
-    const channel = supabase.channel('collective-point-claims')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'collection_claims',
-          filter: `collection_point_id=eq.${collectivePoint.id}`,
-        },
-        async (payload) => {
-          console.log('Cambio en reclamo del punto colectivo:', payload);
-          
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const claimData = payload.new;
-            if (claimData.status === 'claimed') {
-              // Obtener información del reciclador
-              const { data: recyclerProfile } = await supabase
-                .from('profiles')
-                .select('name, avatar_url, phone')
-                .eq('user_id', claimData.recycler_id)
-                .single();
-              
-              setCollectivePointClaim({
-                id: claimData.id,
-                status: claimData.status,
-                recycler_id: claimData.recycler_id,
-                pickup_time: claimData.pickup_time,
-                created_at: claimData.created_at,
-                recycler_name: recyclerProfile?.name,
-                recycler_avatar: recyclerProfile?.avatar_url,
-                recycler_phone: recyclerProfile?.phone,
-              });
-            } else if (claimData.status === 'completed' || claimData.status === 'cancelled') {
-              setCollectivePointClaim(null);
-            }
-          } else if (payload.eventType === 'DELETE') {
-            setCollectivePointClaim(null);
-          }
-        }
-      )
-      .subscribe();
-    
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // No-op: collectivePointClaim state is managed only during initial fetch
+    return () => {};
   }, [collectivePoint]);
 
   // Cerrar menú de contacto al hacer clic fuera
@@ -469,7 +399,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
       // Sumar materiales y autos
       const materiales: Record<string, number> = {};
       let autos = 0;
-      (points || []).forEach((p: CollectionPoint) => {
+      (points || []).forEach((p: concentrationPoint) => {
         if (Array.isArray(p.materials)) {
           p.materials.forEach((mat: string) => {
             materiales[mat] = (materiales[mat] || 0) + 1;
@@ -492,7 +422,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
     setResidentPoints([]);
     
     try {
-      // Buscar por user_id que es lo que se almacena en collection_points
+      // Buscar por user_id que es lo que se almacena en concentration_points
       const userIdToSearch = res.user_id || res.id;
       console.log('Buscando puntos para user_id:', userIdToSearch);
       
@@ -534,7 +464,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
       </div>
       {/* Botón Agregar centro Colectivo arriba y visible */}
       <div className="flex gap-4 mb-6">
-        <Link to="/add-collection-point" className="px-4 py-2 bg-blue-600 text-white rounded flex items-center gap-2">
+        <Link to="/add-concentration-point" className="px-4 py-2 bg-blue-600 text-white rounded flex items-center gap-2">
           <Plus className="w-4 h-4" /> Agregar Escuela
         </Link>
       </div>
@@ -571,141 +501,64 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
                   </div>
                   <div className="flex items-center">
                     <h3 className="font-semibold text-gray-700 mr-2">Estado:</h3>
-                    {collectivePointClaim ? (
-                      <div className="flex flex-col gap-2">
-                        <span className="bg-orange-100 text-orange-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
-                          Reclamado por Reciclador
-                        </span>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          {collectivePointClaim.recycler_avatar && (
-                            <img 
-                              src={collectivePointClaim.recycler_avatar} 
-                              alt="Reciclador" 
-                              className="w-6 h-6 rounded-full"
-                            />
-                          )}
-                          <span className="font-medium">
-                            {collectivePointClaim.recycler_name || 'Reciclador'}
-                          </span>
-                          {collectivePointClaim.recycler_phone && (
-                            <span className="text-xs text-gray-500">
-                              • {collectivePointClaim.recycler_phone}
-                            </span>
-                          )}
-                        </div>
-                        {collectivePointClaim.pickup_time && (
-                          <div className="text-xs text-gray-500">
-                            <strong>Hora programada:</strong> {new Date(collectivePointClaim.pickup_time).toLocaleString('es-ES')}
-                          </div>
-                        )}
-                        <div className="text-xs text-gray-500">
-                          <strong>Reclamado:</strong> {new Date(collectivePointClaim.created_at || '').toLocaleString('es-ES')}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded-full">
-                        Disponible
-                      </span>
-                    )}
+                    <span className="bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded-full">
+                      Disponible
+                    </span>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end gap-2">
-                  {collectivePointClaim && (
-                    <div className="relative" data-contact-menu style={{ zIndex: 9999 }}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log('Toggleando menú:', !showContactMenu);
-                          setShowContactMenu(!showContactMenu);
-                        }}
-                        className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
-                        data-contact-menu
-                      >
-                        <Phone className="w-4 h-4" />
-                        Contactar Reciclador
-                        <svg className={`w-4 h-4 ml-1 transition-transform ${showContactMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      
-                      {showContactMenu && (
-                        <div 
-                          className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
-                          style={{ 
-                            zIndex: 99999, 
-                            position: 'absolute',
-                            display: 'block',
-                            visibility: 'visible'
-                          }}
-                          data-contact-menu
-                        >
-                          <div className="py-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log('Llamando al teléfono:', collectivePointClaim.recycler_phone);
-                                if (collectivePointClaim.recycler_phone) {
-                                  window.open(`tel:${collectivePointClaim.recycler_phone}`, '_self');
-                                } else {
-                                  alert('No hay número de teléfono disponible para este reciclador');
-                                }
-                                setShowContactMenu(false);
-                              }}
-                              className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors border-b border-gray-100"
-                              data-contact-menu
-                            >
-                              <Phone className="w-4 h-4 mr-3 text-blue-500" />
-                              Llamar
-                            </button>
-                            
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log('Abriendo WhatsApp:', collectivePointClaim.recycler_phone);
-                                if (collectivePointClaim.recycler_phone) {
-                                  // Limpiar el número de teléfono (quitar espacios, guiones, etc.)
-                                  const cleanPhone = collectivePointClaim.recycler_phone.replace(/[\s\-()]/g, '');
-                                  const institutionName = user?.name || 'nuestra institución';
-                                  const recyclerName = collectivePointClaim.recycler_name || 'reciclador';
-                                  const scheduledTime = collectivePointClaim.pickup_time 
-                                    ? new Date(collectivePointClaim.pickup_time).toLocaleString('es-ES')
-                                    : 'la hora programada';
-                                  
-                                  const message = `Hola ${recyclerName}! Te contacto desde *${institutionName}* a través de EcoNecta 🌱\n\nVeo que reclamaste nuestro punto de recolección colectivo para el ${scheduledTime}.\n\n¿Podrías confirmarme el estado de la recolección? ¡Muchas gracias por tu trabajo! ♻️`;
-                                  const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-                                  window.open(whatsappUrl, '_blank');
-                                } else {
-                                  alert('No hay número de teléfono disponible para este reciclador');
-                                }
-                                setShowContactMenu(false);
-                              }}
-                              className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                              data-contact-menu
-                            >
-                              <svg className="w-4 h-4 mr-3 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
-                              </svg>
-                              WhatsApp
-                            </button>
-                          </div>
+                  <div className="relative" data-contact-menu style={{ zIndex: 9999 }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowContactMenu(!showContactMenu);
+                      }}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
+                      data-contact-menu
+                    >
+                      <Phone className="w-4 h-4" />
+                      Contactar Reciclador
+                    </button>
+
+                    {showContactMenu && (
+                      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden" style={{ zIndex: 99999 }} data-contact-menu>
+                        <div className="py-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alert('Funcionalidad de contacto aún requiere datos del reciclador.');
+                              setShowContactMenu(false);
+                            }}
+                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors border-b border-gray-100"
+                            data-contact-menu
+                          >
+                            <Phone className="w-4 h-4 mr-3 text-blue-500" />
+                            Llamar
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); alert('Funcionalidad WhatsApp no disponible.'); setShowContactMenu(false); }}
+                            className="flex items-center w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                            data-contact-menu
+                          >
+                            <svg className="w-4 h-4 mr-3 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                            </svg>
+                            WhatsApp
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() => setShowQrModal(true)}
                     className="px-3 py-2 bg-blue-600 text-white rounded-md flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm"
-                    disabled={!!collectivePointClaim}
-                    title={collectivePointClaim ? "No se puede invitar mientras el punto está reclamado" : "Invitar con QR"}
                   >
                     <QrCode className="w-4 h-4" />
                     Invitar con QR
                   </button>
                   <button
                     onClick={handleDeletePoint}
-                    className="px-3 py-2 bg-red-600 text-white rounded-md flex items-center gap-2 hover:bg-red-700 transition-colors text-sm font-semibold shadow-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    disabled={!!collectivePointClaim}
-                    title={collectivePointClaim ? "No se puede eliminar mientras el punto está reclamado" : "Eliminar punto"}
+                    className="px-3 py-2 bg-red-600 text-white rounded-md flex items-center gap-2 hover:bg-red-700 transition-colors text-sm font-semibold shadow-sm"
                   >
                     <Trash2 className="w-4 h-4" />
                     Eliminar
@@ -716,30 +569,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
               <p className="text-gray-500">No tienes un punto colectivo registrado.</p>
             )}
             
-            {/* Información adicional del reclamo */}
-            {collectivePointClaim && (
-              <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <h4 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Punto Reclamado - Información del Reciclador
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p><strong>Reciclador:</strong> {collectivePointClaim.recycler_name || 'No disponible'}</p>
-                    <p><strong>Teléfono:</strong> {collectivePointClaim.recycler_phone || 'No disponible'}</p>
-                  </div>
-                  <div>
-                    <p><strong>Hora programada:</strong> {collectivePointClaim.pickup_time ? new Date(collectivePointClaim.pickup_time).toLocaleString('es-ES') : 'No especificada'}</p>
-                    <p><strong>Reclamado el:</strong> {new Date(collectivePointClaim.created_at || '').toLocaleString('es-ES')}</p>
-                  </div>
-                </div>
-                <div className="mt-3 p-2 bg-orange-100 rounded text-xs text-orange-800">
-                  <strong>Nota:</strong> El punto colectivo está siendo atendido por un reciclador. No puedes eliminar el punto ni invitar nuevos Dirigentes hasta que la recolección se complete.
-                </div>
-              </div>
-            )}
+            {/* La funcionalidad de reclamos fue removida del cliente; no se muestra información dependiente */}
           </div>
           
           <div className="bg-white rounded-lg shadow p-4 mb-6">

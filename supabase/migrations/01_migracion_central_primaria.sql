@@ -5,8 +5,8 @@
 DROP TABLE IF EXISTS user_statistics CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS recycler_ratings CASCADE;
-DROP TABLE IF EXISTS collection_claims CASCADE;
-DROP TABLE IF EXISTS collection_points CASCADE;
+DROP TABLE IF EXISTS concentration_claims CASCADE;
+DROP TABLE IF EXISTS concentration_points CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS advertisements CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
@@ -61,15 +61,15 @@ CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications(user_id);
 -- Tabla de estadísticas de usuario
 CREATE TABLE user_statistics (
   user_id uuid PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
-  collections_completed integer DEFAULT 0,
-  collections_cancelled integer DEFAULT 0,
+  concentrations_completed integer DEFAULT 0,
+  concentrations_cancelled integer DEFAULT 0,
   last_active_at timestamptz,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
 
 -- Tabla de Centros de Movilizaciòn
-CREATE TABLE collection_points (
+CREATE TABLE concentration_points (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
   address text,
@@ -82,9 +82,9 @@ CREATE TABLE collection_points (
 );
 
 -- Tabla de reclamos de Centros de Movilizaciòn
-CREATE TABLE collection_claims (
+CREATE TABLE concentration_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  collection_point_id uuid REFERENCES collection_points(id) ON DELETE CASCADE,
+  concentration_point_id uuid REFERENCES concentration_points(id) ON DELETE CASCADE,
   recycler_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
   user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
   status text DEFAULT 'claimed',
@@ -152,31 +152,31 @@ CREATE TRIGGER trg_update_user_statistics_updated_at
 BEFORE UPDATE ON user_statistics
 FOR EACH ROW EXECUTE FUNCTION update_user_statistics_updated_at();
 
--- Trigger para updated_at en collection_points
-CREATE OR REPLACE FUNCTION update_collection_points_updated_at() RETURNS TRIGGER AS $$
+-- Trigger para updated_at en concentration_points
+CREATE OR REPLACE FUNCTION update_concentration_points_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_collection_points_updated_at ON collection_points;
-CREATE TRIGGER trg_update_collection_points_updated_at
-BEFORE UPDATE ON collection_points
-FOR EACH ROW EXECUTE FUNCTION update_collection_points_updated_at();
+DROP TRIGGER IF EXISTS trg_update_concentration_points_updated_at ON concentration_points;
+CREATE TRIGGER trg_update_concentration_points_updated_at
+BEFORE UPDATE ON concentration_points
+FOR EACH ROW EXECUTE FUNCTION update_concentration_points_updated_at();
 
--- Trigger para updated_at en collection_claims
-CREATE OR REPLACE FUNCTION update_collection_claims_updated_at() RETURNS TRIGGER AS $$
+-- Trigger para updated_at en concentration_claims
+CREATE OR REPLACE FUNCTION update_concentration_claims_updated_at() RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_collection_claims_updated_at ON collection_claims;
-CREATE TRIGGER trg_update_collection_claims_updated_at
-BEFORE UPDATE ON collection_claims
-FOR EACH ROW EXECUTE FUNCTION update_collection_claims_updated_at();
+DROP TRIGGER IF EXISTS trg_update_concentration_claims_updated_at ON concentration_claims;
+CREATE TRIGGER trg_update_concentration_claims_updated_at
+BEFORE UPDATE ON concentration_claims
+FOR EACH ROW EXECUTE FUNCTION update_concentration_claims_updated_at();
 
 -- Trigger para updated_at en advertisements
 CREATE OR REPLACE FUNCTION update_advertisements_updated_at() RETURNS TRIGGER AS $$
@@ -200,8 +200,8 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recycler_ratings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_statistics ENABLE ROW LEVEL SECURITY;
-ALTER TABLE collection_points ENABLE ROW LEVEL SECURITY;
-ALTER TABLE collection_claims ENABLE ROW LEVEL SECURITY;
+ALTER TABLE concentration_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE concentration_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE advertisements ENABLE ROW LEVEL SECURITY;
 
@@ -271,33 +271,33 @@ CREATE POLICY "Usuarios ven sus estadísticas o admin"
     user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
--- RLS para collection_points
-DROP POLICY IF EXISTS "Usuarios ven puntos propios o admin" ON collection_points;
+-- RLS para concentration_points
+DROP POLICY IF EXISTS "Usuarios ven puntos propios o admin" ON concentration_points;
 CREATE POLICY "Usuarios ven puntos propios o admin"
-  ON collection_points
+  ON concentration_points
   FOR SELECT
   USING (
     user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
-DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON collection_points;
+DROP POLICY IF EXISTS "Usuarios crean puntos propios" ON concentration_points;
 CREATE POLICY "Usuarios crean puntos propios"
-  ON collection_points
+  ON concentration_points
   FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
--- RLS para collection_claims
-DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON collection_claims;
+-- RLS para concentration_claims
+DROP POLICY IF EXISTS "Usuarios ven claims propios o admin" ON concentration_claims;
 CREATE POLICY "Usuarios ven claims propios o admin"
-  ON collection_claims
+  ON concentration_claims
   FOR SELECT
   USING (
     recycler_id = auth.uid() OR user_id = auth.uid() OR auth.uid() = 'f61d8fea-5758-47e9-852f-f5b92717b5ae'
   );
 
-DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON collection_claims;
+DROP POLICY IF EXISTS "Dirigentes pueden reclamar puntos" ON concentration_claims;
 CREATE POLICY "Dirigentes pueden reclamar puntos"
-  ON collection_claims
+  ON concentration_claims
   FOR INSERT
   WITH CHECK (recycler_id = auth.uid());
 

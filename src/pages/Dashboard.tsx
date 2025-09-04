@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
-import DashboardRecycler from './DashboardRecycler';
-import DashboardResident from './DashboardResident';
-import DashboardInstitutional from './DashboardInstitutional';
+import DashboardReferente from './DashboardReferente';
+import DashboardDirigente from './DashboardDirigente';
+import DashboardFiscal from './DashboardFiscal';
 import AdminPanel from './AdminPanel';
 
 const Dashboard: React.FC = () => {
@@ -25,13 +25,13 @@ const Dashboard: React.FC = () => {
   }
   // Usuarios con rol 'fiscal' ven el dashboard institucional
   if (user.role === 'fiscal') {
-    return <DashboardInstitutional />;
+    return <DashboardFiscal />;
   }
   if (user.type === 'recycler') {
-    return <DashboardRecycler />;
+    return <DashboardReferente />;
   }
-  // Cualquier otro tipo (antes existía 'resident_institutional') se muestra como Referente (DashboardResident)
-  return <DashboardResident />;
+  // Cualquier otro tipo (antes existía 'resident_institutional') se muestra como Referente (DashboardDirigente)
+  return <DashboardDirigente />;
 };
 
 export default Dashboard;

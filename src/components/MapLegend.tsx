@@ -12,12 +12,7 @@ const MapLegend: React.FC = () => {
           </div>
           <span className="text-sm text-gray-600">Punto Disponible</span>
         </div>
-        <div className="flex items-center">
-          <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center mr-2">
-            <User className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-sm text-gray-600">Punto Reclamado</span>
-        </div>
+  {/* 'Punto Reclamado' removed from legend: claims feature is not present in client */}
         <div className="flex items-center">
           <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mr-2">
             <CheckCircle className="h-4 w-4 text-white" />

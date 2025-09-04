@@ -8,8 +8,8 @@ BEGIN
     
     -- Verificar si ya existe un claim activo para este punto
     IF EXISTS (
-        SELECT 1 FROM collection_claims 
-        WHERE collection_point_id = NEW.collection_point_id 
+        SELECT 1 FROM concentration_claims 
+        WHERE concentration_point_id = NEW.concentration_point_id 
         AND status = 'claimed'
         AND id != NEW.id
     ) THEN
@@ -24,13 +24,13 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION set_point_claimed_on_claim() RETURNS TRIGGER AS $$
 BEGIN
     -- Actualizar el estado del punto de recolección a "claimed"
-    UPDATE collection_points
+    UPDATE concentration_points
     SET 
         status = 'claimed',
         claim_id = NEW.id,
         recycler_id = NEW.recycler_id,
         pickup_time = NEW.pickup_time
-    WHERE id = NEW.collection_point_id;
+    WHERE id = NEW.concentration_point_id;
     
     RETURN NEW;
 END;
@@ -47,8 +47,8 @@ BEGIN
     IF OLD.status != 'completed' AND NEW.status = 'completed' THEN
         -- Obtener el ID del Dirigente asociado al punto de recolección
         SELECT user_id INTO resident_id
-        FROM collection_points
-        WHERE id = NEW.collection_point_id;
+        FROM concentration_points
+        WHERE id = NEW.concentration_point_id;
         
         -- Sumar 10 EcoCreditos al Dirigente
         UPDATE profiles
@@ -72,8 +72,8 @@ BEGIN
             resident_id,
             'Recolección Completada',
             'Tu punto de recolección ha sido completado exitosamente. Has ganado 10 EcoCreditos.',
-            'collection_completed',
-            NEW.collection_point_id
+            'concentration_completed',
+            NEW.concentration_point_id
         );
     END IF;
     
@@ -82,7 +82,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to update the updated_at field
-CREATE OR REPLACE FUNCTION update_collection_claims_updated_at() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION update_concentration_claims_updated_at() RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;

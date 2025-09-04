@@ -31,7 +31,7 @@ export type ProfileRealtimePayload = {
   role?: string;
 };
 
-type CollectionPoint = {
+type concentrationPoint = {
   additional_info: boolean | string; // Puede ser string según tu tabla
   notas: string;
   id: string; // <-- Cambiado a string (uuid)
@@ -63,7 +63,7 @@ export type User = {
   // otros campos...
 };
 
-const DashboardResident = () => {
+const DashboardDirigente = () => {
   const { user, login } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -264,7 +264,7 @@ useEffect(() => {
   }, [fetchOnlineRecyclers, isDebugMode]);
 
   // Estado para la pestaña activa (activeTab)
-  type DetailedPoint = CollectionPoint & {
+  type DetailedPoint = concentrationPoint & {
     status?: string;
     claim_id?: string | null; // <-- Añadido para acceso seguro
     claim?: {
@@ -396,7 +396,7 @@ useEffect(() => {
         // Actualizar inmediatamente solo para cambios en nuestros puntos
         fetchDetailedPoints();
       })
-  // Eliminadas suscripciones a collection_claims (la app ahora solo gestiona concentration_points)
+  // Eliminadas suscripciones a concentration_claims (la app ahora solo gestiona concentration_points)
       .subscribe((status, err) => {
         if (process.env.NODE_ENV === 'development') {
           console.log('[REALTIME] Estado de suscripción:', status);
@@ -481,11 +481,12 @@ useEffect(() => {
 // Tipos para los claims y Dirigentes
 // RecyclerType eliminado (no usado en este componente)
 
-// ClaimType eliminado (la app ya no usa collection_claims en el cliente)
+// ClaimType eliminado (la app ya no usa concentration_claims en el cliente)
 
 // Categorías simples basadas en `status` del punto
   const puntosTodos = detailedPoints.filter(p => !p.status || p.status === 'available');
-const puntosReclamados = detailedPoints.filter(p => p.status === 'claimed');
+// Ya no se distinguen puntos 'claimed' en el cliente; tratamos todos según su status base
+const puntosReclamados: typeof detailedPoints = [];
 const puntosRetirados = detailedPoints.filter(p => p.status === 'completed' || p.status === 'retired');
 const puntosDemorados = detailedPoints.filter(p => p.status === 'delayed');
 
@@ -734,7 +735,7 @@ useEffect(() => {
     // Refresca puntos si se navega con el flag refresh (tras crear un punto)
     const locState = (location as typeof location & { state?: unknown }).state as { refresh?: boolean } | undefined;
     if (locState && locState.refresh) {
-      // refreshCollectionPoints(); // Eliminar o comentar
+      // refreshconcentrationPoints(); // Eliminar o comentar
       // Limpia el state para evitar refrescos innecesarios al navegar de nuevo
       window.history.replaceState({}, document.title);
     }
@@ -1084,7 +1085,7 @@ useEffect(() => {
           )}
         </div>
       </div>
-      <Link to="/collection-points" className="block px-6 py-4 rounded-md font-bold text-blue-700 hover:bg-blue-700 hover:text-white">
+      <Link to="/concentration-points" className="block px-6 py-4 rounded-md font-bold text-blue-700 hover:bg-blue-700 hover:text-white">
         <img
           src="https://res.cloudinary.com/dhvrrxejo/image/upload/v1747796657/icon_map.mp4_uphkzx.gif"
           alt="Mapa"
@@ -1200,7 +1201,7 @@ useEffect(() => {
             </div>
             {/* Enlace para Agregar centro: elimina el paso de función por state */}
             <Link
-              to="/add-collection-point"
+              to="/add-concentration-point"
               className="bg-blue-600 text-white px-4 py-2 rounded-md flex items-center gap-2 hover:bg-blue-700 focus:ring-4 focus:ring-blue-400 focus:outline-none shadow-xl transition-all duration-300 w-fit mb-4 group animate-bounce animate-delay-500 animate-once animate-ease-in-out animate-fill-both animate-fast animate-important border-2 border-blue-400 scale-105 hover:scale-110 ring-4 ring-blue-300/40 hover:ring-blue-500/60"
               style={{ minWidth: 'unset', maxWidth: '220px', boxShadow: '0 0 0 4px #bbf7d0, 0 8px 24px 0 rgba(34,197,94,0.15)' }}
             >
@@ -1234,7 +1235,7 @@ useEffect(() => {
                                   <div className="text-sm text-gray-500">Tipo: {p.type || 'individual'}</div>
                                 </div>
                                 <div className="text-sm">
-                                  <span className={`px-2 py-1 rounded-full text-xs ${p.status === 'available' ? 'bg-green-100 text-green-800' : p.status === 'claimed' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}`}>
+                                  <span className={`px-2 py-1 rounded-full text-xs ${p.status === 'available' ? 'bg-green-100 text-green-800' : p.status === 'completed' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}`}>
                                     {p.status || 'unknown'}
                                   </span>
                                 </div>
@@ -1889,7 +1890,7 @@ useEffect(() => {
   );
 };
 
-export default DashboardResident;
+export default DashboardDirigente;
 
 
 

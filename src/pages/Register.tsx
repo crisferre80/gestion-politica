@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
 import { signUpUser } from '../lib/supabase';
 import { uploadAvatar, updateProfileAvatar } from '../lib/uploadAvatar';
-import { supabase } from '../lib/supabase';
 import PhotoCapture from '../components/PhotoCapture';
 import { createNotification } from '../lib/notifications';
 
@@ -94,10 +93,12 @@ const Register: React.FC = () => {
       }
   // Si es dirigente (recycler) y hay alias, actualizar el perfil con alias
   if (data?.user && userType === 'recycler' && alias.trim()) {
-        await supabase
-          .from('profiles')
-          .update({ alias: alias.trim() })
-          .eq('user_id', data.user.id);
+        try {
+          const { updateProfileByUserId } = await import('../lib/profileHelpers');
+          await updateProfileByUserId(data.user.id, { alias: alias.trim() });
+        } catch (e) {
+          console.warn('No se pudo actualizar alias en Register:', e);
+        }
       }
       // Notificación para el nuevo usuario
       if (data?.user) {
@@ -116,14 +117,10 @@ const Register: React.FC = () => {
         // Fetch perfil actualizado para obtener avatar_url real
         let updatedProfile = null;
         try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', data.user.id)
-            .maybeSingle();
-          updatedProfile = profile;
+          const { resolveProfileRow } = await import('../lib/profileHelpers');
+          updatedProfile = await resolveProfileRow(data.user.id);
         } catch {
-          // Error al obtener el perfil actualizado, se ignora intencionalmente
+          // Ignorar errores al obtener perfil actualizado
         }
           login({
                   id: data.user.id,

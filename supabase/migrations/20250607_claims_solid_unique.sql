@@ -6,8 +6,8 @@ DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'unique_active_claim_per_point'
   ) THEN
-    ALTER TABLE collection_claims
-    ADD CONSTRAINT unique_active_claim_per_point UNIQUE (collection_point_id)
+    ALTER TABLE concentration_claims
+    ADD CONSTRAINT unique_active_claim_per_point UNIQUE (concentration_point_id)
     DEFERRABLE INITIALLY IMMEDIATE;
   END IF;
 END $$;
@@ -17,8 +17,8 @@ CREATE OR REPLACE FUNCTION prevent_duplicate_active_claims()
 RETURNS TRIGGER AS $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM collection_claims
-    WHERE collection_point_id = NEW.collection_point_id
+    SELECT 1 FROM concentration_claims
+    WHERE concentration_point_id = NEW.concentration_point_id
       AND status IN ('claimed', 'completed')
       AND id <> NEW.id
   ) THEN
@@ -28,9 +28,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_prevent_duplicate_active_claims ON collection_claims;
+DROP TRIGGER IF EXISTS trg_prevent_duplicate_active_claims ON concentration_claims;
 CREATE CONSTRAINT TRIGGER trg_prevent_duplicate_active_claims
-AFTER INSERT OR UPDATE ON collection_claims
+AFTER INSERT OR UPDATE ON concentration_claims
 DEFERRABLE INITIALLY IMMEDIATE
 FOR EACH ROW EXECUTE FUNCTION prevent_duplicate_active_claims();
 
@@ -38,14 +38,14 @@ FOR EACH ROW EXECUTE FUNCTION prevent_duplicate_active_claims();
 CREATE OR REPLACE FUNCTION set_point_claimed_on_claim()
 RETURNS TRIGGER AS $$
 BEGIN
-  UPDATE collection_points
+  UPDATE concentration_points
   SET status = 'claimed'
-  WHERE id = NEW.collection_point_id;
+  WHERE id = NEW.concentration_point_id;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_set_point_claimed_on_claim ON collection_claims;
+DROP TRIGGER IF EXISTS trg_set_point_claimed_on_claim ON concentration_claims;
 CREATE TRIGGER trg_set_point_claimed_on_claim
-AFTER INSERT ON collection_claims
+AFTER INSERT ON concentration_claims
 FOR EACH ROW EXECUTE FUNCTION set_point_claimed_on_claim();

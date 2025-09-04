@@ -10,6 +10,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Set con las tablas detectadas como existentes en la base de datos.
+// Se poblará durante la inicialización para evitar pings repetidos a tablas inexistentes
+export const existingTables = new Set<string>();
+
 // Logs de diagnóstico (seguros: solo mostramos prefijos, nunca claves completas)
 try {
   console.log('Supabase URL (masked):', supabaseUrl ? supabaseUrl.replace(/(https?:\/\/)([^.]+)(.*)/, '$1$2...') : 'MISSING');
@@ -46,7 +50,8 @@ export async function initializeSupabase(): Promise<boolean> {
     
     // 2. Realizar una operación simple para verificar conectividad
     try {
-      const { error: pingError } = await supabase.from('profiles').select('count(*)').limit(1);
+      // Usar la forma recomendada para obtener cuenta sin solicitar datos en el body
+      const { error: pingError } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).limit(1);
       
       if (pingError) {
         if (pingError.code === '42P01') {
@@ -79,27 +84,39 @@ export async function initializeSupabase(): Promise<boolean> {
     
     // Intentamos usar las tablas principales, pero no bloqueamos la inicialización
     // Esto nos ayuda a diagnosticar el problema
-  const tables = ['profiles', 'concentration_points', 'collection_claims'];
+  // Evitamos hacer un ping proactivo a `concentration_claims` durante la
+  // inicialización porque muchas instalaciones no tienen esa migración y
+  // provoca errores 400/404 recurrentes en logs. Las consultas a esa tabla
+  // deberán comprobar existencia con `checkTableExists` antes de ejecutarse.
+  const tables = ['profiles', 'concentration_points'];
+    const missingTables: string[] = [];
     for (const table of tables) {
       try {
-        console.log(`Intentando acceder a la tabla ${table}...`);
+        // Hacemos un ping mínimo a la tabla usando el count en los headers
         const { error: tableError } = await supabase
           .from(table)
-          .select('count(*)')
+          .select('*', { count: 'exact', head: true })
           .limit(1);
-          
+
         if (tableError) {
+          // Si la tabla no existe, la marcamos como ausente pero no spammeamos la consola
           if (tableError.code === '42P01') {
-            console.warn(`La tabla ${table} no existe en la base de datos o no es accesible`);
+            missingTables.push(table);
           } else {
-            console.warn(`Error al acceder a la tabla ${table}:`, tableError);
+            console.warn(`Error al acceder a la tabla ${table}:`, tableError?.message || tableError);
           }
         } else {
+          existingTables.add(table);
           console.log(`Tabla ${table} accesible correctamente`);
         }
       } catch (tableErr) {
         console.warn(`Error al intentar acceder a la tabla ${table}:`, tableErr);
       }
+    }
+
+    if (missingTables.length > 0) {
+      console.warn('Las siguientes tablas no están disponibles en la base de datos:', missingTables.join(', '));
+      console.warn('Consulta los archivos SQL en `supabase/migrations` o `sql/` para crear las tablas necesarias si corresponde.');
     }
     
     // Consideramos la inicialización exitosa incluso si hay problemas
@@ -114,11 +131,15 @@ export async function initializeSupabase(): Promise<boolean> {
 
 // Función para verificar si existe una tabla
 export async function checkTableExists(tableName: string): Promise<boolean> {
-  try {
+    try {
+    // Si ya detectamos tablas durante initializeSupabase, usamos ese cache para evitar nuevas consultas REST
+    if (existingTables.size > 0) {
+      return existingTables.has(tableName);
+    }
     // Método directo: intentar hacer una consulta mínima a la tabla
     const { error } = await supabase
       .from(tableName)
-      .select('count(*)', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true })
       .limit(1);
     
     // Si no hay error, la tabla existe
@@ -167,7 +188,10 @@ export interface User {
   email: string;
   phone?: string;
   address?: string;
-  type: 'resident' | 'recycler';
+  // Tipos de usuario: se incluyen variantes históricas y el tipo 'fiscal'
+  // 'resident' -> vecino/dirigente, 'recycler' -> referente/dirigente técnico
+  // 'resident_institutional' se mantuvo para compatibilidad con migraciones antiguas
+  type: 'resident' | 'recycler' | 'fiscal' | 'resident_institutional';
   avatar_url?: string;
   online?: boolean;
   materials?: string[];
@@ -177,7 +201,7 @@ export interface User {
   dni?: string; // <-- Agregado para permitir el uso de dni
 }
 
-export type CollectionPoint = {
+export type concentrationPoint = {
   creator_dni: string | undefined;
   additional_info: unknown;
   user_id: string;
@@ -199,8 +223,9 @@ export type CollectionPoint = {
   materials: string[];
   schedule: string;
   status: string;
-  claim_id?: string | null; // <-- usa claim_id
-  claim_status?: string; // <-- Agregado para el estado real del claim
+  // claim fields removed from client - DB may still have claim-related columns but client no longer uses them
+  // claim_id?: string | null;
+  // claim_status?: string;
   pickup_time?: string | null;
   pickup_extra?: string | null; // Nuevo campo agregado
   type?: string; // <-- Añadido para distinguir puntos colectivos
@@ -226,9 +251,9 @@ export interface RecyclerProfile {
   };
 }
 
-export interface CollectionClaim {
+export interface concentrationClaim {
   id: string;
-  collection_point_id: string;
+  concentration_point_id: string;
   recycler_id: string;
   status: 'claimed' | 'completed' | 'cancelled' | 'failed';
   claimed_at: string;
@@ -238,6 +263,9 @@ export interface CollectionClaim {
   cancelled_by?: string;
   pickup_time?: string; // Added for countdown timer
 }
+// NOTE: The concentration_claims feature was removed from the client.
+// We keep stubs for the old functions so callers fail-fast with a clear message.
+const CLAIMS_REMOVED_MESSAGE = 'La funcionalidad de "claims" ha sido eliminada del cliente. Contacta al administrador si necesitas restaurarla.';
 
 export async function signUpUser(email: string, password: string, userData: Partial<User> & { dni?: string }) {
   try {
@@ -428,353 +456,25 @@ export async function signInUser(email: string, password: string) {
   }
 }
 
-export async function claimCollectionPoint(
-  pointId: string,
-  recyclerId: string,
-  pickupTime: string,
-  userId: string // <-- nuevo parámetro obligatorio
+export async function claimconcentrationPoint(
 ): Promise<void> {
-  try {
-    console.log('Iniciando proceso de reclamación de punto', { pointId, recyclerId, userId });
-    
-    // Validar que los parámetros sean valores válidos
-    if (!pointId || !recyclerId || !userId || !pickupTime) {
-      throw new Error('Faltan parámetros requeridos para reclamar el punto');
-    }
-    
-    // Validar que sean UUIDs válidos
-    const isValidUuid = (id: string) => {
-      return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
-    };
-    
-    if (!isValidUuid(pointId) || !isValidUuid(recyclerId) || !isValidUuid(userId)) {
-      throw new Error('Uno o más IDs no tienen formato UUID válido');
-    }
-
-    // Verificar si las tablas necesarias existen
-  const claimsTableExists = await checkTableExists('collection_claims');
-  const pointsTableExists = await checkTableExists('concentration_points');
-    
-    if (!claimsTableExists) {
-      console.error('ERROR CRÍTICO: La tabla collection_claims no existe');
-      throw new Error('La tabla collection_claims no existe en la base de datos. Por favor contacta al administrador del sistema.');
-    }
-    
-    if (!pointsTableExists) {
-      console.error('ERROR CRÍTICO: La tabla concentration_points no existe');
-      throw new Error('La tabla concentration_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
-    }
-
-    // NUEVO: Verificar si existe un claim activo para este punto
-    console.log('Verificando claims existentes para el punto:', pointId);
-    const { data: existingClaims, error: checkError } = await supabase
-      .from('collection_claims')
-      .select('id, status, recycler_id, created_at')
-      .eq('collection_point_id', pointId)
-      .order('created_at', { ascending: false });
-
-    if (checkError) {
-      console.error('Error al verificar claims existentes:', checkError);
-      throw new Error('Error al verificar el estado del punto de recolección');
-    }
-
-    // Si hay claims, verificar el estado del más reciente
-    if (existingClaims && existingClaims.length > 0) {
-      const latestClaim = existingClaims[0]; // El más reciente por el order
-      console.log('Claim más reciente encontrado:', latestClaim);
-      
-      if (latestClaim.status === 'claimed') {
-        throw new Error('Este punto ya ha sido reclamado por otro reciclador.');
-      }
-      
-      if (latestClaim.status === 'completed') {
-        throw new Error('Este punto ya ha sido completado y no está disponible.');
-      }
-      
-      // Si está 'cancelled', eliminarlo para evitar conflictos con el constraint único
-      if (latestClaim.status === 'cancelled') {
-        console.log('Eliminando claim cancelado para permitir nueva reclamación');
-        const { error: deleteError } = await supabase
-          .from('collection_claims')
-          .delete()
-          .eq('id', latestClaim.id);
-        
-        if (deleteError) {
-          console.error('Error al eliminar claim cancelado:', deleteError);
-          throw new Error('Error al procesar claim cancelado anterior');
-        }
-        
-        console.log('Claim cancelado eliminado exitosamente, procediendo con nueva reclamación');
-      }
-    }
-
-  // Verificar que el punto esté disponible en concentration_points
-    console.log('Verificando estado del punto en concentration_points');
-    const { data: pointData, error: pointCheckError } = await supabase
-      .from('concentration_points')
-      .select('id, status, user_id')
-      .eq('id', pointId)
-      .single();
-
-    if (pointCheckError) {
-      console.error('Error al verificar el punto:', pointCheckError);
-      throw new Error('El punto de recolección no existe o no está disponible');
-    }
-
-    if (!pointData) {
-      throw new Error('El punto de recolección no fue encontrado');
-    }
-
-    if (pointData.status !== 'available') {
-      throw new Error(`El punto no está disponible (estado actual: ${pointData.status})`);
-    }
-
-    if (pointData.user_id !== userId) {
-      throw new Error('El ID del usuario propietario no coincide');
-    }
-
-    // Crear el claim con status 'claimed'
-    console.log('Insertando registro en collection_claims');
-    const { data: claim, error: claimError } = await supabase
-      .from('collection_claims')
-      .insert([
-        {
-          collection_point_id: pointId,
-          recycler_id: recyclerId,
-          user_id: userId, // <-- importante para cumplir el constraint
-          status: 'claimed',
-          pickup_time: pickupTime
-        }
-      ])
-      .select()
-      .single();
-
-    if (claimError) {
-      // Manejar específicamente el error cuando la tabla no existe
-      if (claimError.code === '42P01') {
-        console.error('La tabla collection_claims no existe en la base de datos');
-        throw new Error('La tabla collection_claims no existe en la base de datos. Por favor contacta al administrador del sistema.');
-      }
-      
-      // Manejar error de duplicado/conflicto
-      if (claimError.code === '23505') {
-        console.error('Conflicto de clave única al insertar claim:', claimError);
-        
-        // Verificar si el conflicto es por un claim cancelado que no se pudo eliminar
-        const { data: conflictingClaim } = await supabase
-          .from('collection_claims')
-          .select('id, status, recycler_id')
-          .eq('collection_point_id', pointId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        
-        if (conflictingClaim && conflictingClaim.length > 0) {
-          const claim = conflictingClaim[0];
-          if (claim.status === 'cancelled') {
-            throw new Error('Error interno: existe un claim cancelado que impide la nueva reclamación. Reintenta en unos momentos.');
-          } else {
-            throw new Error(`Este punto ya ha sido reclamado por otro reciclador (estado: ${claim.status}).`);
-          }
-        } else {
-          throw new Error('Este punto ya ha sido reclamado por otro reciclador mientras procesabas tu solicitud.');
-        }
-      }
-      
-      // Manejar error de constraint de foreign key
-      if (claimError.code === '23503') {
-        console.error('Error de referencia de clave foránea:', claimError);
-        throw new Error('Error de referencia en la base de datos. El punto puede haber sido eliminado.');
-      }
-      
-      console.error('Error al insertar en collection_claims:', claimError);
-      throw new Error(`Error al crear la reclamación: ${claimError.message || 'Error desconocido'}`);
-    }
-
-    if (!claim || !claim.id) {
-      console.error('No se pudo obtener el ID del claim creado');
-      throw new Error('Error al crear la reclamación: no se pudo obtener el ID de la reclamación');
-    }
-
-    console.log('Registro insertado correctamente en collection_claims:', claim);
-
-    // Actualizar el punto de recolección
-    console.log('Actualizando concentration_points');
-    const { error: updateError } = await supabase
-      .from('concentration_points')
-      .update({
-        status: 'claimed',
-        claim_id: claim.id,
-        pickup_time: pickupTime,
-        recycler_id: recyclerId
-      })
-      .eq('id', pointId); // <-- CORRECTO: debe ser .eq('id', pointId)
-
-    if (updateError) {
-      // Manejar específicamente el error cuando la tabla no existe
-      if (updateError.code === '42P01') {
-  console.error('La tabla concentration_points no existe en la base de datos');
-  throw new Error('La tabla concentration_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
-      }
-      
-  console.error('Error al actualizar concentration_points:', updateError);
-      throw updateError;
-    }
-    
-    console.log('Punto de recolección actualizado correctamente');
-
-  } catch (error) {
-    console.error('Error claiming collection point:', error);
-    throw error;
-  }
+  // Stub implementation: feature removed
+  throw new Error(CLAIMS_REMOVED_MESSAGE);
 }
 
 export async function cancelClaim(
-  claimId: string, pointId: string, reason: string): Promise<void> {
-  try {
-    // Verificar si las tablas necesarias existen
-  const claimsTableExists = await checkTableExists('collection_claims');
-  const pointsTableExists = await checkTableExists('concentration_points');
-    
-    if (!claimsTableExists) {
-      console.error('ERROR CRÍTICO: La tabla collection_claims no existe');
-      throw new Error('La tabla collection_claims no existe en la base de datos. Por favor contacta al administrador del sistema.');
-    }
-    
-    if (!pointsTableExists) {
-      console.error('ERROR CRÍTICO: La tabla concentration_points no existe');
-      throw new Error('La tabla concentration_points no existe en la base de datos. Por favor contacta al administrador del sistema.');
-    }
-    
-    // Update claim status
-    const { error: claimError } = await supabase
-      .from('collection_claims')
-      .update({
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
-        cancellation_reason: reason
-      })
-      .eq('id', claimId);
-
-    if (claimError) throw claimError;
-
-    // Update collection point status
-    const { error: pointError } = await supabase
-      .from('concentration_points')
-      .update({
-        status: 'available',
-        claim_id: null,
-        pickup_time: null,
-        recycler_id: null
-      })
-      .eq('id', pointId);
-
-    if (pointError) throw pointError;
-
-  } catch (error) {
-    console.error('Error cancelling claim:', error);
-    throw error;
-  }
-}
-
-export async function completeCollection(
-  claimId: string,
-  pointId: string
 ): Promise<void> {
-  try {
-    // Verificar si las tablas necesarias existen
-  const claimsTableExists = await checkTableExists('collection_claims');
-  const pointsTableExists = await checkTableExists('concentration_points');
-  const profilesTableExists = await checkTableExists('profiles');
-    const notificationsTableExists = await checkTableExists('notifications');
-    
-    if (!claimsTableExists || !pointsTableExists || !profilesTableExists) {
-      const missingTables = [];
-      if (!claimsTableExists) missingTables.push('collection_claims');
-      if (!pointsTableExists) missingTables.push('concentration_points');
-      if (!profilesTableExists) missingTables.push('profiles');
-      
-      console.error(`ERROR CRÍTICO: Las siguientes tablas no existen: ${missingTables.join(', ')}`);
-      throw new Error(`Una o más tablas requeridas no existen: ${missingTables.join(', ')}. Por favor contacta al administrador del sistema.`);
-    }
-
-    // Update claim status
-    const { error: claimError } = await supabase
-      .from('collection_claims')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', claimId);
-
-    if (claimError) throw claimError;
-
-    // Update collection point status
-    const { error: pointError } = await supabase
-      .from('concentration_points')
-      .update({
-        status: 'completed'
-      })
-      .eq('id', pointId);
-
-    if (pointError) throw pointError;
-
-    // Get resident ID
-    const { data: point, error: pointFetchError } = await supabase
-      .from('concentration_points')
-      .select('user_id')
-      .eq('id', pointId)
-      .single();
-
-    if (pointFetchError) throw pointFetchError;
-
-    // DEBUG: Mostrar el user_id del Dirigente
-    console.log('[DEBUG completeCollection] user_id del Dirigente:', point.user_id);
-
-    // Sumar 10 EcoCreditos al Dirigente
-    const { data: currentProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('eco_creditos, user_id')
-      .eq('user_id', point.user_id)
-      .single();
-    if (profileError) throw profileError;
-    console.log('[DEBUG completeCollection] eco_creditos actuales:', currentProfile?.eco_creditos, 'user_id:', currentProfile?.user_id);
-    const nuevosCreditos = (currentProfile?.eco_creditos || 0) + 10;
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ eco_creditos: nuevosCreditos })
-      .eq('user_id', point.user_id);
-    if (updateError) throw updateError;
-    console.log('[DEBUG completeCollection] eco_creditos nuevos:', nuevosCreditos);
-
-    // Crear notificación para el Dirigente si la tabla existe
-    if (notificationsTableExists) {
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert([{
-          user_id: point.user_id,
-          title: 'Recolección Completada',
-          content: 'Tu punto de recolección ha sido completado exitosamente. Has ganado 10 EcoCreditos.',
-          type: 'collection_completed',
-          related_id: pointId
-        }]);
-  
-      if (notificationError) {
-        // No falla la función principal si hay error en notificaciones
-        console.warn('No se pudo crear la notificación, pero la recolección se completó:', notificationError);
-      }
-    } else {
-      console.warn('La tabla notifications no existe, no se creará notificación');
-    }
-
-    // Fin de función
-    return;
-  } catch (error) {
-    console.error('Error completing collection:', error);
-    throw error;
-  }
+  // Stub implementation: feature removed
+  throw new Error(CLAIMS_REMOVED_MESSAGE);
 }
 
-export async function deleteCollectionPoint(pointId: string, userId: string): Promise<void> {
+export async function completeconcentration(
+): Promise<void> {
+  // Stub implementation: feature removed
+  throw new Error(CLAIMS_REMOVED_MESSAGE);
+}
+
+export async function deleteconcentrationPoint(pointId: string, userId: string): Promise<void> {
   try {
     const { error } = await supabase
       .from('concentration_points')
@@ -786,7 +486,7 @@ export async function deleteCollectionPoint(pointId: string, userId: string): Pr
       throw error;
     }
   } catch (error) {
-    console.error('Error deleting collection point:', error);
+    console.error('Error deleting concentration point:', error);
     throw error;
   }
 }
@@ -817,33 +517,10 @@ export async function ensureUserProfile({ id, email, name }: { id: string; email
 }
 
 // Función de mantenimiento: limpiar claims cancelados antiguos
-export async function cleanupOldCancelledClaims(olderThanHours: number = 24): Promise<{ deleted: number; error?: string }> {
-  try {
-    const cutoffDate = new Date();
-    cutoffDate.setHours(cutoffDate.getHours() - olderThanHours);
-    
-    console.log(`Limpiando claims cancelados anteriores a: ${cutoffDate.toISOString()}`);
-    
-    const { data, error } = await supabase
-      .from('collection_claims')
-      .delete()
-      .eq('status', 'cancelled')
-      .lt('cancelled_at', cutoffDate.toISOString())
-      .select('id');
-    
-    if (error) {
-      console.error('Error al limpiar claims cancelados:', error);
-      return { deleted: 0, error: error.message };
-    }
-    
-    const deletedCount = data?.length || 0;
-    console.log(`Claims cancelados eliminados: ${deletedCount}`);
-    
-    return { deleted: deletedCount };
-  } catch (err) {
-    console.error('Error en cleanupOldCancelledClaims:', err);
-    return { deleted: 0, error: (err as Error).message };
-  }
+export async function cleanupOldCancelledClaims(_olderThanHours: number = 24): Promise<{ deleted: number; error?: string }> {
+  // Stub implementation: feature removed
+  console.warn('cleanupOldCancelledClaims called but claims feature was removed. No action taken.');
+  return { deleted: 0 };
 }
 
 // Función para obtener estadísticas de claims para debugging
@@ -854,34 +531,6 @@ export async function getClaimsStats(): Promise<{
   cancelled: number; 
   byPoint: Record<string, number>;
 }> {
-  try {
-    const { data: claims, error } = await supabase
-      .from('collection_claims')
-      .select('collection_point_id, status');
-    
-    if (error) throw error;
-    
-    const stats = {
-      total: claims?.length || 0,
-      claimed: 0,
-      completed: 0,
-      cancelled: 0,
-      byPoint: {} as Record<string, number>
-    };
-    
-    claims?.forEach(claim => {
-      switch (claim.status) {
-        case 'claimed': stats.claimed++; break;
-        case 'completed': stats.completed++; break;
-        case 'cancelled': stats.cancelled++; break;
-      }
-      
-      stats.byPoint[claim.collection_point_id] = (stats.byPoint[claim.collection_point_id] || 0) + 1;
-    });
-    
-    return stats;
-  } catch (err) {
-    console.error('Error al obtener estadísticas de claims:', err);
-    return { total: 0, claimed: 0, completed: 0, cancelled: 0, byPoint: {} };
-  }
+  // Stub implementation: feature removed
+  return { total: 0, claimed: 0, completed: 0, cancelled: 0, byPoint: {} };
 }

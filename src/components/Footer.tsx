@@ -9,7 +9,7 @@ const Footer: React.FC = () => {
           <div>
             <div className="flex items-center mb-4">
               <span className="h-8 w-8 mr-2" />
-              <span className="font-bold text-xl">Gestion Dirigencial y Politica</span>
+              <span className="font-bold text-xl"> Gestión Dirigencial y Política</span>
             </div>
             <p className="text-blue-200 mb-4">
               Conectando Dirigentes urbanos con Dirigentes comprometidos con el medio ambiente.
@@ -37,7 +37,7 @@ const Footer: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4">Enlaces Rápidos</h3>
             <ul className="space-y-2">
               <li><a href="/" className="text-blue-200 hover:text-white">Inicio</a></li>
-              <li><a href="/collection-points" className="text-blue-200 hover:text-white">Centros de Movilizaciòn</a></li>
+              <li><a href="/concentration-points" className="text-blue-200 hover:text-white">Centros de Movilizaciòn</a></li>
               <li><a href="/register" className="text-blue-200 hover:text-white">Registrarse</a></li>
               <li><a href="/login" className="text-blue-200 hover:text-white">Ingresar</a></li>
               <li><a href="/dossier" className="text-blue-200 hover:text-white">Dossier Institucional</a></li>
@@ -67,7 +67,7 @@ const Footer: React.FC = () => {
         </div>
         
         <div className="border-t border-blue-700 mt-8 pt-6 text-center text-blue-300">
-          <p>&copy; {new Date().getFullYear()} Gestion Dirigencial y Politica. Todos los derechos reservados.</p>
+          <p>&copy; {new Date().getFullYear()} Gestión Dirigencial y Política. Todos los derechos reservados.</p>
         </div>
       </div>
     </footer>

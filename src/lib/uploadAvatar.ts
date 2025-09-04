@@ -231,8 +231,23 @@ export async function uploadAvatar(
  * @param avatarUrl URL del avatar
  */
 export async function updateProfileAvatar(userId: string, avatarUrl: string) {
-  const { error } = await supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('user_id', userId);
-  if (error) throw error;
+  // Primero buscar el profile.id y luego actualizar por id para evitar rutas REST problemáticas
+  try {
+    const { data: profileRows, error: selErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (!selErr && profileRows && (profileRows as any).id) {
+      const { error } = await supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', (profileRows as any).id);
+      if (error) {
+        return { publicUrl: null, error };
+      }
+    }
+  } catch (err) {
+    return { publicUrl: null, error: err as any };
+  }
 }
 
 /**
@@ -381,8 +396,18 @@ export async function handleProfileImageUpload(userId: string, file: File): Prom
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
     const avatarUrl = urlData.publicUrl;
     
-    // 4. Actualizar el perfil con la URL del avatar
-    await updateProfileAvatar(userId, avatarUrl);
+    // 4. Actualizar el perfil con la URL del avatar (usar helper que evita actualizar por user_id directamente)
+    try {
+      const { updateProfileByUserId } = await import('./profileHelpers');
+      await updateProfileByUserId(userId, { avatar_url: avatarUrl });
+    } catch (e) {
+      // Fallback: intentar la actualización directa si el helper falla
+      try {
+        await updateProfileAvatar(userId, avatarUrl);
+      } catch (err) {
+        console.error('No se pudo actualizar el perfil con avatar URL:', err);
+      }
+    }
 
     return {
       success: true,

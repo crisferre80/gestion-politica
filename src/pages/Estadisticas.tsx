@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, checkTableExists } from '../lib/supabase';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Award, TrendingUp, Package, Star, Users } from 'lucide-react';
 import 'chart.js/auto';
@@ -23,6 +23,7 @@ const Estadisticas: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [claimsAvailable, setClaimsAvailable] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -33,9 +34,23 @@ const Estadisticas: React.FC = () => {
           .from('concentration_points')
           .select('id, created_at, user_id, status');
         // Reclamos por mes y estado
-        const { data: claims } = await supabase
-          .from('collection_claims')
-          .select('id, created_at, status, completed_at, cancelled_at');
+        let claims = [] as any[];
+        try {
+          const exists = await checkTableExists('concentration_claims');
+          setClaimsAvailable(!!exists);
+          if (exists) {
+            const { data } = await supabase
+              .from('concentration_claims')
+              .select('id, created_at, status, completed_at, cancelled_at');
+            claims = data || [];
+          } else {
+            claims = [];
+          }
+        } catch (err) {
+          console.warn('No se pudieron obtener claims (tabla ausente):', err);
+          setClaimsAvailable(false);
+          claims = [];
+        }
         // Dirigentes más comprometidos
         const { data: residentPoints } = await supabase
           .from('concentration_points')
@@ -118,6 +133,9 @@ const Estadisticas: React.FC = () => {
           <div className="text-red-600 font-semibold">{error}</div>
         ) : stats && (
           <div className="space-y-10">
+            {!claimsAvailable && (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">Las métricas relacionadas con reclamos no están disponibles porque la tabla <code>concentration_claims</code> no existe en la base de datos.</div>
+            )}
             {/* Gráfico de barras: Puntos creados y reclamos por mes */}
             <div className="bg-white rounded-xl p-6 shadow">
               <h2 className="text-xl font-bold text-blue-700 mb-2 flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Puntos y Reclamos por Mes</h2>

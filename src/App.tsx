@@ -8,13 +8,13 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import RecyclerProfile from './pages/RecyclerProfile';
 import CollectionPoints from './pages/CollectionPoints';
-import AddCollectionPoint from './pages/AddCollectionPoint';
+import AddCollectionPoint from './pages/AddConcentrationPoint';
 import Dashboard from './pages/Dashboard';
 import AdminAds from './pages/AdminAds';
 import { UserProvider, useUser } from './context/UserContext';
 import Chat from './pages/Chat';
 import { MessagesProvider } from './context/MessagesContext';
-import DashboardRecycler from './pages/DashboardRecycler';
+import DashboardReferente from './pages/DashboardReferente';
 import { NotificationsProvider } from './context/NotificationsContext';
 import Notifications from './components/Notifications';
 import AdminPanel from './pages/AdminPanel';
@@ -26,7 +26,7 @@ import TerminosCondicionesPage from './pages/TerminosCondicionesPage';
 import Estadisticas from './pages/Estadisticas';
 import EstadisticasPanel from './components/EstadisticasPanel';
 import FeedbackForm from './pages/FeedbackForm';
-import DashboardInstitutional from './pages/DashboardInstitutional';
+import DashboardFiscal from './pages/DashboardFiscal';
 import JoinPoint from './pages/JoinPoint';
 import TestZones from './pages/TestZones';
 import ChangePassword from './pages/ChangePassword';
@@ -73,10 +73,10 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/recycler-profile/:id" element={<RecyclerProfile />} />
-                  <Route path="/collection-points" element={<CollectionPoints />} />
-                  <Route path="/add-collection-point" element={<AddCollectionPoint />} />
+                  <Route path="/concentration-points" element={<CollectionPoints />} />
+                  <Route path="/add-concentration-point" element={<AddCollectionPoint />} />
                   <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/dashboard-recycler" element={<DashboardRecycler />} />
+                  <Route path="/dashboard-recycler" element={<DashboardReferente />} />
                   <Route path="/admin/ads" element={<AdminAds />} />
                   <Route path="/chat/:otherUserId" element={<Chat />} />
                   <Route path="/admin-panel" element={
@@ -91,7 +91,7 @@ function App() {
                   <Route path="/mi-historial" element={<MiHistorialRoute />} />
                   <Route path="/feedback" element={<FeedbackForm />} />
                   <Route path="/change-password" element={<ChangePassword />} />
-                  <Route path="/dashboard-institutional" element={<DashboardInstitutional />} />
+                  <Route path="/dashboard-institutional" element={<DashboardFiscal />} />
                   <Route path="/join-point/:pointId" element={<JoinPoint />} />
                   <Route path="/test-zones" element={<TestZones />} />
                   <Route path="*" element={<Navigate to="/" replace />} />

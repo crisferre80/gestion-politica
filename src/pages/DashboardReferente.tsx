@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
 import { Calendar, Phone, Mail, MapIcon, X } from 'lucide-react';
 import { supabase, type concentrationPoint } from '../lib/supabase.js';
@@ -45,7 +46,7 @@ const DashboardReferente = () => {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // UI state
-  const [] = useState<string[]>([]);
+  // (el estado vacío fue removido porque causaba una advertencia de ESLint no-empty-pattern)
 
   // --- Chats y notificaciones ---
   const [showChatModal, setShowChatModal] = useState(false);
@@ -89,11 +90,13 @@ const DashboardReferente = () => {
         }
       };
 
-      // Obtener puntos de barrio (concentration_points)
-      const barrioPointsRaw = await safeSelect('concentration_points', (qb: any) => qb.eq('user_id', userId));
+  // Obtener puntos de barrio: puntos disponibles para que el referente los vea
+  // Antes se filtraba por el user_id del referente (mostraba solo puntos creados por él).
+  // Ahora traemos los puntos con status = 'available' para la pestaña "Disponibles".
+  const barrioPointsRaw = await safeSelect('concentration_points', (qb: any) => qb.eq('status', 'available'));
 
-      // Obtener puntos de concentración
-      const concentrationPointsRaw = await safeSelect('concentration_points', (qb: any) => qb.eq('user_id', userId));
+  // Obtener puntos de concentración (todos) para usos internos y para detectar puntos creados por dirigentes
+  const concentrationPointsRaw = await safeSelect('concentration_points');
 
       // Obtener perfiles de usuarios para mostrar información completa
       // Tomamos los user_ids tanto de los puntos de barrio y concentración filtrados como de todos los puntos
@@ -238,7 +241,7 @@ const DashboardReferente = () => {
     };
     
     init();
-  }, [user]);
+  }, [user, fetchData]);
 
   // Abrir modal para programar recolección
   // Abrir modal/mapa para ver un punto
@@ -343,7 +346,7 @@ const DashboardReferente = () => {
           const value = profileRow[key as keyof typeof profileRow];
           await supabase.from('profiles').update({ online: false }).eq(key, value as any);
         }
-      } catch (e) {
+        } catch {
         // Ignorar errores en unload
       }
     };
@@ -370,8 +373,8 @@ const DashboardReferente = () => {
                 const value = profileRow[key as keyof typeof profileRow];
                 await supabase.from('profiles').update({ lat, lng }).eq(key, value as any);
               }
-            } catch (e) {
-              console.warn('Error actualizando ubicación del perfil:', e);
+            } catch {
+              console.warn('Error actualizando ubicación del perfil');
             }
           }
         );
@@ -539,9 +542,10 @@ const DashboardReferente = () => {
         // Convertir base64 a File
         const base64Response = await fetch(avatarTransformed.url);
         const processedBlob = await base64Response.blob();
-        const fileName = `${userId}_${Date.now()}.jpg`;
-        const processedFile = new File([processedBlob], fileName, { type: 'image/jpeg' });
-        const filePath = `avatars/${fileName}`;
+  const fileName = `${userId}_${Date.now()}.jpg`;
+  const processedFile = new File([processedBlob], fileName, { type: 'image/jpeg' });
+  // Subir en la raíz del bucket o en la subcarpeta manejada por el helper central.
+  const filePath = fileName; // no prefix to avoid duplicating 'avatares/'
         
         // Verificar tamaño final
         const finalSizeKB = Math.round(processedBlob.size/1024);
@@ -566,7 +570,7 @@ const DashboardReferente = () => {
         }
 
         // Obtiene la URL pública del archivo subido
-        const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
         return data?.publicUrl || null;
       } catch (error) {
         console.error('Error en el procesamiento de avatar:', error);
@@ -1252,7 +1256,7 @@ const DashboardReferente = () => {
                                   <img
                                     src={point.photo_url || (point.type === 'colective_point'
                                       ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                                      : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png')}
+                                      : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756952486/Generated_Image_September_03_2025_-_11_19PM_ty6l6i.jpg')}
                                     alt={point.photo_url ? "Foto del material" : (point.type === 'colective_point' ? 'Contenedor Colectivo' : 'Reciclaje')}
                                     className="w-32 h-38 object-cover rounded-lg shadow-md border border-blue-200"
                                     style={{ background: '#f0fdf4', filter: 'drop-shadow(0 4px 12px rgba(34,197,94,0.25))' }}
@@ -1260,7 +1264,7 @@ const DashboardReferente = () => {
                                       const target = e.target as HTMLImageElement;
                                       target.src = point.type === 'colective_point'
                                         ? 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1750866292/Pcolectivo_fges4s.png'
-                                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1748621356/pngwing.com_30_y0imfa.png';
+                                        : 'https://res.cloudinary.com/dhvrrxejo/image/upload/v1756952486/Generated_Image_September_03_2025_-_11_19PM_ty6l6i.jpg';
                                       target.className = target.className.replace('object-cover', 'object-contain');
                                     }}
                                   />
@@ -1276,11 +1280,9 @@ const DashboardReferente = () => {
                                 </div>
                               </div>
                               <div className="flex-1">
-                                <h4 className="text-sm font-medium text-gray-700">Materiales:</h4>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {point.materials.map((material: string, idx: number) => (
-                                    <span key={String(material) + '-' + idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{material}</span>
-                                  ))}
+                                <div className="text-sm text-gray-700">
+                                  <div className="mb-2"><strong>Autos estimados:</strong> {typeof (point as any).autos === 'number' ? (point as any).autos : (typeof (point as any).vehicles === 'number' ? (point as any).vehicles : 'No disponible')}</div>
+                                  <div><strong>Barrio:</strong> {((point as any).district || (point as any).neighbourhood || (point as any).barrio || 'No disponible')}</div>
                                 </div>
                               </div>
                             </div>

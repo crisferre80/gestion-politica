@@ -517,6 +517,7 @@ export async function ensureUserProfile({ id, email, name }: { id: string; email
 }
 
 // Función de mantenimiento: limpiar claims cancelados antiguos
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function cleanupOldCancelledClaims(_olderThanHours: number = 24): Promise<{ deleted: number; error?: string }> {
   // Stub implementation: feature removed
   console.warn('cleanupOldCancelledClaims called but claims feature was removed. No action taken.');

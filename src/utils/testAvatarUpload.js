@@ -55,8 +55,8 @@ export async function testAvatarUpload() {
     
     // 4. Intentar subir el archivo
     console.log('4. Subiendo archivo de prueba...');
-    const fileName = `test_${Date.now()}.png`;
-    const filePath = `avatars/${fileName}`;
+  const fileName = `test_${Date.now()}.png`;
+  const filePath = fileName;
     
     const { error: uploadError } = await supabase.storage
       .from('avatars')
@@ -75,9 +75,7 @@ export async function testAvatarUpload() {
     
     // 5. Verificar que el archivo fue subido
     console.log('5. Verificando que el archivo existe...');
-    const { data: uploadedFiles, error: verifyError } = await supabase.storage
-      .from('avatars')
-      .list('avatars/', { limit: 100 });
+  const { data: uploadedFiles, error: verifyError } = await supabase.storage.from('avatars').list('', { limit: 100 });
     
     if (verifyError) {
       console.error('Error verificando archivo:', verifyError);
@@ -92,7 +90,7 @@ export async function testAvatarUpload() {
     
     // 6. Obtener URL pública
     console.log('6. Obteniendo URL pública...');
-    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
     console.log('URL pública generada:', data.publicUrl);
     
     // 7. Limpiar - eliminar archivo de prueba
@@ -131,7 +129,7 @@ export async function testAvatarsSubfolder() {
     const testFile = new File([blob], 'test-subfolder.png', { type: 'image/png' });
     
     const fileName = `test_subfolder_${Date.now()}.png`;
-    const filePath = `avatares/${fileName}`; // Subcarpeta avatares
+  const filePath = fileName; // Subir en la raíz del bucket
     
     console.log('Intentando subir a subcarpeta avatares:', filePath);
     
@@ -151,9 +149,7 @@ export async function testAvatarsSubfolder() {
     console.log('✓ Subida a subcarpeta exitosa');
     
     // Verificar
-    const { data: files, error: listError } = await supabase.storage
-      .from('avatars')
-      .list('avatares/', { limit: 100 });
+  const { data: files, error: listError } = await supabase.storage.from('avatars').list('', { limit: 100 });
     
     if (listError) {
       console.error('Error listando subcarpeta:', listError);

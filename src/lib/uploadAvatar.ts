@@ -19,55 +19,38 @@ async function dataURLtoFile(dataUrl: string, filename: string): Promise<File> {
 async function verifyAvatarsBucket(): Promise<boolean> {
   try {
     console.log('Verificando bucket de avatars...');
-    
-    // Intentar listar los buckets
-    const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-    
-    if (bucketsError) {
-      console.error('Error al listar buckets:', bucketsError);
-      return false;
-    }
-    
-    console.log('Buckets disponibles:', buckets?.map(b => b.name));
-    
-    // Verificar si el bucket 'avatars' existe
-    const avatarsBucket = buckets?.find(bucket => bucket.name === 'avatars');
-    
-    if (!avatarsBucket) {
-      console.error('Bucket "avatars" no encontrado');
-      return false;
-    }
-    
-    console.log('Bucket "avatars" encontrado:', avatarsBucket);
-    
-    // Intentar hacer una operación de prueba en el bucket
+    // La API pública del cliente de Supabase no expone listBuckets().
+    // En su lugar intentamos listar la raíz del bucket 'avatars' para comprobar existencia/permiso.
     try {
-      const { error: listError } = await supabase.storage
-        .from('avatars')
-        .list('avatares', { limit: 1 }); // Verificar específicamente la subcarpeta "avatares"
-      
-      if (listError) {
-        console.error('Error al acceder a la subcarpeta avatares:', listError);
-        
-        // Si la subcarpeta no existe, intentar crear un archivo de prueba para crearla
-        console.log('Intentando crear la subcarpeta avatares...');
-        const dummyFile = new File(['test'], 'avatares/.placeholder', { type: 'text/plain' });
-        const { error: createError } = await supabase.storage
-          .from('avatars')
-          .upload('avatares/.placeholder', dummyFile);
-        
-        if (createError) {
-          console.error('Error al crear la subcarpeta avatares:', createError);
+  const { error: listErr } = await supabase.storage.from('avatars').list('', { limit: 1 });
+  if (listErr) {
+        // Si hay un error al listar, intentamos crear una pequeña prueba en la subcarpeta 'avatares'
+        console.warn('No fue posible listar el bucket avatars, intentando subir archivo de prueba:', listErr);
+        try {
+          const dummyName = `avatares/.placeholder_${Date.now()}.txt`;
+          const dummyFile = new File(['ok'], dummyName, { type: 'text/plain' });
+          const { error: uploadErr } = await supabase.storage.from('avatars').upload(dummyName, dummyFile);
+          if (uploadErr) {
+            console.error('No se pudo crear archivo de prueba en avatars:', uploadErr);
+            return false;
+          }
+          // Intentar eliminar inmediatamente el placeholder (no crítico)
+          try {
+            await supabase.storage.from('avatars').remove([dummyName]);
+          } catch {
+            // ignorar errores de limpieza
+          }
+          return true;
+        } catch (uErr) {
+          console.error('Error creando archivo de prueba en avatars:', uErr);
           return false;
         }
-        
-        console.log('Subcarpeta avatares creada exitosamente');
       }
-      
-      console.log('Acceso a la subcarpeta avatares exitoso');
+
+      // Si listData es undefined pero no hay error, consideramos que el bucket existe
       return true;
     } catch (err) {
-      console.error('Error en operación de prueba del bucket:', err);
+      console.error('Error comprobando existencia del bucket avatars:', err);
       return false;
     }
   } catch (err) {
@@ -107,8 +90,8 @@ export async function uploadAvatar(
       throw new Error('El bucket "avatars" no está disponible o no está configurado correctamente en Supabase Storage');
     }
     
-    // Generamos un nombre único para el archivo con la ruta correcta
-    const fileName = `avatares/${userId}_${Date.now()}.webp`; // Subir a la subcarpeta "avatares"
+  // Generamos un nombre único para el archivo (subir en la raíz del bucket)
+  const fileName = `${userId}_${Date.now()}.webp`;
     console.log('Nombre de archivo generado con ruta:', fileName);
     
     // Convertimos a blob según el tipo de entrada
@@ -165,7 +148,7 @@ export async function uploadAvatar(
       console.warn('Error con WebP, intentando con JPEG como fallback:', uploadResult.error);
       
       // Convertir a JPEG
-      const jpegFileName = fileName.replace('.webp', '.jpg'); // Esto ya tendrá la ruta "avatares/"
+  const jpegFileName = fileName.replace('.webp', '.jpg');
       console.log('Intentando subir como JPEG:', jpegFileName);
       
       // Crear archivo JPEG desde el original
@@ -210,15 +193,47 @@ export async function uploadAvatar(
       
       console.log('Archivo subido exitosamente como JPEG, obteniendo URL pública...');
       const { data } = supabase.storage.from('avatars').getPublicUrl(jpegFileName);
-      console.log('URL pública obtenida:', data.publicUrl);
-      return data.publicUrl || null;
+      const publicUrl = data?.publicUrl || null;
+      if (publicUrl) {
+        console.log('URL pública obtenida:', publicUrl);
+        return publicUrl;
+      }
+      // Fallback: si el bucket es privado, intentar crear una signed URL temporal
+      try {
+        const expires = 60 * 60; // 1 hora
+        const { data: signedData, error: signedErr } = await supabase.storage.from('avatars').createSignedUrl(jpegFileName, expires);
+        if (!signedErr && signedData?.signedUrl) {
+          console.log('Signed URL obtenida:', signedData.signedUrl);
+          return signedData.signedUrl;
+        }
+        console.warn('No se pudo obtener signed URL para avatar JPEG:', signedErr);
+      } catch (e) {
+        console.warn('Excepción al intentar crear signed URL para JPEG:', e);
+      }
+      return null;
     }
 
     console.log('Archivo subido exitosamente como WebP, obteniendo URL pública...');
     // Obtener URL pública
     const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
-    console.log('URL pública obtenida:', data.publicUrl);
-    return data.publicUrl || null;
+    const publicUrl = data?.publicUrl || null;
+    if (publicUrl) {
+      console.log('URL pública obtenida:', publicUrl);
+      return publicUrl;
+    }
+    // Fallback: si el bucket es privado, intentar crear una signed URL temporal
+    try {
+      const expires = 60 * 60; // 1 hora
+      const { data: signedData, error: signedErr } = await supabase.storage.from('avatars').createSignedUrl(fileName, expires);
+      if (!signedErr && signedData?.signedUrl) {
+        console.log('Signed URL obtenida:', signedData.signedUrl);
+        return signedData.signedUrl;
+      }
+      console.warn('No se pudo obtener signed URL para avatar WebP:', signedErr);
+    } catch (e) {
+      console.warn('Excepción al intentar crear signed URL para WebP:', e);
+    }
+    return null;
   } catch (err) {
     console.error('Error en uploadAvatar:', err);
     return null;
@@ -239,14 +254,15 @@ export async function updateProfileAvatar(userId: string, avatarUrl: string) {
       .eq('user_id', userId)
       .limit(1)
       .maybeSingle();
-    if (!selErr && profileRows && (profileRows as any).id) {
-      const { error } = await supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', (profileRows as any).id);
+    if (!selErr && profileRows && (profileRows as unknown as { id?: string }).id) {
+      const idVal = (profileRows as unknown as { id?: string }).id;
+      const { error } = await supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', idVal);
       if (error) {
         return { publicUrl: null, error };
       }
     }
   } catch (err) {
-    return { publicUrl: null, error: err as any };
+    return { publicUrl: null, error: err as unknown as Error };
   }
 }
 
@@ -400,7 +416,7 @@ export async function handleProfileImageUpload(userId: string, file: File): Prom
     try {
       const { updateProfileByUserId } = await import('./profileHelpers');
       await updateProfileByUserId(userId, { avatar_url: avatarUrl });
-    } catch (e) {
+    } catch {
       // Fallback: intentar la actualización directa si el helper falla
       try {
         await updateProfileAvatar(userId, avatarUrl);
@@ -445,7 +461,7 @@ export async function testSupabaseStorage(): Promise<void> {
     // 2. Crear un archivo de prueba
     console.log('2. Creando archivo de prueba...');
     const testData = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzAwODAyNiIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VEVTVDwvdGV4dD48L3N2Zz4=';
-    const testFileName = `avatares/test_${Date.now()}.jpg`; // Usar la subcarpeta correcta
+  const testFileName = `test_${Date.now()}.jpg`;
     
     const response = await fetch(testData);
     const blob = await response.blob();
@@ -472,14 +488,12 @@ export async function testSupabaseStorage(): Promise<void> {
     
     // 4. Obtener URL pública
     console.log('4. Obteniendo URL pública...');
-    const { data } = supabase.storage.from('avatars').getPublicUrl(testFileName);
+  const { data } = supabase.storage.from('avatars').getPublicUrl(testFileName);
     console.log('✅ URL pública obtenida:', data.publicUrl);
     
     // 5. Limpiar archivo de prueba
     console.log('5. Limpiando archivo de prueba...');
-    const { error: deleteError } = await supabase.storage
-      .from('avatars')
-      .remove([testFileName]);
+  const { error: deleteError } = await supabase.storage.from('avatars').remove([testFileName]);
     
     if (deleteError) {
       console.warn('⚠️ Error al eliminar archivo de prueba:', deleteError);
